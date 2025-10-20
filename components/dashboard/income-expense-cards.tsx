@@ -1,7 +1,8 @@
-"use client"
+"use client";
 
-import { Card } from "@/components/ui/card"
-import { ArrowDownLeft, ArrowUpRight } from "lucide-react"
+import { Card } from "@/components/ui/card";
+import { ArrowDownLeft, ArrowUpRight } from "lucide-react";
+import Image from "next/image";
 
 export function IncomeExpenseCards() {
   return (
@@ -12,7 +13,10 @@ export function IncomeExpenseCards() {
             <p className="text-gray-600 text-sm mb-2">Income</p>
             <div className="flex items-baseline gap-2">
               <span className="text-2xl font-bold">23,000.05</span>
-              <span className="text-gray-600 text-sm">cNGN</span>
+              <div className="flex items-center">
+                <Image src={"cngn.svg"} alt="cNGN" width={24} height={24} />
+                <span className="text-gray-600">cNGN</span>
+              </div>
             </div>
             <p className="text-red-600 text-xs mt-2">2.13% than last month</p>
           </div>
@@ -26,7 +30,10 @@ export function IncomeExpenseCards() {
             <p className="text-gray-600 text-sm mb-2">Expense</p>
             <div className="flex items-baseline gap-2">
               <span className="text-2xl font-bold">45,000.23</span>
-              <span className="text-gray-600 text-sm">cNGN</span>
+               <div className="flex items-center">
+                <Image src={"cngn.svg"} alt="cNGN" width={24} height={24} />
+                <span className="text-gray-600">cNGN</span>
+              </div>
             </div>
             <p className="text-red-600 text-xs mt-2">0.01% than last month</p>
           </div>
@@ -34,5 +41,5 @@ export function IncomeExpenseCards() {
         </div>
       </Card>
     </div>
-  )
+  );
 }

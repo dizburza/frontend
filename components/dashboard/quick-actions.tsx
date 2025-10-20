@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button"
 import { Send, ArrowDownLeft, ArrowUpRight } from "lucide-react"
+import Image from "next/image"
 
 interface QuickActionsProps {
   onSendToCNGN: () => void
@@ -17,7 +18,7 @@ export function QuickActions({ onSendToCNGN, onSendToBank, onReceive }: QuickAct
         className="h-24 flex flex-col items-center justify-center gap-2 bg-transparent"
         onClick={onSendToCNGN}
       >
-        <Send size={24} className="text-blue-600" />
+       <Image src={"send-to-cngn.svg"} alt="Send to cNGN" width={54} height={54} />
         <span className="text-sm">To cNGN</span>
       </Button>
       <Button
@@ -25,7 +26,7 @@ export function QuickActions({ onSendToCNGN, onSendToBank, onReceive }: QuickAct
         className="h-24 flex flex-col items-center justify-center gap-2 bg-transparent"
         onClick={onSendToBank}
       >
-        <ArrowUpRight size={24} className="text-blue-600" />
+        <Image src={"send-to-bank.svg"} alt="Send to Bank" width={54} height={54} />
         <span className="text-sm">To Bank</span>
       </Button>
       <Button
@@ -33,7 +34,7 @@ export function QuickActions({ onSendToCNGN, onSendToBank, onReceive }: QuickAct
         className="h-24 flex flex-col items-center justify-center gap-2 bg-transparent"
         onClick={onReceive}
       >
-        <ArrowDownLeft size={24} className="text-blue-600" />
+        <Image src={"receive.svg"} alt="Receive" width={54} height={54} />
         <span className="text-sm">Receive</span>
       </Button>
     </div>
