@@ -3,6 +3,7 @@
 import type React from "react"
 import { useState, useRef } from "react"
 import Image from "next/image"
+import { FileText } from "lucide-react"
 
 interface FileUploadAreaProps {
   onFileSelect?: (file: File) => void
@@ -20,11 +21,23 @@ export default function FileUploadArea({
   const [error, setError] = useState<string>("")
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  const getValidFileTypes = (): string[] => {
+    return accept.split(",").map((type) => type.trim())
+  }
+
+  const getFileTypeLabel = (): string => {
+    const types = getValidFileTypes()
+    if (types.includes("application/pdf")) {
+      return types.length > 1 ? "PDF and images" : "PDF"
+    }
+    return "PNG or JPEG"
+  }
+
   const validateFile = (file: File): boolean => {
-    const validTypes = ["image/png", "image/jpeg"]
+    const validTypes = getValidFileTypes()
 
     if (!validTypes.includes(file.type)) {
-      setError("Only PNG and JPEG files are allowed")
+      setError(`Only ${getFileTypeLabel()} files are allowed`)
       return false
     }
 
@@ -74,6 +87,27 @@ export default function FileUploadArea({
     fileInputRef.current?.click()
   }
 
+  const renderPreview = () => {
+    if (!uploadedFile) {
+      return <Image src="/gallery-add.jpg" alt="Upload Image" width={50} height={50} />
+    }
+
+    if (uploadedFile.type === "application/pdf") {
+      return <FileText size={50} className="text-red-500" />
+    }
+
+    return (
+      <div className="relative w-20 h-20">
+        <Image
+          src={URL.createObjectURL(uploadedFile) || "/placeholder.svg"}
+          alt="Uploaded preview"
+          fill
+          className="object-cover rounded"
+        />
+      </div>
+    )
+  }
+
   return (
     <div>
       <div
@@ -85,32 +119,21 @@ export default function FileUploadArea({
         }`}
       >
         <div className="flex flex-col items-center gap-4">
-          {uploadedFile ? (
-            <div className="relative w-20 h-20">
-              <Image
-                src={URL.createObjectURL(uploadedFile) || "/placeholder.svg"}
-                alt="Uploaded preview"
-                fill
-                className="object-cover rounded"
-              />
-            </div>
-          ) : (
-            <Image src="/gallery-add.svg" alt="Upload Image" width={50} height={50} />
-          )}
+          {renderPreview()}
 
           <p className="text-gray-700">
             {uploadedFile ? (
               <span className="text-green-600 font-medium">{uploadedFile.name}</span>
             ) : (
               <>
-                Drop your image here or{" "}
+                Drop your file here or{" "}
                 <button onClick={handleUploadClick} className="text-blue-600 hover:underline font-medium">
                   Upload
                 </button>
               </>
             )}
           </p>
-          <p className="text-xs text-gray-500">You can upload Png or Jpeg files. Max size 15MB.</p>
+          <p className="text-xs text-gray-500">You can upload {getFileTypeLabel()} files. Max size 15MB.</p>
           {error && <p className="text-xs text-red-500 mt-2">{error}</p>}
         </div>
       </div>
