@@ -89,7 +89,7 @@ export default function FileUploadArea({
 
   const renderPreview = () => {
     if (!uploadedFile) {
-      return <Image src="/gallery-add.jpg" alt="Upload Image" width={50} height={50} />
+      return <Image src="/gallery-add.svg" alt="Upload Image" width={50} height={50} />
     }
 
     if (uploadedFile.type === "application/pdf") {
