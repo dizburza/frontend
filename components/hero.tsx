@@ -9,7 +9,7 @@ export default function Hero() {
         <span>Pay and Disburse.</span>
       </h1>
       <p className="text-lg text-gray-600 mb-8 max-w-2xl">Manage all payment disbursements in one simple place.</p>
-      <Link href="/setup-profile"><button className="px-8 py-3 bg-black text-white rounded-lg hover:bg-gray-900 font-medium" >Get Started</button></Link>
+      <Link href="/account-type"><button className="px-8 py-3 bg-[#454ADE] text-white rounded-lg hover:bg-gray-900 font-medium" >Get Started</button></Link>
     </section>
   )
 }

@@ -6,12 +6,12 @@ export default function OnboardingLayout({
   children: React.ReactNode
 }) {
   return (
-    <div className="min-h-screen bg-[#F9F9FE] relative overflow-hidden">
+    <div className="h-screen bg-[#F9F9FE] relative overflow-hidden overflow-y-auto">
 
       {/* Header */}
       <header className="relative z-10 bg-white flex items-center h-[80px] justify-between px-8 py-6 border-b border-gray-200">
         <div className="flex items-center gap-2">
-          <Image src="logo.svg" alt="Logo" width="150" height="200"/>
+          <Image src="/logo.svg" alt="Logo" width="150" height="200"/>
         </div>
         <div className="flex items-center gap-4">
           <span className="text-sm text-gray-600">0x12...abcd</span>
@@ -38,7 +38,7 @@ export default function OnboardingLayout({
       
 
       {/* Content */}
-      <main className="relative z-10 flex items-center justify-center min-h-[calc(100vh-80px)]">{children}</main>
+      <main className="relative z-10 flex items-center justify-center min-h-[calc(100vh-80px)] h-fit">{children}</main>
     </div>
 )
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import StepIndicator from "@/components/step-indicator";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +9,7 @@ import { Card } from "@/components/ui/card";
 import FileUploadArea from "@/components/file-upload-area";
 
 export default function OrganizationDetailsPage() {
+  const router = useRouter();
   const [formData, setFormData] = useState({
     industry: "",
     registrationType: "",
@@ -38,6 +40,17 @@ export default function OrganizationDetailsPage() {
       active: false,
     },
   ];
+
+  const handleContinue = () => {
+    // Store organization details
+    localStorage.setItem("orgDetails", JSON.stringify(formData));
+    // Navigate to organization profile
+    router.push("/organization-setup/organization-profile");
+  };
+
+  const handleBack = () => {
+    router.push("/organization-setup");
+  };
 
   return (
     <div className="flex w-full min-h-[calc(100vh-80px)]">
@@ -140,10 +153,10 @@ export default function OrganizationDetailsPage() {
               </div>
 
               <div className="flex gap-4 pt-4">
-                <Button variant="outline"   className="flex-1 bg-transparent">
+                <Button variant="outline" onClick={handleBack} className="flex-1 bg-transparent">
                   Back
                 </Button>
-                <Button className="flex-1 bg-blue-600 hover:bg-blue-700">
+                <Button onClick={handleContinue} className="flex-1 bg-blue-600 hover:bg-blue-700">
                   Continue
                 </Button>
               </div>

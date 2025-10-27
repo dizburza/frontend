@@ -1,11 +1,21 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import OnboardingCard from "@/components/onboarding-card"
 import Button from "@/components/button"
 
 export default function UsernamePage() {
   const [username, setUsername] = useState("")
+  const router = useRouter()
+
+  const handleSubmit = () => {
+    if (!username) return
+    // Store username
+    localStorage.setItem("username", username)
+    // Navigate to personal dashboard
+    router.push("/personal/wallet")
+  }
 
   return (
     <OnboardingCard>
@@ -32,7 +42,7 @@ export default function UsernamePage() {
         </div>
       </div>
 
-      <Button className="w-full mb-6">Submit</Button>
+      <Button onClick={handleSubmit} disabled={!username} className="w-full mb-6">Submit</Button>
 
       <p className="text-center text-xs text-gray-600">
         By creating an account, I agree to the{" "}

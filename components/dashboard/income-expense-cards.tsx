@@ -14,7 +14,7 @@ export function IncomeExpenseCards() {
             <div className="flex items-baseline gap-2">
               <span className="text-2xl font-bold">23,000.05</span>
               <div className="flex items-center">
-                <Image src={"cngn.svg"} alt="cNGN" width={24} height={24} />
+                <Image src={"/cngn.svg"} alt="cNGN" width={24} height={24} />
                 <span className="text-gray-600">cNGN</span>
               </div>
             </div>
@@ -31,7 +31,7 @@ export function IncomeExpenseCards() {
             <div className="flex items-baseline gap-2">
               <span className="text-2xl font-bold">45,000.23</span>
                <div className="flex items-center">
-                <Image src={"cngn.svg"} alt="cNGN" width={24} height={24} />
+                <Image src={"/cngn.svg"} alt="cNGN" width={24} height={24} />
                 <span className="text-gray-600">cNGN</span>
               </div>
             </div>

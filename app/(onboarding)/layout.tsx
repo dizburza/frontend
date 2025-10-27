@@ -11,7 +11,7 @@ export default function OnboardingLayout({
       {/* Header */}
       <header className="relative z-10 bg-white flex items-center h-[80px] justify-between px-8 py-6 border-b border-gray-200">
         <div className="flex items-center gap-2">
-          <Image src="logo.svg" alt="Logo" width="150" height="200"/>
+          <Image src="/logo.svg" alt="Logo" width="150" height="200"/>
         </div>
         <div className="flex items-center gap-4">
           <span className="text-sm text-gray-600">0x12...abcd</span>

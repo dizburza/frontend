@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import StepIndicator from "@/components/step-indicator";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +9,7 @@ import { Card } from "@/components/ui/card";
 import FileUploadArea from "@/components/file-upload-area";
 
 export default function OrganizationProfilePage() {
+  const router = useRouter();
   const [formData, setFormData] = useState({
     organizationName: "",
     businessEmail: "",
@@ -37,6 +39,17 @@ export default function OrganizationProfilePage() {
     },
   ];
 
+  const handleContinue = () => {
+    // Store organization profile data
+    localStorage.setItem("orgProfile", JSON.stringify(formData));
+    // Navigate to add signers
+    router.push("/organization-setup/add-signers");
+  };
+
+  const handleBack = () => {
+    router.push("/organization-setup/organization-details");
+  };
+
   return (
     <div className="flex min-h-[calc(100vh-80px)]">
       {/* Left sidebar */}
@@ -49,10 +62,10 @@ export default function OrganizationProfilePage() {
         <Card className="w-full max-w-md relative right-1/3 rounded-[40px] ">
           <div className="p-8">
             <h2 className="text-2xl font-bold text-[#1D1F5D] text-center mb-2">
-              Organization Details
+              Organization Profile
             </h2>
             <p className="text-gray-600 text-center text-sm mb-8">
-              Let&apos;s start with your organization&apos;s basic details.
+              Add your organization&apos;s profile information.
             </p>
 
             <div className="space-y-6">
@@ -95,10 +108,10 @@ export default function OrganizationProfilePage() {
               </div>
 
               <div className="flex gap-4 pt-4">
-                <Button variant="outline" className="flex-1 bg-transparent">
+                <Button variant="outline" onClick={handleBack} className="flex-1 bg-transparent">
                   Back
                 </Button>
-                <Button className="flex-1 bg-blue-600 hover:bg-blue-700">
+                <Button onClick={handleContinue} className="flex-1 bg-blue-600 hover:bg-blue-700">
                   Continue
                 </Button>
               </div>

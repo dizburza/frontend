@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import StepIndicator from "@/components/step-indicator"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -15,6 +16,7 @@ interface Signer {
 }
 
 export default function AddSignersPage() {
+  const router = useRouter()
   const [numSigners, setNumSigners] = useState(0)
   const [quorum, setQuorum] = useState(0)
   const [signerRole, setSignerRole] = useState("")
@@ -59,6 +61,20 @@ export default function AddSignersPage() {
 
   const handleRemoveSigner = (id: string) => {
     setSigners(signers.filter((s) => s.id !== id))
+  }
+
+  const handleFinishSetup = () => {
+    // Store signers data
+    localStorage.setItem("signers", JSON.stringify(signers))
+    localStorage.setItem("quorum", quorum.toString())
+    localStorage.setItem("accountType", "organization")
+    
+    // Navigate to organization dashboard
+    router.push("/organization")
+  }
+
+  const handleBack = () => {
+    router.push("/organization-setup/organization-profile")
   }
 
   return (
@@ -194,10 +210,10 @@ export default function AddSignersPage() {
               </div>
 
               <div className="flex gap-4 pt-4">
-                <Button variant="outline" className="flex-1 bg-transparent">
+                <Button variant="outline" onClick={handleBack} className="flex-1 bg-transparent">
                   Back
                 </Button>
-                <Button className="flex-1 bg-gray-600 hover:bg-gray-700 text-white">Finish set up</Button>
+                <Button onClick={handleFinishSetup} className="flex-1 bg-gray-600 hover:bg-gray-700 text-white">Finish set up</Button>
               </div>
             </div>
           </div>

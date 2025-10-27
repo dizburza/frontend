@@ -3,6 +3,7 @@
 import type React from "react"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,6 +11,7 @@ import { Label } from "@/components/ui/label"
 import FileUploadArea from "@/components/file-upload-area"
 
 export default function SetupProfilePage() {
+  const router = useRouter()
   const [formData, setFormData] = useState({
     surname: "",
     firstName: "",
@@ -23,7 +25,10 @@ export default function SetupProfilePage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    // Handle form submission
+    // Store profile data
+    localStorage.setItem("userProfile", JSON.stringify(formData))
+    // Navigate to username selection
+    router.push("/personal/wallet")
   }
 
   return (
@@ -50,6 +55,7 @@ export default function SetupProfilePage() {
                 value={formData.surname}
                 onChange={handleChange}
                 className="pl-10 border-gray-300"
+                required
               />
             </div>
           </div>
@@ -68,6 +74,7 @@ export default function SetupProfilePage() {
                 value={formData.firstName}
                 onChange={handleChange}
                 className="pl-10 border-gray-300"
+                required
               />
             </div>
           </div>
@@ -87,6 +94,7 @@ export default function SetupProfilePage() {
                 value={formData.email}
                 onChange={handleChange}
                 className="pl-10 border-gray-300"
+                required
               />
             </div>
           </div>

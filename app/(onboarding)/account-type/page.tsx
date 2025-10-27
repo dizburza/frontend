@@ -1,12 +1,28 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import OnboardingCard from "@/components/onboarding-card"
 import AccountTypeOption from "@/components/account-type"
 import Button from "@/components/button"
 
 export default function AccountTypePage() {
   const [selected, setSelected] = useState<"personal" | "business" | null>(null)
+  const router = useRouter()
+
+  const handleContinue = () => {
+    if (!selected) return
+    
+    // Store account type in localStorage
+    localStorage.setItem("accountType", selected)
+    
+    // Navigate to next step based on account type
+    if (selected === "personal") {
+      router.push("/setup-profile")
+    } else {
+      router.push("/organization-setup")
+    }
+  }
 
   return (
     <OnboardingCard>
@@ -32,7 +48,7 @@ export default function AccountTypePage() {
         />
       </div>
 
-      <Button disabled={!selected} className="w-full">
+      <Button disabled={!selected} onClick={handleContinue} className="w-full bg-[#454ADE]">
         Continue
       </Button>
     </OnboardingCard>

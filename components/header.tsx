@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 
 export default function Header() {
   return (
@@ -23,9 +24,9 @@ export default function Header() {
         </a>
       </nav>
 
-      <button className="px-6 py-2 bg-black text-white rounded-lg hover:bg-gray-900 text-sm font-medium">
+      <Link href="/account-type"> <button className="px-6 py-2 bg-[#454ADE] text-white rounded-lg hover:bg-gray-900 text-sm font-medium">
         Get Started
-      </button>
+      </button></Link>
     </header>
   )
 }

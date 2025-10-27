@@ -1,9 +1,22 @@
 "use client"
 
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 
 export default function OrganizationSetupPage() {
+  const router = useRouter()
+
+  const handleCreateOrganization = () => {
+    // Navigate to organization dashboard
+    router.push("/organization-setup/organization-details")
+  }
+
+  const handleJoinOrganization = () => {
+    // Navigate to organization dashboard (in real app, might have different flow)
+    router.push("/organization")
+  }
+
   return (
     <Card className="w-full max-w-lg border-gray-200 shadow-lg">
       <CardHeader className="text-center">
@@ -15,7 +28,10 @@ export default function OrganizationSetupPage() {
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Create New Organization Button */}
-        <Button className="w-full bg-blue-600 shadow-md shadow-[#8286E9] hover:bg-blue-700 text-white font-medium py-2 rounded-lg">
+        <Button 
+          onClick={handleCreateOrganization}
+          className="w-full bg-blue-600 shadow-md shadow-[#8286E9] hover:bg-blue-700 text-white font-medium py-2 rounded-lg"
+        >
           Create New Organization
         </Button>
 
@@ -28,6 +44,7 @@ export default function OrganizationSetupPage() {
 
         {/* Join Existing Organization Button */}
         <Button
+          onClick={handleJoinOrganization}
           variant="outline"
           className="w-full border-blue-200 text-blue-600 hover:bg-blue-50 font-medium py-2 rounded-lg bg-transparent"
         >

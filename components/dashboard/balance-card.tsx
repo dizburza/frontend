@@ -36,7 +36,7 @@ export function BalanceCard() {
             {showBalance ? "450,000.00" : "••••••"}
           </span>
           <div className="flex">
-          <Image src={"cngn.svg"} alt="cNGN" width={24} height={24} />
+          <Image src={"/cngn.svg"} alt="cNGN" width={24} height={24} />
           <span className="text-gray-600">cNGN</span></div>
         </div>
         <p className="text-sm text-green-600"> 0.08% than last month</p>
