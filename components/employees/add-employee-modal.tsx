@@ -6,12 +6,14 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { X, ChevronLeft } from "lucide-react"
 import { AddEmployeeSuccessModal } from "./add-employee-success-modal"
+import { addEmployeeToSession } from "@/lib/localStorage"
 
 interface AddEmployeeModalProps {
   onClose: () => void
+  onEmployeeAdded?: () => void
 }
 
-export function AddEmployeeModal({ onClose }: AddEmployeeModalProps) {
+export function AddEmployeeModal({ onClose, onEmployeeAdded }: AddEmployeeModalProps) {
   const [step, setStep] = useState<"form" | "success">("form")
   const [formData, setFormData] = useState({
     username: "",
@@ -25,6 +27,22 @@ export function AddEmployeeModal({ onClose }: AddEmployeeModalProps) {
   }
 
   const handleSubmit = () => {
+    if (!formData.username || !formData.role || !formData.salary) {
+      return
+    }
+    
+    // Add employee to session storage
+    addEmployeeToSession({
+      username: formData.username,
+      role: formData.role,
+      salary: Number(formData.salary),
+    })
+    
+    // Notify parent to refresh
+    if (onEmployeeAdded) {
+      onEmployeeAdded()
+    }
+    
     setStep("success")
   }
 
@@ -32,8 +50,12 @@ export function AddEmployeeModal({ onClose }: AddEmployeeModalProps) {
     setStep("form")
   }
 
+  const handleClose = () => {
+    onClose()
+  }
+
   if (step === "success") {
-    return <AddEmployeeSuccessModal onClose={onClose} />
+    return <AddEmployeeSuccessModal onClose={handleClose} />
   }
 
   return (
@@ -54,7 +76,7 @@ export function AddEmployeeModal({ onClose }: AddEmployeeModalProps) {
 
         {/* Content */}
         <div className="p-6 space-y-6">
-          <p className="text-sm text-gray-600">Enter the details of your new proposal for review and approval.</p>
+          <p className="text-sm text-gray-600">Enter the details of your new employee to add them to your organization.</p>
 
           {/* Employee's username */}
           <div>
@@ -109,7 +131,11 @@ export function AddEmployeeModal({ onClose }: AddEmployeeModalProps) {
 
         {/* Footer */}
         <div className="p-6 border-t border-gray-200">
-          <Button onClick={handleSubmit} className="w-full bg-blue-600 hover:bg-blue-700 text-white">
+          <Button 
+            onClick={handleSubmit} 
+            disabled={!formData.username || !formData.role || !formData.salary}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white disabled:bg-gray-300"
+          >
             Add Employee
           </Button>
         </div>

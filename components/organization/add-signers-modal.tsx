@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card } from "@/components/ui/card"
 import { X } from "lucide-react"
+import { updateOrganizationSigners } from "@/lib/localStorage"
 
 interface Signer {
   id: string
@@ -17,9 +18,10 @@ interface Signer {
 interface AddSignersModalProps {
   isOpen: boolean
   onClose: () => void
+  onSignersAdded?: () => void
 }
 
-export default function AddSignersModal({ isOpen, onClose }: AddSignersModalProps) {
+export default function AddSignersModal({ isOpen, onClose, onSignersAdded }: AddSignersModalProps) {
   const [numSigners, setNumSigners] = useState(0)
   const [quorum, setQuorum] = useState(0)
   const [signerRole, setSignerRole] = useState("")
@@ -58,6 +60,29 @@ export default function AddSignersModal({ isOpen, onClose }: AddSignersModalProp
 
   const handleRemoveSigner = (id: string) => {
     setSigners(signers.filter((s) => s.id !== id))
+  }
+
+  const handleSave = () => {
+    if (signers.length > 0) {
+      // Convert to organization signer format
+      const organizationSigners = signers.map((s, index) => ({
+        id: s.id,
+        username: s.username,
+        fullName: s.name,
+        role: s.role,
+        status: "active",
+        walletAddress: `0x${Math.random().toString(16).substring(2, 10)}...`,
+      }))
+      
+      // Update organization signers in session
+      updateOrganizationSigners(organizationSigners)
+      
+      // Notify parent to refresh
+      if (onSignersAdded) {
+        onSignersAdded()
+      }
+    }
+    handleClose()
   }
 
   const handleClose = () => {
@@ -219,7 +244,7 @@ export default function AddSignersModal({ isOpen, onClose }: AddSignersModalProp
               <Button variant="outline" className="flex-1 bg-transparent" onClick={handleClose}>
                 Cancel
               </Button>
-              <Button className="flex-1 bg-blue-600 hover:bg-blue-700 text-white" onClick={handleClose}>
+              <Button className="flex-1 bg-blue-600 hover:bg-blue-700 text-white" onClick={handleSave}>
                 Save Signers
               </Button>
             </div>

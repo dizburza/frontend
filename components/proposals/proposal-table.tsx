@@ -1,10 +1,18 @@
 "use client"
 
-import { mockProposals } from "@/lib/mock-data"
+interface ProposalTableProps {
+  proposals: Array<{
+    id: string
+    title: string
+    createdBy: string
+    timeLeft: string
+    status: string
+    votesFor: number
+    votesAgainst: number
+  }>
+}
 
-export function ProposalTable() {
-  const proposals = mockProposals.list
-
+export function ProposalTable({ proposals }: ProposalTableProps) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
@@ -21,7 +29,7 @@ export function ProposalTable() {
           </tr>
         </thead>
         <tbody>
-          {proposals.map((proposal: typeof mockProposals.list[0], index: number) => (
+          {proposals.map((proposal, index) => (
             <tr key={proposal.id} className="border-b border-gray-100 hover:bg-gray-50">
               <td className="py-4 px-4">{index + 1}</td>
               <td className="py-4 px-4">

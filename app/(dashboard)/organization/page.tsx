@@ -11,16 +11,23 @@ import {
   mockProposals,
   mockTransactions,
 } from "@/lib/mock-data";
+import { getOrganizationSigners } from "@/lib/localStorage";
 import Image from "next/image";
 import { Copy, Info } from "lucide-react";
 
 export default function OrganizationDashboardPage() {
   const [isAddSignersOpen, setIsAddSignersOpen] = useState(false);
+  const [signers, setSigners] = useState(getOrganizationSigners());
 
   const org = mockOrganizations.current;
   const wallet = mockWallet.organization;
   const proposals = mockProposals.list;
   const transactions = mockTransactions.list;
+
+  // Refresh signers when they're added
+  const handleSignersAdded = () => {
+    setSigners(getOrganizationSigners());
+  };
 
   return (
     <div className=" py-8">
@@ -102,8 +109,8 @@ export default function OrganizationDashboardPage() {
           </div>
         </div>
 
-        {/* Organization Info Card */}
-        <div className="pt-4 px-8">
+         {/* Organization Info Card */}
+         <div className="pt-4 px-8">
           <div className="flex items-start justify-between">
             <div className="flex items-start gap-x-4">
               <div className=" relative bottom-8 z-10">
@@ -129,16 +136,16 @@ export default function OrganizationDashboardPage() {
               </div>
             </div>
             <div className="flex gap-2">
-              <Button
-                className="bg-blue-600 hover:bg-blue-700  border-b-2 border-[#8286E9]"
-                onClick={() => setIsAddSignersOpen(true)}
-              >
-                + Add Signers
-              </Button>
-              <Button variant="outline">Export ↓</Button>
+               <Button
+                 className="bg-blue-600 hover:bg-blue-700  border-b-2 border-[#8286E9]"
+                 onClick={() => setIsAddSignersOpen(true)}
+               >
+                 + Add Signers
+               </Button>
+               <Button variant="outline">Export ↓</Button>
             </div>
           </div>
-        </div>
+         </div>
       </Card>
 
       {/* Main Content Grid */}
@@ -254,11 +261,11 @@ export default function OrganizationDashboardPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {org.signers.map((signer, index) => (
+                    {signers.map((signer: typeof org.signers[0], index: number) => (
                       <tr
                         key={signer.id}
                         className={
-                          index < org.signers.length - 1
+                          index < signers.length - 1
                             ? "border-b border-gray-100"
                             : ""
                         }
@@ -288,7 +295,7 @@ export default function OrganizationDashboardPage() {
       {/* Analysis and Proposal History */}
       <div className="grid grid-cols-2 gap-6 mb-8">
         <Card className="h-96">
-          <AnalysisChart />
+           <AnalysisChart />
         </Card>
 
         <Card>
@@ -443,10 +450,11 @@ export default function OrganizationDashboardPage() {
           </div>
         </CardContent>
       </Card>
-      <AddSignersModal
-        isOpen={isAddSignersOpen}
-        onClose={() => setIsAddSignersOpen(false)}
-      />
+       <AddSignersModal
+         isOpen={isAddSignersOpen}
+         onClose={() => setIsAddSignersOpen(false)}
+         onSignersAdded={handleSignersAdded}
+       />
     </div>
   );
 }

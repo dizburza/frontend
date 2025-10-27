@@ -6,9 +6,11 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { X, ChevronLeft } from "lucide-react"
 import { Card } from "@/components/ui/card"
+import { SuccessModal } from "@/components/success-modal"
 
 interface BatchPaymentCreationModalProps {
   onClose: () => void
+  onPaymentCreated?: () => void
 }
 
 const employees = [
@@ -95,8 +97,8 @@ const employees = [
   },
 ]
 
-export function BatchPaymentCreationModal({ onClose }: BatchPaymentCreationModalProps) {
-  const [step, setStep] = useState<"details" | "employees" | "preview">("details")
+export function BatchPaymentCreationModal({ onClose, onPaymentCreated }: BatchPaymentCreationModalProps) {
+  const [step, setStep] = useState<"details" | "employees" | "preview" | "success">("details")
   const [selectedEmployees, setSelectedEmployees] = useState<number[]>([])
   const [formData, setFormData] = useState({
     batchName: "",
@@ -118,6 +120,30 @@ export function BatchPaymentCreationModal({ onClose }: BatchPaymentCreationModal
     } else {
       setSelectedEmployees(employees.map((e) => e.id))
     }
+  }
+
+  const handleProceedToPayment = () => {
+    // Store batch payment to localStorage
+    const batchPayment = {
+      id: `batch_${Date.now()}`,
+      batchName: formData.batchName,
+      totalAmount: totalAmount,
+      date: formData.paymentDate,
+      employees: selectedEmployeeData.length,
+      status: "Draft" as const,
+      recipients: selectedEmployeeData,
+    }
+
+    const batches = JSON.parse(localStorage.getItem("sessionPaymentBatches") || "[]")
+    batches.push(batchPayment)
+    localStorage.setItem("sessionPaymentBatches", JSON.stringify(batches))
+
+    // Notify parent to refresh
+    if (onPaymentCreated) {
+      onPaymentCreated()
+    }
+
+    setStep("success")
   }
 
   const selectedEmployeeData = employees.filter((e) => selectedEmployees.includes(e.id))
@@ -153,6 +179,35 @@ export function BatchPaymentCreationModal({ onClose }: BatchPaymentCreationModal
       </div>
     </div>
   )
+
+  // Show success modal
+  if (step === "success") {
+    return (
+      <SuccessModal
+        title="Batch Payment Created"
+        icon="check"
+        summary={[
+          {
+            label: "Batch Name",
+            value: formData.batchName,
+          },
+          {
+            label: "Total Amount",
+            value: `${(totalAmount / 1000000).toFixed(3)}M cNGN`,
+          },
+          {
+            label: "Employees",
+            value: selectedEmployeeData.length.toString(),
+          },
+          {
+            label: "Payment Date",
+            value: formData.paymentDate,
+          },
+        ]}
+        onClose={onClose}
+      />
+    )
+  }
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -333,8 +388,16 @@ export function BatchPaymentCreationModal({ onClose }: BatchPaymentCreationModal
           <div className="flex items-center gap-3">
             {step === "preview" && (
               <>
-                <Button variant="outline">Save Draft</Button>
-                <Button className="bg-blue-600 hover:bg-blue-700 text-white">Proceed to Payment</Button>
+                <Button variant="outline" onClick={() => setStep("details")}>
+                  Save Draft
+                </Button>
+                <Button 
+                  onClick={handleProceedToPayment}
+                  disabled={!formData.batchName || selectedEmployees.length === 0}
+                  className="bg-blue-600 hover:bg-blue-700 text-white disabled:bg-gray-300"
+                >
+                  Proceed to Payment
+                </Button>
               </>
             )}
             {step !== "preview" && (
@@ -345,7 +408,7 @@ export function BatchPaymentCreationModal({ onClose }: BatchPaymentCreationModal
                 <Button
                   onClick={() => setStep(step === "details" ? "employees" : "preview")}
                   className="bg-blue-600 hover:bg-blue-700 text-white"
-                  disabled={step === "employees" && selectedEmployees.length === 0}
+                  disabled={step === "employees" && selectedEmployees.length === 0 || (step === "details" && !formData.batchName)}
                 >
                   Next
                 </Button>

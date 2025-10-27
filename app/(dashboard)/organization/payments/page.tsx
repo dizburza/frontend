@@ -1,73 +1,51 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { StatCard } from "@/components/stat-card"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ChevronDown, Search, MoreVertical } from "lucide-react"
 import { BatchPaymentCreationModal } from "@/components/payments/batch-payment-creation-modal"
+import { getSessionPaymentBatches } from "@/lib/localStorage"
 
-const paymentBatches = [
-  {
-    id: 1,
-    name: "CSR Initiative Funding for Community Development",
-    amount: "3,500,000",
-    date: "25 Oct, 2025",
-    time: "At 7:45 AM",
-    employees: 4,
-    status: "Draft",
-  },
-  {
-    id: 2,
-    name: "CSR Initiative Funding for Community Development",
-    amount: "3,500,000",
-    date: "25 Oct, 2025",
-    time: "At 7:45 AM",
-    employees: 4,
-    status: "Draft",
-  },
-  {
-    id: 3,
-    name: "CSR Initiative Funding for Community Development",
-    amount: "3,500,000",
-    date: "25 Oct, 2025",
-    time: "At 7:45 AM",
-    employees: 4,
-    status: "Draft",
-  },
-  {
-    id: 4,
-    name: "CSR Initiative Funding for Community Development",
-    amount: "3,500,000",
-    date: "25 Oct, 2025",
-    time: "At 7:45 AM",
-    employees: 4,
-    status: "Draft",
-  },
-  {
-    id: 5,
-    name: "CSR Initiative Funding for Community Development",
-    amount: "3,500,000",
-    date: "25 Oct, 2025",
-    time: "At 7:45 AM",
-    employees: 4,
-    status: "Draft",
-  },
-  {
-    id: 6,
-    name: "CSR Initiative Funding for Community Development",
-    amount: "3,500,000",
-    date: "25 Oct, 2025",
-    time: "At 7:45 AM",
-    employees: 4,
-    status: "Draft",
-  },
-]
+interface PaymentBatch {
+  id: string
+  batchName: string
+  totalAmount: number
+  date: string
+  employees: number
+  status: string
+  recipients: Array<{
+    surname: string
+    firstName: string
+    salary: string
+  }>
+}
 
 export default function PaymentsPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [showBatchModal, setShowBatchModal] = useState(false)
+  const [paymentBatches, setPaymentBatches] = useState(getSessionPaymentBatches())
+
+  // Refresh batches when modal closes after creating a new one
+  const handlePaymentCreated = () => {
+    setPaymentBatches(getSessionPaymentBatches())
+    setShowBatchModal(false)
+  }
+
+  // Load batches on mount
+  useEffect(() => {
+    setPaymentBatches(getSessionPaymentBatches())
+  }, [])
+
+  // Format amount for display
+  const formatAmount = (amount: number) => {
+    if (amount >= 1000000) {
+      return `${(amount / 1000000).toFixed(3)}M`
+    }
+    return amount.toLocaleString()
+  }
 
   return (
     <div className="p-8 space-y-6">
@@ -88,7 +66,7 @@ export default function PaymentsPage() {
 
       {/* Stat Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Total Batches" value="6" trend={{ value: "+2 than last month", direction: "up" }} />
+        <StatCard label="Total Batches" value={paymentBatches.length.toString()} trend={{ value: "+2 than last month", direction: "up" }} />
         <StatCard label="Pending Approval" value="0" lastUpdated="1 min ago" />
         <StatCard label="Executed This Month" value="2" trend={{ value: "+2 than last month", direction: "up" }} />
         <StatCard label="Employees Paid" value="3" lastUpdated="1 min ago" />
@@ -144,35 +122,48 @@ export default function PaymentsPage() {
               </tr>
             </thead>
             <tbody>
-              {paymentBatches.map((batch) => (
-                <tr key={batch.id} className="border-b border-gray-100 hover:bg-gray-50">
-                  <td className="py-4 px-4 text-sm text-gray-900">{batch.id}</td>
-                  <td className="py-4 px-4 text-sm text-gray-900">{batch.name}</td>
-                  <td className="py-4 px-4 text-sm font-semibold text-gray-900">{batch.amount}</td>
-                  <td className="py-4 px-4 text-sm text-gray-600">
-                    {batch.date}
-                    <br />
-                    <span className="text-xs text-gray-500">{batch.time}</span>
-                  </td>
-                  <td className="py-4 px-4 text-sm text-gray-900">{batch.employees}</td>
-                  <td className="py-4 px-4 text-sm">
-                    <span className="px-3 py-1 bg-gray-100 text-gray-700 rounded text-xs font-medium">
-                      {batch.status}
-                    </span>
-                  </td>
-                  <td className="py-4 px-4 text-sm">
-                    <button className="text-gray-400 hover:text-gray-600">
-                      <MoreVertical className="w-5 h-5" />
-                    </button>
+              {paymentBatches.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-8 text-center text-gray-500">
+                    No payment batches yet. Create your first batch to get started.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                paymentBatches.map((batch: PaymentBatch, index: number) => (
+                  <tr key={batch.id} className="border-b border-gray-100 hover:bg-gray-50">
+                    <td className="py-4 px-4 text-sm text-gray-900">{index + 1}</td>
+                    <td className="py-4 px-4 text-sm text-gray-900">{batch.batchName}</td>
+                    <td className="py-4 px-4 text-sm font-semibold text-gray-900">
+                      {formatAmount(batch.totalAmount)} cNGN
+                    </td>
+                    <td className="py-4 px-4 text-sm text-gray-600">
+                      {batch.date}
+                    </td>
+                    <td className="py-4 px-4 text-sm text-gray-900">{batch.employees}</td>
+                    <td className="py-4 px-4 text-sm">
+                      <span className="px-3 py-1 bg-gray-100 text-gray-700 rounded text-xs font-medium">
+                        {batch.status}
+                      </span>
+                    </td>
+                    <td className="py-4 px-4 text-sm">
+                      <button className="text-gray-400 hover:text-gray-600">
+                        <MoreVertical className="w-5 h-5" />
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
       </Card>
 
-      {showBatchModal && <BatchPaymentCreationModal onClose={() => setShowBatchModal(false)} />}
+      {showBatchModal && (
+        <BatchPaymentCreationModal 
+          onClose={() => setShowBatchModal(false)} 
+          onPaymentCreated={handlePaymentCreated}
+        />
+      )}
     </div>
   )
 }

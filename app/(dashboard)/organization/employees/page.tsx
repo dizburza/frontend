@@ -1,28 +1,34 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Search, Filter, ArrowUpDown, MoreVertical } from "lucide-react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { AddEmployeeModal } from "@/components/employees/add-employee-modal"
-import { mockEmployees } from "@/lib/mock-data"
+import { getSessionEmployees } from "@/lib/localStorage"
 
 export default function EmployeesPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [filterBy, setFilterBy] = useState("New Employees")
   const [sortBy, setSortBy] = useState("Date")
   const [showAddEmployeeModal, setShowAddEmployeeModal] = useState(false)
+  const [employees, setEmployees] = useState(getSessionEmployees())
+
+  // Refresh employees when modal closes after adding
+  const handleEmployeeAdded = () => {
+    setEmployees(getSessionEmployees())
+  }
 
   const stats = [
     { label: "Total Salary Payout", value: "5,820,000", unit: "cNGN", lastUpdated: "1 min ago" },
-    { label: "Total Employees", value: mockEmployees.list.length.toString(), lastUpdated: "1 min ago" },
+    { label: "Total Employees", value: employees.length.toString(), lastUpdated: "1 min ago" },
     { label: "New Employees", value: "2", change: "+2 than last month", lastUpdated: "" },
     { label: "Proposal Contributors", value: "3", lastUpdated: "1 min ago" },
   ]
 
-  const filteredEmployees = mockEmployees.list.filter(
+  const filteredEmployees = employees.filter(
     (emp) =>
       emp.surname.toLowerCase().includes(searchTerm.toLowerCase()) ||
       emp.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -126,7 +132,12 @@ export default function EmployeesPage() {
         </div>
       </Card>
 
-      {showAddEmployeeModal && <AddEmployeeModal onClose={() => setShowAddEmployeeModal(false)} />}
+      {showAddEmployeeModal && (
+        <AddEmployeeModal 
+          onClose={() => setShowAddEmployeeModal(false)} 
+          onEmployeeAdded={handleEmployeeAdded}
+        />
+      )}
     </div>
   )
 }

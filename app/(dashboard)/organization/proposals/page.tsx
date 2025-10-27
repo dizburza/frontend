@@ -8,14 +8,20 @@ import { Search, Filter, ArrowUpDown } from "lucide-react"
 import { ProposalStatCard } from "@/components/proposals/proposal-stat-card"
 import { ProposalTable } from "@/components/proposals/proposal-table"
 import { CreateProposalModal } from "@/components/proposals/create-proposal-modal"
-import { mockProposals } from "@/lib/mock-data"
+import { getSessionProposals } from "@/lib/localStorage"
 
 export default function ProposalsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [proposals, setProposals] = useState(getSessionProposals())
   
-  const totalProposals = mockProposals.list.length
-  const approvedProposals = mockProposals.list.filter(p => p.status === "Completed").length
-  const rejectedProposals = mockProposals.list.filter(p => p.status === "Rejected").length
+  // Refresh proposals when a new one is created
+  const handleProposalCreated = () => {
+    setProposals(getSessionProposals())
+  }
+
+  const totalProposals = proposals.length
+  const approvedProposals = proposals.filter(p => p.status === "Completed").length
+  const rejectedProposals = proposals.filter(p => p.status === "Rejected").length
 
   const stats = [
     { label: "Total Proposals Created", value: totalProposals.toString(), lastUpdated: "1 min ago" },
@@ -65,11 +71,16 @@ export default function ProposalsPage() {
           </Button>
         </div>
 
-        <ProposalTable />
+        <ProposalTable proposals={proposals} />
       </Card>
 
       {/* Create Proposal Modal */}
-      {showCreateModal && <CreateProposalModal onClose={() => setShowCreateModal(false)} />}
+      {showCreateModal && (
+        <CreateProposalModal 
+          onClose={() => setShowCreateModal(false)} 
+          onProposalCreated={handleProposalCreated}
+        />
+      )}
     </div>
   )
 }

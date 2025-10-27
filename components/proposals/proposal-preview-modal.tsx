@@ -4,6 +4,7 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { X, ChevronLeft } from "lucide-react"
 import { ProposalSuccessModal } from "./proposal-success-modal"
+import { addProposalToSession } from "@/lib/localStorage"
 
 interface ProposalPreviewModalProps {
   formData: {
@@ -15,10 +16,23 @@ interface ProposalPreviewModalProps {
   }
   onBack: () => void
   onClose: () => void
+  onProposalCreated?: () => void
 }
 
-export function ProposalPreviewModal({ formData, onBack, onClose }: ProposalPreviewModalProps) {
+export function ProposalPreviewModal({ formData, onBack, onClose, onProposalCreated }: ProposalPreviewModalProps) {
   const [showSuccess, setShowSuccess] = useState(false)
+
+  const handleSubmit = () => {
+    // Add proposal to session storage
+    addProposalToSession(formData)
+    
+    // Notify parent to refresh
+    if (onProposalCreated) {
+      onProposalCreated()
+    }
+    
+    setShowSuccess(true)
+  }
 
   if (showSuccess) {
     return <ProposalSuccessModal onClose={onClose} />
@@ -57,7 +71,7 @@ export function ProposalPreviewModal({ formData, onBack, onClose }: ProposalPrev
               </div>
               <div>
                 <p className="text-gray-600">Amount Requested:</p>
-                <p className="font-medium">cNGN{formData.amount}</p>
+                <p className="font-medium">cNGN {formData.amount}</p>
               </div>
             </div>
           </div>
@@ -73,7 +87,7 @@ export function ProposalPreviewModal({ formData, onBack, onClose }: ProposalPrev
           <Button variant="outline" onClick={onBack}>
             Back
           </Button>
-          <Button onClick={() => setShowSuccess(true)} className="bg-blue-600 hover:bg-blue-700 text-white">
+          <Button onClick={handleSubmit} className="bg-blue-600 hover:bg-blue-700 text-white">
             Submit
           </Button>
         </div>

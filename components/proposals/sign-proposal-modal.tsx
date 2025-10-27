@@ -3,19 +3,28 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { X } from "lucide-react"
+import { updateProposalVote } from "@/lib/localStorage"
 
 interface SignProposalModalProps {
   onClose: () => void
+  proposalId?: string
+  onVoteSubmitted?: () => void
 }
 
-export function SignProposalModal({ onClose }: SignProposalModalProps) {
+export function SignProposalModal({ onClose, proposalId, onVoteSubmitted }: SignProposalModalProps) {
   const [vote, setVote] = useState<"for" | "against" | null>(null)
 
   const handleSubmit = () => {
-    if (vote) {
-      // Handle submission
-      onClose()
+    if (vote && proposalId) {
+      // Update proposal vote in session
+      updateProposalVote(proposalId, vote)
+      
+      // Notify parent to refresh
+      if (onVoteSubmitted) {
+        onVoteSubmitted()
+      }
     }
+    onClose()
   }
 
   return (

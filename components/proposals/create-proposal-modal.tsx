@@ -10,9 +10,10 @@ import { ProposalPreviewModal } from "./proposal-preview-modal"
 
 interface CreateProposalModalProps {
   onClose: () => void
+  onProposalCreated?: () => void
 }
 
-export function CreateProposalModal({ onClose }: CreateProposalModalProps) {
+export function CreateProposalModal({ onClose, onProposalCreated }: CreateProposalModalProps) {
   const [step, setStep] = useState<"form" | "preview">("form")
   const [formData, setFormData] = useState({
     title: "",
@@ -36,7 +37,7 @@ export function CreateProposalModal({ onClose }: CreateProposalModalProps) {
   }
 
   if (step === "preview") {
-    return <ProposalPreviewModal formData={formData} onBack={handleBack} onClose={onClose} />
+    return <ProposalPreviewModal formData={formData} onBack={handleBack} onClose={onClose} onProposalCreated={onProposalCreated} />
   }
 
   return (

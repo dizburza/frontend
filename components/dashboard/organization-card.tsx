@@ -3,6 +3,7 @@
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import Image from "next/image"
+import Link from "next/link"
 
 export function OrganizationPromotionCard() {
   return (
@@ -69,10 +70,10 @@ export function OrganizationPromotionCard() {
             </p>
           </div>
           <Card className=" rounded-lg relative bottom-2 flex  justify-between  bg-gradient-to-br  w-[40%] from-[#454ADE] to-[#5B63F0] self-center h-[90%] z-10">
-        <div className="space-y-1 p-4">
-          <h2 className="text-xl font-bold text-white">Create an Organization Account</h2>
-          <p className="text-sm text-white/90 text-balance  ">Manage batch payments, and approve transactions with your team.</p>
-          <Button className="bg-white text-[#454ADE] hover:bg-white/90 font-semibold">+ Create Organization Now</Button>
+        <div className="space-y-1 p-4 h-full ">
+          <h2 className="text-base font-bold text-white">Create an Organization Account</h2>
+          <p className="text-xs text-white/90 text-balance">Manage batch payments, and approve transactions with your team.</p>
+          <div className="flex self-end"><Link href={"/organization-setup/organization-details"} ><Button className="bg-white self-end  text-[#454ADE] hover:bg-white/90 font-semibold">+ Create Organization Now</Button></Link></div>
         </div>
 
         <div className="flex items-end justify-between">
