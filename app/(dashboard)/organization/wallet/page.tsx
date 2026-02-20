@@ -1,12 +1,9 @@
 "use client";
 
 import { BalanceCard } from "@/components/dashboard/balance-card";
-import { QuickActions } from "@/components/dashboard/quick-actions";
 import { IncomeExpenseCards } from "@/components/dashboard/income-expense-cards";
 import { AnalysisChart } from "@/components/dashboard/analysis-chart";
 import { TransactionHistory } from "@/components/dashboard/transaction-history";
-import { Card } from "@/components/ui/card";
-import Image from "next/image";
 import { OrganizationPromotionCard } from "@/components/dashboard/organization-card";
 
 export default function WalletPage() {

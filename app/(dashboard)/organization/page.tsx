@@ -10,7 +10,7 @@ import {
   mockWallet,
   mockProposals,
   mockTransactions,
-} from "@/lib/mock-data";
+} from "@/lib/static/mock-data";
 import { getOrganizationSigners } from "@/lib/localStorage";
 import Image from "next/image";
 import { Copy, Info } from "lucide-react";
@@ -33,7 +33,7 @@ export default function OrganizationDashboardPage() {
     <div className=" py-8">
       {/* Welcome Banner */}
       <Card className="rounded-xl bg-white px-4 pt-4 mb-4">
-        <div className=" bg-[#373CD0] rounded-md relative h-32 text-white relative overflow-hidden">
+        <div className=" bg-[#373CD0] rounded-md relative h-32 text-white overflow-hidden">
           <div className="absolute inset-0 opacity-50">
             <div className="absolute top-4 left-1/2 w-16 h-16 bg-white rounded-full blur-2xl" />
             <div className="absolute top-20 right-1/2 w-20 h-20 bg-white rounded-full blur-2xl" />
@@ -127,7 +127,7 @@ export default function OrganizationDashboardPage() {
                     {org.name}
                   </h2>
                   <div className="flex items-center gap-2 mt-1">
-                    <span className="px-2 py-1 bg-[#F2F1EC] rounded-xl text-amber-800 text-xs font-medium rounded">
+                    <span className="px-2 py-1 bg-[#F2F1EC] rounded-xl text-amber-800 text-xs font-medium">
                       {org.category}
                     </span>
                   </div>
@@ -192,12 +192,12 @@ export default function OrganizationDashboardPage() {
                 <CardTitle className="text-lg font-semibold">
                   Payroll Summary
                 </CardTitle>
-                <a
-                  href="#"
+                <button
+                  type="button"
                   className="text-blue-600 text-sm font-medium hover:underline"
                 >
                   View all
-                </a>
+                </button>
               </div>
             </CardHeader>
             <CardContent>
@@ -233,12 +233,12 @@ export default function OrganizationDashboardPage() {
                 <CardTitle className="text-lg font-semibold">
                   Authorized Signers
                 </CardTitle>
-                <a
-                  href="#"
+                <button
+                  type="button"
                   className="text-blue-600 text-sm font-medium hover:underline"
                 >
                   View all
-                </a>
+                </button>
               </div>
             </CardHeader>
             <CardContent>
@@ -302,9 +302,9 @@ export default function OrganizationDashboardPage() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle>Proposal History</CardTitle>
-              <a href="#" className="text-blue-600 text-sm font-medium">
+              <button type="button" className="text-blue-600 text-sm font-medium">
                 View all
-              </a>
+              </button>
             </div>
           </CardHeader>
           <CardContent>

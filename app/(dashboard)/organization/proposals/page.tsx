@@ -9,10 +9,11 @@ import { ProposalStatCard } from "@/components/proposals/proposal-stat-card"
 import { ProposalTable } from "@/components/proposals/proposal-table"
 import { CreateProposalModal } from "@/components/proposals/create-proposal-modal"
 import { getSessionProposals } from "@/lib/localStorage"
+import type { Proposal } from "@/lib/types/payloads"
 
 export default function ProposalsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false)
-  const [proposals, setProposals] = useState(getSessionProposals())
+  const [proposals, setProposals] = useState<Proposal[]>(getSessionProposals())
   
   // Refresh proposals when a new one is created
   const handleProposalCreated = () => {
@@ -20,8 +21,8 @@ export default function ProposalsPage() {
   }
 
   const totalProposals = proposals.length
-  const approvedProposals = proposals.filter(p => p.status === "Completed").length
-  const rejectedProposals = proposals.filter(p => p.status === "Rejected").length
+  const approvedProposals = proposals.filter((p: Proposal) => p.status === "Completed").length
+  const rejectedProposals = proposals.filter((p: Proposal) => p.status === "Rejected").length
 
   const stats = [
     { label: "Total Proposals Created", value: totalProposals.toString(), lastUpdated: "1 min ago" },
@@ -45,8 +46,8 @@ export default function ProposalsPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-4 gap-4">
-        {stats.map((stat, index) => (
-          <ProposalStatCard key={index} {...stat} />
+        {stats.map((stat) => (
+          <ProposalStatCard key={stat.label} {...stat} />
         ))}
       </div>
 

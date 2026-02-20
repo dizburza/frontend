@@ -7,21 +7,10 @@ import { SignaturesComponent } from "@/components/proposals/signatures-component
 import { StatusTimeline } from "@/components/proposals/status-timeline"
 import { SignProposalModal } from "@/components/proposals/sign-proposal-modal"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
+import { mockVotingLog } from "@/lib/static/mock-data"
 
-export default function ProposalDetailsPage({ params }: { params: { id: string } }) {
+export default function ProposalDetailsPage() {
   const [showSignModal, setShowSignModal] = useState(false)
-
-  const votingLog = [
-    {
-      id: 1,
-      signer: "Bello Damilola",
-      handle: "@bello_dami_6fad",
-      role: "CEO",
-      decision: "Signed For",
-      timestamp: "Oct 7, 2025 - 10:45 AM",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=bello",
-    },
-  ]
 
   return (
     <div className="p-8 space-y-8">
@@ -73,9 +62,9 @@ export default function ProposalDetailsPage({ params }: { params: { id: string }
           <Card className="p-6">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-semibold">Recent Activity (Voting Log)</h2>
-              <a href="#" className="text-blue-600 text-sm font-medium">
+              <button type="button" className="text-blue-600 text-sm font-medium">
                 View all
-              </a>
+              </button>
             </div>
 
             <div className="overflow-x-auto">
@@ -89,7 +78,7 @@ export default function ProposalDetailsPage({ params }: { params: { id: string }
                   </tr>
                 </thead>
                 <tbody>
-                  {votingLog.map((log) => (
+                  {mockVotingLog.map((log) => (
                     <tr key={log.id} className="border-b border-gray-100 hover:bg-gray-50">
                       <td className="py-4 px-4">{log.id}</td>
                       <td className="py-4 px-4">

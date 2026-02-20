@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -8,13 +8,14 @@ import { Search, Filter, ArrowUpDown, MoreVertical } from "lucide-react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { AddEmployeeModal } from "@/components/employees/add-employee-modal"
 import { getSessionEmployees } from "@/lib/localStorage"
+import type { Employee } from "@/lib/types/payloads"
 
 export default function EmployeesPage() {
   const [searchTerm, setSearchTerm] = useState("")
-  const [filterBy, setFilterBy] = useState("New Employees")
-  const [sortBy, setSortBy] = useState("Date")
+  const [filterBy] = useState("New Employees")
+  const [sortBy] = useState("Date")
   const [showAddEmployeeModal, setShowAddEmployeeModal] = useState(false)
-  const [employees, setEmployees] = useState(getSessionEmployees())
+  const [employees, setEmployees] = useState<Employee[]>(getSessionEmployees())
 
   // Refresh employees when modal closes after adding
   const handleEmployeeAdded = () => {
@@ -29,7 +30,7 @@ export default function EmployeesPage() {
   ]
 
   const filteredEmployees = employees.filter(
-    (emp) =>
+    (emp: Employee) =>
       emp.surname.toLowerCase().includes(searchTerm.toLowerCase()) ||
       emp.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       emp.username.toLowerCase().includes(searchTerm.toLowerCase()),
@@ -59,8 +60,8 @@ export default function EmployeesPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-4 gap-4">
-        {stats.map((stat, index) => (
-          <Card key={index} className="p-6">
+        {stats.map((stat) => (
+          <Card key={stat.label} className="p-6">
             <p className="text-sm text-gray-600 mb-2">{stat.label}</p>
             <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
             {stat.unit && <p className="text-xs text-gray-500 mt-1">{stat.unit}</p>}

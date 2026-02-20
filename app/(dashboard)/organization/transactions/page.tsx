@@ -5,7 +5,7 @@ import { StatCard } from "@/components/stat-card"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { ChevronDown, Search, Copy, MoreVertical } from "lucide-react"
-import { mockTransactions } from "@/lib/mock-data"
+import { mockTransactions } from "@/lib/static/mock-data"
 
 export default function TransactionsPage() {
   const [searchTerm, setSearchTerm] = useState("")

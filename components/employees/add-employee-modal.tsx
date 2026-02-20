@@ -13,7 +13,7 @@ interface AddEmployeeModalProps {
   onEmployeeAdded?: () => void
 }
 
-export function AddEmployeeModal({ onClose, onEmployeeAdded }: AddEmployeeModalProps) {
+export function AddEmployeeModal({ onClose, onEmployeeAdded }: Readonly<AddEmployeeModalProps>) {
   const [step, setStep] = useState<"form" | "success">("form")
   const [formData, setFormData] = useState({
     username: "",
@@ -46,10 +46,6 @@ export function AddEmployeeModal({ onClose, onEmployeeAdded }: AddEmployeeModalP
     setStep("success")
   }
 
-  const handleBack = () => {
-    setStep("form")
-  }
-
   const handleClose = () => {
     onClose()
   }
@@ -80,9 +76,10 @@ export function AddEmployeeModal({ onClose, onEmployeeAdded }: AddEmployeeModalP
 
           {/* Employee's username */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Employee&apos;s username</label>
+            <label htmlFor="employee-username" className="block text-sm font-medium text-gray-700 mb-2">Employee&apos;s username</label>
             <div className="relative">
               <Input
+                id="employee-username"
                 name="username"
                 placeholder="Search username"
                 value={formData.username}
@@ -106,8 +103,9 @@ export function AddEmployeeModal({ onClose, onEmployeeAdded }: AddEmployeeModalP
 
           {/* Role */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Role</label>
+            <label htmlFor="employee-role" className="block text-sm font-medium text-gray-700 mb-2">Role</label>
             <Input
+              id="employee-role"
               name="role"
               placeholder="Enter employee's role"
               value={formData.role}
@@ -118,8 +116,9 @@ export function AddEmployeeModal({ onClose, onEmployeeAdded }: AddEmployeeModalP
 
           {/* Salary */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Salary (cNGN)</label>
+            <label htmlFor="employee-salary" className="block text-sm font-medium text-gray-700 mb-2">Salary (cNGN)</label>
             <Input
+              id="employee-salary"
               name="salary"
               placeholder="e.g., 500,000"
               value={formData.salary}

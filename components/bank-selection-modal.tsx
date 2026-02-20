@@ -57,7 +57,10 @@ export function BankSelectionModal({ onSelect, onClose }: BankSelectionModalProp
                 name="bank"
                 value={bank}
                 checked={selected === bank}
-                onChange={() => setSelected(bank)}
+                onChange={() => {
+                  setSelected(bank)
+                  onSelect(bank)
+                }}
                 className="w-4 h-4"
               />
               <span className="text-sm">{bank}</span>

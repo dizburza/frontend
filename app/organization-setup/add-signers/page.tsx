@@ -6,14 +6,8 @@ import StepIndicator from "@/components/step-indicator"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card } from "@/components/ui/card"
-
-interface Signer {
-  id: string
-  name: string
-  username: string
-  role: string
-  avatar: string
-}
+import { mockSignerSearchResults } from "@/lib/static/mock-data/signers"
+import type { Signer } from "@/lib/types/payloads"
 
 export default function AddSignersPage() {
   const router = useRouter()
@@ -29,29 +23,7 @@ export default function AddSignersPage() {
     { number: 3, title: "Add Signers", subtitle: "", completed: false, active: true },
   ]
 
-  const mockSearchResults: Signer[] = [
-    {
-      id: "1",
-      name: "John Chibike",
-      username: "@john_chi_56f1",
-      role: "COO",
-      avatar: "JC",
-    },
-    {
-      id: "2",
-      name: "Adeoye Adetola",
-      username: "@ade_ade_41fd",
-      role: "HR",
-      avatar: "AA",
-    },
-    {
-      id: "3",
-      name: "Bello Damilola",
-      username: "@bello_dami_6fad",
-      role: "CEO",
-      avatar: "BD",
-    },
-  ]
+  const mockSearchResults: Signer[] = mockSignerSearchResults
 
   const handleAddSigner = (signer: Signer) => {
     if (!signers.find((s) => s.id === signer.id)) {

@@ -8,20 +8,7 @@ import { Input } from "@/components/ui/input"
 import { ChevronDown, Search, MoreVertical } from "lucide-react"
 import { BatchPaymentCreationModal } from "@/components/payments/batch-payment-creation-modal"
 import { getSessionPaymentBatches } from "@/lib/localStorage"
-
-interface PaymentBatch {
-  id: string
-  batchName: string
-  totalAmount: number
-  date: string
-  employees: number
-  status: string
-  recipients: Array<{
-    surname: string
-    firstName: string
-    salary: string
-  }>
-}
+import type { PaymentBatch } from "@/lib/types/payloads"
 
 export default function PaymentsPage() {
   const [searchTerm, setSearchTerm] = useState("")
