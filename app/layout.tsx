@@ -3,6 +3,7 @@ import type { Metadata } from "next"
 import "./globals.css"
 import { Inter } from "next/font/google"
 import localFont from "next/font/local"
+import Providers from "./providers"
 
 export const metadata: Metadata = {
   title: "Dizburza",
@@ -34,13 +35,13 @@ const nohemi = localFont({
 
 export default function RootLayout({
   children,
-}: {
+}: Readonly<{
   children: React.ReactNode
-}) {
+}>) {
   return (
     <html lang="en" className={`${inter.variable} ${nohemi.variable}`}>
       <body className="bg-white text-black font-inter antialiased">
-        {children}
+        <Providers>{children}</Providers>
       </body>
     </html>
   )
