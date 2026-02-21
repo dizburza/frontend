@@ -15,7 +15,7 @@ interface AddSignersModalProps {
   onSignersAdded?: () => void
 }
 
-export default function AddSignersModal({ isOpen, onClose, onSignersAdded }: AddSignersModalProps) {
+export default function AddSignersModal({ isOpen, onClose, onSignersAdded }: Readonly<AddSignersModalProps>) {
   const [numSigners, setNumSigners] = useState(0)
   const [quorum, setQuorum] = useState(0)
   const [signerRole, setSignerRole] = useState("")
@@ -25,7 +25,7 @@ export default function AddSignersModal({ isOpen, onClose, onSignersAdded }: Add
   const mockSearchResults: Signer[] = mockSignerSearchResults
 
   const handleAddSigner = (signer: Signer) => {
-    if (!signers.find((s) => s.id === signer.id)) {
+    if (!signers.some((s) => s.id === signer.id)) {
       setSigners([...signers, signer])
     }
   }
@@ -86,7 +86,9 @@ export default function AddSignersModal({ isOpen, onClose, onSignersAdded }: Add
           <div className="space-y-6">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Number of signers</label>
+                <label htmlFor="numSigners" className="block text-sm font-medium text-gray-700 mb-2">
+                  Number of signers
+                </label>
                 <div className="flex items-center border border-gray-300 rounded-lg">
                   <button
                     onClick={() => setNumSigners(Math.max(0, numSigners - 1))}
@@ -95,6 +97,7 @@ export default function AddSignersModal({ isOpen, onClose, onSignersAdded }: Add
                     −
                   </button>
                   <input
+                    id="numSigners"
                     type="number"
                     value={numSigners}
                     onChange={(e) => setNumSigners(Number.parseInt(e.target.value) || 0)}
@@ -110,7 +113,7 @@ export default function AddSignersModal({ isOpen, onClose, onSignersAdded }: Add
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="quorum" className="block text-sm font-medium text-gray-700 mb-2">
                   Set Quorum <span className="text-gray-400 cursor-help">ℹ</span>
                 </label>
                 <div className="flex items-center border border-gray-300 rounded-lg">
@@ -121,6 +124,7 @@ export default function AddSignersModal({ isOpen, onClose, onSignersAdded }: Add
                     −
                   </button>
                   <input
+                    id="quorum"
                     type="number"
                     value={quorum}
                     onChange={(e) => setQuorum(Number.parseInt(e.target.value) || 0)}
@@ -134,8 +138,11 @@ export default function AddSignersModal({ isOpen, onClose, onSignersAdded }: Add
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Signer&apos;s role</label>
+              <label htmlFor="signerRole" className="block text-sm font-medium text-gray-700 mb-2">
+                Signer&apos;s role
+              </label>
               <Input
+                id="signerRole"
                 type="text"
                 placeholder="Enter role"
                 value={signerRole}
@@ -144,9 +151,12 @@ export default function AddSignersModal({ isOpen, onClose, onSignersAdded }: Add
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Search signer&apos;s username</label>
+              <label htmlFor="signerUsernameSearch" className="block text-sm font-medium text-gray-700 mb-2">
+                Search signer&apos;s username
+              </label>
               <div className="relative">
                 <Input
+                  id="signerUsernameSearch"
                   type="text"
                   placeholder="Search username"
                   value={searchQuery}

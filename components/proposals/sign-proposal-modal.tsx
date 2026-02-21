@@ -11,7 +11,7 @@ interface SignProposalModalProps {
   onVoteSubmitted?: () => void
 }
 
-export function SignProposalModal({ onClose, proposalId, onVoteSubmitted }: SignProposalModalProps) {
+export function SignProposalModal({ onClose, proposalId, onVoteSubmitted }: Readonly<SignProposalModalProps>) {
   const [vote, setVote] = useState<"for" | "against" | null>(null)
 
   const handleSubmit = () => {
@@ -55,7 +55,7 @@ export function SignProposalModal({ onClose, proposalId, onVoteSubmitted }: Sign
                   : "bg-gray-100 border-2 border-transparent hover:bg-gray-200"
               }`}
             >
-              <span className="text-4xl">{vote === "for" ? "👍" : "👍"}</span>
+              <span className="text-4xl">👍</span>
               <span className={`text-sm font-medium ${vote === "for" ? "text-green-600" : "text-gray-600"}`}>For</span>
             </button>
 
@@ -67,7 +67,7 @@ export function SignProposalModal({ onClose, proposalId, onVoteSubmitted }: Sign
                   : "bg-gray-100 border-2 border-transparent hover:bg-gray-200"
               }`}
             >
-              <span className="text-4xl">{vote === "against" ? "👎" : "👎"}</span>
+              <span className="text-4xl">👎</span>
               <span className={`text-sm font-medium ${vote === "against" ? "text-red-600" : "text-gray-600"}`}>
                 Against
               </span>

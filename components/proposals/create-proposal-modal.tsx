@@ -13,7 +13,7 @@ interface CreateProposalModalProps {
   onProposalCreated?: () => void
 }
 
-export function CreateProposalModal({ onClose, onProposalCreated }: CreateProposalModalProps) {
+export function CreateProposalModal({ onClose, onProposalCreated }: Readonly<CreateProposalModalProps>) {
   const [step, setStep] = useState<"form" | "preview">("form")
   const [formData, setFormData] = useState({
     title: "",
@@ -57,8 +57,9 @@ export function CreateProposalModal({ onClose, onProposalCreated }: CreatePropos
 
           {/* Title */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Title</label>
+            <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-2">Title</label>
             <Input
+              id="title"
               name="title"
               placeholder="Enter proposal title"
               value={formData.title}
@@ -69,8 +70,9 @@ export function CreateProposalModal({ onClose, onProposalCreated }: CreatePropos
 
           {/* Request Amount */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Request Amount (cNGN)</label>
+            <label htmlFor="requestAmount" className="block text-sm font-medium text-gray-700 mb-2">Request Amount (cNGN)</label>
             <Input
+              id="requestAmount"
               name="amount"
               placeholder="Enter required amount"
               value={formData.amount}
@@ -82,19 +84,20 @@ export function CreateProposalModal({ onClose, onProposalCreated }: CreatePropos
           {/* Dates */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
-              <Input name="startDate" value={formData.startDate} onChange={handleInputChange} className="w-full" />
+              <label htmlFor="startDate" className="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
+              <Input id="startDate" name="startDate" value={formData.startDate} onChange={handleInputChange} className="w-full" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">End Date</label>
-              <Input name="endDate" value={formData.endDate} onChange={handleInputChange} className="w-full" />
+              <label htmlFor="endDate" className="block text-sm font-medium text-gray-700 mb-2">End Date</label>
+              <Input id="endDate" name="endDate" value={formData.endDate} onChange={handleInputChange} className="w-full" />
             </div>
           </div>
 
           {/* Description */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
+            <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">Description</label>
             <textarea
+              id="description"
               name="description"
               placeholder="Enter brief description about the proposal"
               value={formData.description}

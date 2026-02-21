@@ -97,7 +97,7 @@ const employees = [
   },
 ]
 
-export function BatchPaymentCreationModal({ onClose, onPaymentCreated }: BatchPaymentCreationModalProps) {
+export function BatchPaymentCreationModal({ onClose, onPaymentCreated }: Readonly<BatchPaymentCreationModalProps>) {
   const [step, setStep] = useState<"details" | "employees" | "preview" | "success">("details")
   const [selectedEmployees, setSelectedEmployees] = useState<number[]>([])
   const [formData, setFormData] = useState({
@@ -147,7 +147,7 @@ export function BatchPaymentCreationModal({ onClose, onPaymentCreated }: BatchPa
   }
 
   const selectedEmployeeData = employees.filter((e) => selectedEmployees.includes(e.id))
-  const totalAmount = selectedEmployeeData.reduce((sum, emp) => sum + Number.parseInt(emp.salary.replace(/,/g, "")), 0)
+  const totalAmount = selectedEmployeeData.reduce((sum, emp) => sum + Number.parseInt(emp.salary.replaceAll(',', "")), 0)
 
   const renderStepIndicator = () => (
     <div className="flex items-center justify-center gap-8 mb-8">
@@ -217,7 +217,9 @@ export function BatchPaymentCreationModal({ onClose, onPaymentCreated }: BatchPa
           <div className="flex items-center gap-3">
             {step !== "details" && (
               <button
-                onClick={() => setStep(step === "employees" ? "details" : "employees")}
+                onClick={() =>
+                  setStep(step === "employees" ? "details" : "employees")
+                }
                 className="text-gray-600 hover:text-gray-900"
               >
                 <ChevronLeft size={24} />
@@ -225,7 +227,10 @@ export function BatchPaymentCreationModal({ onClose, onPaymentCreated }: BatchPa
             )}
             <h2 className="text-xl font-semibold">Batch Payment Creation</h2>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600"
+          >
             <X size={24} />
           </button>
         </div>
@@ -239,12 +244,20 @@ export function BatchPaymentCreationModal({ onClose, onPaymentCreated }: BatchPa
             <div className="space-y-6">
               <div>
                 <h3 className="text-lg font-semibold mb-2">Basic Details</h3>
-                <p className="text-gray-600 text-sm mb-4">Set up your payment batch name and approval requirements</p>
+                <p className="text-gray-600 text-sm mb-4">
+                  Set up your payment batch name and approval requirements
+                </p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Batch Name</label>
+                <label
+                  htmlFor="batchName"
+                  className="block text-sm font-medium text-gray-700 mb-2"
+                >
+                  Batch Name
+                </label>
                 <Input
+                  id="batchName"
                   name="batchName"
                   placeholder="Enter batch name"
                   value={formData.batchName}
@@ -254,8 +267,14 @@ export function BatchPaymentCreationModal({ onClose, onPaymentCreated }: BatchPa
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Payment Date</label>
+                <label
+                  htmlFor="paymentDate"
+                  className="block text-sm font-medium text-gray-700 mb-2"
+                >
+                  Payment Date
+                </label>
                 <Input
+                  id="paymentDate"
                   name="paymentDate"
                   value={formData.paymentDate}
                   onChange={handleInputChange}
@@ -270,7 +289,9 @@ export function BatchPaymentCreationModal({ onClose, onPaymentCreated }: BatchPa
             <div className="space-y-6">
               <div>
                 <h3 className="text-lg font-semibold mb-1">Select Employees</h3>
-                <p className="text-gray-600 text-sm">Choose which employees to include in this payment batch</p>
+                <p className="text-gray-600 text-sm">
+                  Choose which employees to include in this payment batch
+                </p>
               </div>
 
               {/* Search and Select All */}
@@ -294,18 +315,35 @@ export function BatchPaymentCreationModal({ onClose, onPaymentCreated }: BatchPa
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-gray-200 bg-gray-50">
-                      <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm w-12">#</th>
-                      <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">SURNAME</th>
-                      <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">FIRST NAME</th>
-                      <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">SALARY (cNGN)</th>
-                      <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">USERNAME</th>
-                      <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">WALLET ADDRESS</th>
-                      <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">ROLE</th>
+                      <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm w-12">
+                        #
+                      </th>
+                      <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">
+                        SURNAME
+                      </th>
+                      <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">
+                        FIRST NAME
+                      </th>
+                      <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">
+                        SALARY (cNGN)
+                      </th>
+                      <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">
+                        USERNAME
+                      </th>
+                      <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">
+                        WALLET ADDRESS
+                      </th>
+                      <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">
+                        ROLE
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {employees.map((emp) => (
-                      <tr key={emp.id} className="border-b border-gray-100 hover:bg-gray-50">
+                      <tr
+                        key={emp.id}
+                        className="border-b border-gray-100 hover:bg-gray-50"
+                      >
                         <td className="py-4 px-4">
                           <input
                             type="checkbox"
@@ -314,12 +352,24 @@ export function BatchPaymentCreationModal({ onClose, onPaymentCreated }: BatchPa
                             className="w-4 h-4"
                           />
                         </td>
-                        <td className="py-4 px-4 text-sm text-gray-900">{emp.surname}</td>
-                        <td className="py-4 px-4 text-sm text-gray-900">{emp.firstName}</td>
-                        <td className="py-4 px-4 text-sm text-gray-900">{emp.salary}</td>
-                        <td className="py-4 px-4 text-sm text-gray-600">{emp.username}</td>
-                        <td className="py-4 px-4 text-sm text-gray-600">{emp.wallet}</td>
-                        <td className="py-4 px-4 text-sm text-gray-900">{emp.role}</td>
+                        <td className="py-4 px-4 text-sm text-gray-900">
+                          {emp.surname}
+                        </td>
+                        <td className="py-4 px-4 text-sm text-gray-900">
+                          {emp.firstName}
+                        </td>
+                        <td className="py-4 px-4 text-sm text-gray-900">
+                          {emp.salary}
+                        </td>
+                        <td className="py-4 px-4 text-sm text-gray-600">
+                          {emp.username}
+                        </td>
+                        <td className="py-4 px-4 text-sm text-gray-600">
+                          {emp.wallet}
+                        </td>
+                        <td className="py-4 px-4 text-sm text-gray-900">
+                          {emp.role}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -332,33 +382,45 @@ export function BatchPaymentCreationModal({ onClose, onPaymentCreated }: BatchPa
           {step === "preview" && (
             <div className="space-y-6">
               <div>
-                <h3 className="text-lg font-semibold mb-4">{formData.batchName}</h3>
+                <h3 className="text-lg font-semibold mb-4">
+                  {formData.batchName}
+                </h3>
               </div>
 
               {/* Summary Cards */}
               <div className="grid grid-cols-3 gap-4">
                 <Card className="p-4">
                   <p className="text-gray-600 text-sm mb-1">Employees</p>
-                  <p className="text-2xl font-bold text-gray-900">{selectedEmployeeData.length}</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {selectedEmployeeData.length}
+                  </p>
                 </Card>
                 <Card className="p-4">
                   <p className="text-gray-600 text-sm mb-1">Total Amount</p>
                   <p className="text-2xl font-bold text-gray-900">
-                    {(totalAmount / 1000000).toFixed(3)}M<span className="text-sm">cNGN</span>
+                    {(totalAmount / 1000000).toFixed(3)}M
+                    <span className="text-sm">cNGN</span>
                   </p>
                 </Card>
                 <Card className="p-4">
                   <p className="text-gray-600 text-sm mb-1">Payment Date</p>
-                  <p className="text-2xl font-bold text-gray-900">{formData.paymentDate}</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {formData.paymentDate}
+                  </p>
                 </Card>
               </div>
 
               {/* Payment Breakdown */}
               <div>
-                <h4 className="font-semibold text-gray-900 mb-4">Payment Breakdown</h4>
+                <h4 className="font-semibold text-gray-900 mb-4">
+                  Payment Breakdown
+                </h4>
                 <div className="space-y-3 max-h-64 overflow-y-auto">
                   {selectedEmployeeData.map((emp) => (
-                    <div key={emp.id} className="flex items-center justify-between p-3 bg-gray-50 rounded">
+                    <div
+                      key={emp.id}
+                      className="flex items-center justify-between p-3 bg-gray-50 rounded"
+                    >
                       <div>
                         <p className="font-medium text-gray-900">
                           {emp.surname} {emp.firstName}
@@ -367,7 +429,9 @@ export function BatchPaymentCreationModal({ onClose, onPaymentCreated }: BatchPa
                           {emp.username} • {emp.role}
                         </p>
                       </div>
-                      <p className="font-semibold text-gray-900">{emp.salary}</p>
+                      <p className="font-semibold text-gray-900">
+                        {emp.salary}
+                      </p>
                     </div>
                   ))}
                 </div>
@@ -391,9 +455,11 @@ export function BatchPaymentCreationModal({ onClose, onPaymentCreated }: BatchPa
                 <Button variant="outline" onClick={() => setStep("details")}>
                   Save Draft
                 </Button>
-                <Button 
+                <Button
                   onClick={handleProceedToPayment}
-                  disabled={!formData.batchName || selectedEmployees.length === 0}
+                  disabled={
+                    !formData.batchName || selectedEmployees.length === 0
+                  }
                   className="bg-blue-600 hover:bg-blue-700 text-white disabled:bg-gray-300"
                 >
                   Proceed to Payment
@@ -406,9 +472,14 @@ export function BatchPaymentCreationModal({ onClose, onPaymentCreated }: BatchPa
                   Cancel
                 </Button>
                 <Button
-                  onClick={() => setStep(step === "details" ? "employees" : "preview")}
+                  onClick={() =>
+                    setStep(step === "details" ? "employees" : "preview")
+                  }
                   className="bg-blue-600 hover:bg-blue-700 text-white"
-                  disabled={step === "employees" && selectedEmployees.length === 0 || (step === "details" && !formData.batchName)}
+                  disabled={
+                    (step === "employees" && selectedEmployees.length === 0) ||
+                    (step === "details" && !formData.batchName)
+                  }
                 >
                   Next
                 </Button>
@@ -418,5 +489,5 @@ export function BatchPaymentCreationModal({ onClose, onPaymentCreated }: BatchPa
         </div>
       </div>
     </div>
-  )
+  );
 }

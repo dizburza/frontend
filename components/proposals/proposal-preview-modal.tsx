@@ -19,7 +19,7 @@ interface ProposalPreviewModalProps {
   onProposalCreated?: () => void
 }
 
-export function ProposalPreviewModal({ formData, onBack, onClose, onProposalCreated }: ProposalPreviewModalProps) {
+export function ProposalPreviewModal({ formData, onBack, onClose, onProposalCreated }: Readonly<ProposalPreviewModalProps>) {
   const [showSuccess, setShowSuccess] = useState(false)
 
   const handleSubmit = () => {

@@ -26,7 +26,7 @@ export default function AddSignersPage() {
   const mockSearchResults: Signer[] = mockSignerSearchResults
 
   const handleAddSigner = (signer: Signer) => {
-    if (!signers.find((s) => s.id === signer.id)) {
+    if (!signers.some((s) => s.id === signer.id)) {
       setSigners([...signers, signer])
     }
   }
