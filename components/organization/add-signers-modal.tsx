@@ -8,6 +8,8 @@ import { X } from "lucide-react"
 import { updateOrganizationSigners } from "@/lib/localStorage"
 import { mockSignerSearchResults } from "@/lib/static/mock-data/signers"
 import type { Signer } from "@/lib/types/payloads"
+import { useGlobalLoading } from "@/lib/global-loading"
+import { toast } from "sonner"
 
 interface AddSignersModalProps {
   isOpen: boolean
@@ -21,6 +23,8 @@ export default function AddSignersModal({ isOpen, onClose, onSignersAdded }: Rea
   const [signerRole, setSignerRole] = useState("")
   const [searchQuery, setSearchQuery] = useState("")
   const [signers, setSigners] = useState<Signer[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const { showLoading, hideLoading } = useGlobalLoading()
 
   const mockSearchResults: Signer[] = mockSignerSearchResults
 
@@ -34,8 +38,18 @@ export default function AddSignersModal({ isOpen, onClose, onSignersAdded }: Rea
     setSigners(signers.filter((s) => s.id !== id))
   }
 
-  const handleSave = () => {
-    if (signers.length > 0) {
+  const handleSave = async () => {
+    if (isLoading) return
+
+    try {
+      setIsLoading(true)
+      showLoading("Saving signers...")
+
+      if (signers.length === 0) {
+        toast.error("Please add at least one signer")
+        return
+      }
+
       // Convert to organization signer format
       const organizationSigners = signers.map((s) => ({
         id: s.id,
@@ -45,16 +59,24 @@ export default function AddSignersModal({ isOpen, onClose, onSignersAdded }: Rea
         status: "active",
         walletAddress: `0x${Math.random().toString(16).substring(2, 10)}...`,
       }))
-      
+
       // Update organization signers in session
       updateOrganizationSigners(organizationSigners)
-      
+
+      toast.success("Signers saved")
+
       // Notify parent to refresh
       if (onSignersAdded) {
         onSignersAdded()
       }
+      handleClose()
+    } catch (error) {
+      console.error(error)
+      toast.error("Could not save signers. Please try again.")
+    } finally {
+      hideLoading()
+      setIsLoading(false)
     }
-    handleClose()
   }
 
   const handleClose = () => {
@@ -226,8 +248,12 @@ export default function AddSignersModal({ isOpen, onClose, onSignersAdded }: Rea
               <Button variant="outline" className="flex-1 bg-transparent" onClick={handleClose}>
                 Cancel
               </Button>
-              <Button className="flex-1 bg-blue-600 hover:bg-blue-700 text-white" onClick={handleSave}>
-                Save Signers
+              <Button
+                disabled={isLoading}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                onClick={handleSave}
+              >
+                {isLoading ? "Saving..." : "Save Signers"}
               </Button>
             </div>
           </div>

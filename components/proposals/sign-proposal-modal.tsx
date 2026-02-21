@@ -4,6 +4,8 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { X } from "lucide-react"
 import { updateProposalVote } from "@/lib/localStorage"
+import { useGlobalLoading } from "@/lib/global-loading"
+import { toast } from "sonner"
 
 interface SignProposalModalProps {
   onClose: () => void
@@ -13,18 +15,33 @@ interface SignProposalModalProps {
 
 export function SignProposalModal({ onClose, proposalId, onVoteSubmitted }: Readonly<SignProposalModalProps>) {
   const [vote, setVote] = useState<"for" | "against" | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const { showLoading, hideLoading } = useGlobalLoading()
 
-  const handleSubmit = () => {
-    if (vote && proposalId) {
+  const handleSubmit = async () => {
+    if (!vote || !proposalId || isLoading) return
+
+    try {
+      setIsLoading(true)
+      showLoading("Submitting signature...")
+
       // Update proposal vote in session
       updateProposalVote(proposalId, vote)
-      
+      toast.success("Vote submitted")
+
       // Notify parent to refresh
       if (onVoteSubmitted) {
         onVoteSubmitted()
       }
+
+      onClose()
+    } catch (error) {
+      console.error(error)
+      toast.error("Could not submit vote. Please try again.")
+    } finally {
+      hideLoading()
+      setIsLoading(false)
     }
-    onClose()
   }
 
   return (
@@ -79,10 +96,10 @@ export function SignProposalModal({ onClose, proposalId, onVoteSubmitted }: Read
         <div className="p-6 border-t border-gray-200">
           <Button
             onClick={handleSubmit}
-            disabled={!vote}
+            disabled={!vote || isLoading}
             className="w-full bg-blue-600 hover:bg-blue-700 text-white disabled:bg-gray-300 disabled:cursor-not-allowed"
           >
-            Submit
+            {isLoading ? "Submitting..." : "Submit"}
           </Button>
         </div>
       </div>

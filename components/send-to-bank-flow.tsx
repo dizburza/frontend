@@ -6,6 +6,8 @@ import { SuccessModal } from "@/components/success-modal"
 import { BankSelectionModal } from "@/components/bank-selection-modal"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import { useGlobalLoading } from "@/lib/global-loading"
+import { toast } from "sonner"
 
 interface SendToBankFlowProps {
   isOpen: boolean
@@ -14,21 +16,36 @@ interface SendToBankFlowProps {
 
 type Step = "account" | "bank" | "amount" | "success"
 
-export function SendToBankFlow({ isOpen, onClose }: SendToBankFlowProps) {
+export function SendToBankFlow({ isOpen, onClose }: Readonly<SendToBankFlowProps>) {
   const [step, setStep] = useState<Step>("account")
   const [accountNumber, setAccountNumber] = useState("")
   const [selectedBank, setSelectedBank] = useState("")
   const [amount, setAmount] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
+  const { showLoading, hideLoading } = useGlobalLoading()
 
   if (!isOpen) return null
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (step === "account" && accountNumber) {
       setStep("bank")
     } else if (step === "bank" && selectedBank) {
       setStep("amount")
     } else if (step === "amount" && amount) {
-      setStep("success")
+      if (isLoading) return
+
+      try {
+        setIsLoading(true)
+        showLoading("Confirming bank transfer...")
+        toast.success("Transfer submitted")
+        setStep("success")
+      } catch (error) {
+        console.error(error)
+        toast.error("Could not send. Please try again.")
+      } finally {
+        hideLoading()
+        setIsLoading(false)
+      }
     }
   }
 
@@ -123,8 +140,8 @@ export function SendToBankFlow({ isOpen, onClose }: SendToBankFlowProps) {
                 Available balance: <span className="font-semibold">25 cNGN</span>
               </div>
             </div>
-            <Button onClick={handleNext} disabled={!amount} className="w-full">
-              Send
+            <Button onClick={handleNext} disabled={!amount || isLoading} className="w-full">
+              {isLoading ? "Sending..." : "Send"}
             </Button>
           </>
         )}

@@ -5,6 +5,8 @@ import { TransactionModal } from "@/components/transaction-modal"
 import { SuccessModal } from "@/components/success-modal"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import { useGlobalLoading } from "@/lib/global-loading"
+import { toast } from "sonner"
 
 interface SendToCNGNFlowProps {
   isOpen: boolean
@@ -13,18 +15,33 @@ interface SendToCNGNFlowProps {
 
 type Step = "recipient" | "amount" | "success"
 
-export function SendToCNGNFlow({ isOpen, onClose }: SendToCNGNFlowProps) {
+export function SendToCNGNFlow({ isOpen, onClose }: Readonly<SendToCNGNFlowProps>) {
   const [step, setStep] = useState<Step>("recipient")
   const [recipient, setRecipient] = useState("")
   const [amount, setAmount] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
+  const { showLoading, hideLoading } = useGlobalLoading()
 
   if (!isOpen) return null
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (step === "recipient" && recipient) {
       setStep("amount")
     } else if (step === "amount" && amount) {
-      setStep("success")
+      if (isLoading) return
+
+      try {
+        setIsLoading(true)
+        showLoading("Confirming transfer...")
+        toast.success("Transfer submitted")
+        setStep("success")
+      } catch (error) {
+        console.error(error)
+        toast.error("Could not send. Please try again.")
+      } finally {
+        hideLoading()
+        setIsLoading(false)
+      }
     }
   }
 
@@ -84,7 +101,7 @@ export function SendToCNGNFlow({ isOpen, onClose }: SendToCNGNFlowProps) {
                 onChange={(e) => setRecipient(e.target.value)}
               />
             </div>
-            <Button onClick={handleNext} disabled={!recipient} className="w-full">
+            <Button onClick={handleNext} disabled={!recipient || isLoading} className="w-full">
               Next
             </Button>
           </>
@@ -105,8 +122,8 @@ export function SendToCNGNFlow({ isOpen, onClose }: SendToCNGNFlowProps) {
                 Available balance: <span className="font-semibold">25 cNGN</span>
               </div>
             </div>
-            <Button onClick={handleNext} disabled={!amount} className="w-full">
-              Send
+            <Button onClick={handleNext} disabled={!amount || isLoading} className="w-full">
+              {isLoading ? "Sending..." : "Send"}
             </Button>
           </>
         )}
