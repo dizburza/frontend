@@ -8,9 +8,11 @@ import { Input } from "@/components/ui/input"
 import { Card } from "@/components/ui/card"
 import { mockSignerSearchResults } from "@/lib/static/mock-data/signers"
 import type { Signer } from "@/lib/types/payloads"
+import { toast } from "sonner"
 
 export default function AddSignersPage() {
   const router = useRouter()
+  const [isLoading, setIsLoading] = useState(false)
   const [numSigners, setNumSigners] = useState(0)
   const [quorum, setQuorum] = useState(0)
   const [signerRole, setSignerRole] = useState("")
@@ -35,14 +37,26 @@ export default function AddSignersPage() {
     setSigners(signers.filter((s) => s.id !== id))
   }
 
-  const handleFinishSetup = () => {
-    // Store signers data
-    localStorage.setItem("signers", JSON.stringify(signers))
-    localStorage.setItem("quorum", quorum.toString())
-    localStorage.setItem("accountType", "organization")
-    
-    // Navigate to organization dashboard
-    router.push("/organization")
+  const handleFinishSetup = async () => {
+    if (isLoading) return
+
+    try {
+      setIsLoading(true)
+      // Store signers data
+      localStorage.setItem("signers", JSON.stringify(signers))
+      localStorage.setItem("quorum", quorum.toString())
+      localStorage.setItem("accountType", "organization")
+
+      toast.success("Organization setup completed")
+
+      // Navigate to organization dashboard
+      router.push("/organization")
+    } catch (error) {
+      console.error(error)
+      toast.error("Could not complete setup. Please try again.")
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const handleBack = () => {
@@ -69,10 +83,13 @@ export default function AddSignersPage() {
             <div className="space-y-6">
               <div className="grid grid-cols-2 gap-4 ">
                 <div>
-                  <label className="block text-sm font-medium text-[#69696C] mb-2">Number of signers</label>
+                  <label htmlFor="numSigners" className="block text-sm font-medium text-[#69696C] mb-2">
+                    Number of signers
+                  </label>
                   <div className="flex">
                     
                     <input
+                      id="numSigners"
                       type="number"
                       value={numSigners}
                       onChange={(e) => setNumSigners(Number.parseInt(e.target.value) || 0)}
@@ -83,12 +100,13 @@ export default function AddSignersPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-[#69696C] mb-2">
+                  <label htmlFor="quorum" className="block text-sm font-medium text-[#69696C] mb-2">
                     Set Quorum <span className="text-gray-400 cursor-help">ℹ</span>
                   </label>
                   <div className="">
                 
                     <input
+                      id="quorum"
                       type="number"
                       value={quorum}
                       onChange={(e) => setQuorum(Number.parseInt(e.target.value) || 0)}
@@ -101,8 +119,11 @@ export default function AddSignersPage() {
               </div>
 
               <div>
-                <label className="block text-sm text-start font-medium text-[#69696C] mb-2">Signer&apos;s role</label>
+                <label htmlFor="signerRole" className="block text-sm text-start font-medium text-[#69696C] mb-2">
+                  Signer&apos;s role
+                </label>
                 <Input
+                  id="signerRole"
                   type="text"
                   placeholder="Enter role"
                   value={signerRole}
@@ -112,9 +133,12 @@ export default function AddSignersPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-[#69696C] mb-2">Search signer&apos;s username</label>
+                <label htmlFor="signerUsernameSearch" className="block text-sm font-medium text-[#69696C] mb-2">
+                  Search signer&apos;s username
+                </label>
                 <div className="relative">
                   <Input
+                    id="signerUsernameSearch"
                     type="text"
                     placeholder="Search username"
                     value={searchQuery}
@@ -185,7 +209,13 @@ export default function AddSignersPage() {
                 <Button variant="outline" onClick={handleBack} className="flex-1 bg-transparent">
                   Back
                 </Button>
-                <Button onClick={handleFinishSetup} className="flex-1 bg-gray-600 hover:bg-gray-700 text-white">Finish set up</Button>
+                <Button
+                  disabled={isLoading}
+                  onClick={handleFinishSetup}
+                  className="flex-1 bg-gray-600 hover:bg-gray-700 text-white"
+                >
+                  {isLoading ? "Finishing..." : "Finish set up"}
+                </Button>
               </div>
             </div>
           </div>

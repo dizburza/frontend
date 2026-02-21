@@ -4,17 +4,33 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import OnboardingCard from "@/components/onboarding-card"
 import Button from "@/components/button"
+import { useGlobalLoading } from "@/lib/global-loading"
+import { toast } from "sonner"
 
 export default function UsernamePage() {
   const [username, setUsername] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
+  const { showLoading, hideLoading } = useGlobalLoading()
 
-  const handleSubmit = () => {
-    if (!username) return
-    // Store username
-    localStorage.setItem("username", username)
-    // Navigate to personal dashboard
-    router.push("/personal/wallet")
+  const handleSubmit = async () => {
+    if (!username || isLoading) return
+
+    try {
+      setIsLoading(true)
+      showLoading("Saving username...")
+      // Store username
+      localStorage.setItem("username", username)
+      toast.success("Username saved")
+      // Navigate to personal dashboard
+      router.push("/personal/wallet")
+    } catch (error) {
+      console.error(error)
+      toast.error("Could not save username. Please try again.")
+    } finally {
+      hideLoading()
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -29,10 +45,13 @@ export default function UsernamePage() {
       </div>
 
       <div className="mb-6">
-        <label className="block text-sm font-medium mb-3">Username</label>
+        <label htmlFor="username" className="block text-sm font-medium mb-3">
+          Username
+        </label>
         <div className="relative">
           <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">👤</span>
           <input
+            id="username"
             type="text"
             placeholder="Enter your Username"
             value={username}
@@ -42,11 +61,13 @@ export default function UsernamePage() {
         </div>
       </div>
 
-      <Button onClick={handleSubmit} disabled={!username} className="w-full mb-6">Submit</Button>
+      <Button onClick={handleSubmit} disabled={!username || isLoading} className="w-full mb-6">
+        {isLoading ? "Submitting..." : "Submit"}
+      </Button>
 
       <p className="text-center text-xs text-gray-600">
         By creating an account, I agree to the{" "}
-        <a href="#" className="font-semibold hover:underline">
+        <a href="/terms" className="font-semibold hover:underline">
           Terms & Privacy Policy
         </a>
       </p>

@@ -5,22 +5,38 @@ import { useRouter } from "next/navigation"
 import OnboardingCard from "@/components/onboarding-card"
 import AccountTypeOption from "@/components/account-type"
 import Button from "@/components/button"
+import { useGlobalLoading } from "@/lib/global-loading"
+import { toast } from "sonner"
 
 export default function AccountTypePage() {
   const [selected, setSelected] = useState<"personal" | "business" | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
+  const { showLoading, hideLoading } = useGlobalLoading()
 
-  const handleContinue = () => {
-    if (!selected) return
-    
-    // Store account type in localStorage
-    localStorage.setItem("accountType", selected)
-    
-    // Navigate to next step based on account type
-    if (selected === "personal") {
-      router.push("/setup-profile")
-    } else {
-      router.push("/organization-setup")
+  const handleContinue = async () => {
+    if (!selected || isLoading) return
+
+    try {
+      setIsLoading(true)
+      showLoading("Saving account type...")
+
+      // Store account type in localStorage
+      localStorage.setItem("accountType", selected)
+
+      toast.success("Account type saved")
+
+      // Navigate to next step based on account type
+      if (selected === "personal") {
+        router.push("/setup-profile")
+      } else {
+        router.push("/organization-setup")
+      }
+    } catch {
+      toast.error("Could not continue. Please try again.")
+    } finally {
+      hideLoading()
+      setIsLoading(false)
     }
   }
 
@@ -48,8 +64,8 @@ export default function AccountTypePage() {
         />
       </div>
 
-      <Button disabled={!selected} onClick={handleContinue} className="w-full bg-[#454ADE]">
-        Continue
+      <Button disabled={!selected || isLoading} onClick={handleContinue} className="w-full bg-[#454ADE]">
+        {isLoading ? "Continuing..." : "Continue"}
       </Button>
     </OnboardingCard>
   )

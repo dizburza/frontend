@@ -9,9 +9,13 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import FileUploadArea from "@/components/file-upload-area"
+import { useGlobalLoading } from "@/lib/global-loading"
+import { toast } from "sonner"
 
 export default function SetupProfilePage() {
   const router = useRouter()
+  const [isLoading, setIsLoading] = useState(false)
+  const { showLoading, hideLoading } = useGlobalLoading()
   const [formData, setFormData] = useState({
     surname: "",
     firstName: "",
@@ -23,12 +27,26 @@ export default function SetupProfilePage() {
     setFormData((prev) => ({ ...prev, [name]: value }))
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // Store profile data
-    localStorage.setItem("userProfile", JSON.stringify(formData))
-    // Navigate to username selection
-    router.push("/personal/wallet")
+
+    if (isLoading) return
+
+    try {
+      setIsLoading(true)
+      showLoading("Saving profile...")
+      // Store profile data
+      localStorage.setItem("userProfile", JSON.stringify(formData))
+      toast.success("Profile saved")
+      // Navigate to username selection
+      router.push("/personal/wallet")
+    } catch (error) {
+      console.error(error)
+      toast.error("Could not save profile. Please try again.")
+    } finally {
+      hideLoading()
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -106,14 +124,18 @@ export default function SetupProfilePage() {
           </div>
 
           {/* Submit Button */}
-          <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 rounded-lg">
-            Submit
+          <Button
+            type="submit"
+            disabled={isLoading}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 rounded-lg"
+          >
+            {isLoading ? "Submitting..." : "Submit"}
           </Button>
 
           {/* Terms & Privacy */}
           <p className="text-center text-sm text-gray-600">
             By creating an account, I agree to the <br />
-            <a href="#" className="text-blue-600 hover:underline font-medium">
+            <a href="/terms" className="text-blue-600 hover:underline font-medium">
               Terms & Privacy Policy
             </a>
           </p>

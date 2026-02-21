@@ -7,9 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import FileUploadArea from "@/components/file-upload-area";
+import { toast } from "sonner";
 
 export default function OrganizationProfilePage() {
   const router = useRouter();
+  const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     organizationName: "",
     businessEmail: "",
@@ -39,11 +41,22 @@ export default function OrganizationProfilePage() {
     },
   ];
 
-  const handleContinue = () => {
-    // Store organization profile data
-    localStorage.setItem("orgProfile", JSON.stringify(formData));
-    // Navigate to add signers
-    router.push("/organization-setup/add-signers");
+  const handleContinue = async () => {
+    if (isLoading) return;
+
+    try {
+      setIsLoading(true);
+      // Store organization profile data
+      localStorage.setItem("orgProfile", JSON.stringify(formData));
+      toast.success("Organization profile saved");
+      // Navigate to add signers
+      router.push("/organization-setup/add-signers");
+    } catch (error) {
+      console.error(error);
+      toast.error("Could not save profile. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleBack = () => {
@@ -70,10 +83,11 @@ export default function OrganizationProfilePage() {
 
             <div className="space-y-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="organizationName" className="block text-sm font-medium text-gray-700 mb-2">
                   Organization Name
                 </label>
                 <Input
+                  id="organizationName"
                   type="text"
                   placeholder="Enter organization name"
                   value={formData.organizationName}
@@ -87,10 +101,11 @@ export default function OrganizationProfilePage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="businessEmail" className="block text-sm font-medium text-gray-700 mb-2">
                   Business Email
                 </label>
                 <Input
+                  id="businessEmail"
                   type="email"
                   placeholder="Enter email"
                   value={formData.businessEmail}
@@ -111,8 +126,8 @@ export default function OrganizationProfilePage() {
                 <Button variant="outline" onClick={handleBack} className="flex-1 bg-transparent">
                   Back
                 </Button>
-                <Button onClick={handleContinue} className="flex-1 bg-blue-600 hover:bg-blue-700">
-                  Continue
+                <Button disabled={isLoading} onClick={handleContinue} className="flex-1 bg-blue-600 hover:bg-blue-700">
+                  {isLoading ? "Continuing..." : "Continue"}
                 </Button>
               </div>
             </div>
