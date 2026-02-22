@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -54,9 +55,9 @@ export default function OrganizationSetupPage() {
         {/* Terms & Privacy */}
         <p className="text-center text-sm text-gray-600 mt-6">
           By creating an account, I agree to the{" "}
-          <a href="#" className="text-blue-600 hover:underline font-medium">
+          <Link href="/terms" className="text-blue-600 hover:underline font-medium">
             Terms & Privacy Policy
-          </a>
+          </Link>
         </p>
       </CardContent>
     </Card>

@@ -10,18 +10,18 @@ export default function Header() {
       </div>
 
       <nav className="flex items-center gap-8">
-        <a href="#" className="text-sm hover:text-gray-600">
+        <Link href="/#about" className="text-sm hover:text-gray-600">
           About
-        </a>
-        <a href="#" className="text-sm hover:text-gray-600">
+        </Link>
+        <Link href="/#faq" className="text-sm hover:text-gray-600">
           FAQ
-        </a>
-        <a href="#" className="text-sm hover:text-gray-600">
+        </Link>
+        <Link href="/#features" className="text-sm hover:text-gray-600">
           Features
-        </a>
-        <a href="#" className="text-sm hover:text-gray-600">
+        </Link>
+        <Link href="/#how-it-works" className="text-sm hover:text-gray-600">
           How It Works
-        </a>
+        </Link>
       </nav>
 
       <Link href="/setup-profile"> <button className="px-6 py-2 bg-[#454ADE] text-white rounded-lg hover:bg-gray-900 text-sm font-medium">
