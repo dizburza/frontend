@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useRef } from "react"
+import { useId, useState, useRef } from "react"
 import Image from "next/image"
 import { FileText } from "lucide-react"
 
@@ -9,17 +9,21 @@ interface FileUploadAreaProps {
   onFileSelect?: (file: File) => void
   accept?: string
   maxSize?: number
+  inputId?: string
 }
 
 export default function FileUploadArea({
   onFileSelect,
   accept = "image/png,image/jpeg",
   maxSize = 15 * 1024 * 1024, // 15MB
-}: FileUploadAreaProps) {
+  inputId,
+}: Readonly<FileUploadAreaProps>) {
   const [isDragging, setIsDragging] = useState(false)
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
   const [error, setError] = useState<string>("")
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const generatedId = useId()
+  const resolvedInputId = inputId ?? `file-upload-${generatedId}`
 
   const getValidFileTypes = (): string[] => {
     return accept.split(",").map((type) => type.trim())
@@ -110,11 +114,14 @@ export default function FileUploadArea({
 
   return (
     <div>
-      <div
+      <button
+        type="button"
+        aria-label="Upload a file"
+        onClick={handleUploadClick}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer ${
+        className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer w-full ${
           isDragging ? "border-blue-400 bg-blue-50" : "border-gray-300 bg-gray-50"
         }`}
       >
@@ -127,19 +134,20 @@ export default function FileUploadArea({
             ) : (
               <>
                 Drop your file here or{" "}
-                <button onClick={handleUploadClick} className="text-blue-600 hover:underline font-medium">
+                <span className="text-blue-600 hover:underline font-medium">
                   Upload
-                </button>
+                </span>
               </>
             )}
           </p>
           <p className="text-xs text-gray-500">You can upload {getFileTypeLabel()} files. Max size 15MB.</p>
           {error && <p className="text-xs text-red-500 mt-2">{error}</p>}
         </div>
-      </div>
+      </button>
 
       <input
         ref={fileInputRef}
+        id={resolvedInputId}
         type="file"
         accept={accept}
         onChange={handleInputChange}

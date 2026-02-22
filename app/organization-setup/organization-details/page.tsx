@@ -163,10 +163,10 @@ export default function OrganizationDetailsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-[#69696C] mb-2">
+                <label htmlFor="certificateUpload" className="block text-sm font-medium text-[#69696C] mb-2">
                   Upload Certificate
                 </label>
-                <FileUploadArea accept="image/png,image/jpeg,application/pdf" />
+                <FileUploadArea inputId="certificateUpload" accept="image/png,image/jpeg,application/pdf" />
               </div>
 
               <div className="flex gap-4 pt-4">

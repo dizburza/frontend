@@ -116,10 +116,10 @@ export default function OrganizationProfilePage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="companyLogo" className="block text-sm font-medium text-gray-700 mb-2">
                   Upload Company Logo
                 </label>
-               <FileUploadArea />
+               <FileUploadArea inputId="companyLogo" />
               </div>
 
               <div className="flex gap-4 pt-4">
