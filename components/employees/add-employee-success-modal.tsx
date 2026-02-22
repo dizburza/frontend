@@ -7,7 +7,7 @@ interface AddEmployeeSuccessModalProps {
   onClose: () => void
 }
 
-export function AddEmployeeSuccessModal({ onClose }: AddEmployeeSuccessModalProps) {
+export function AddEmployeeSuccessModal({ onClose }: Readonly<AddEmployeeSuccessModalProps>) {
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg w-full max-w-md">

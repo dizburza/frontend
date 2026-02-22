@@ -23,7 +23,7 @@ interface BankSelectionModalProps {
   onClose: () => void
 }
 
-export function BankSelectionModal({ onSelect, onClose }: BankSelectionModalProps) {
+export function BankSelectionModal({ onSelect, onClose }: Readonly<BankSelectionModalProps>) {
   const [search, setSearch] = useState("")
   const [selected, setSelected] = useState("Access Bank")
 

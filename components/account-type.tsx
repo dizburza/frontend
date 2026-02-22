@@ -10,7 +10,7 @@ interface AccountTypeOptionProps {
   onChange: () => void
 }
 
-export default function AccountTypeOption({ type, title, description, selected, onChange }: AccountTypeOptionProps) {
+export default function AccountTypeOption({ type, title, description, selected, onChange }: Readonly<AccountTypeOptionProps>) {
   return (
     <button
       onClick={onChange}

@@ -8,7 +8,7 @@ interface SignaturesComponentProps {
   onSignClick: () => void
 }
 
-export function SignaturesComponent({ onSignClick }: SignaturesComponentProps) {
+export function SignaturesComponent({ onSignClick }: Readonly<SignaturesComponentProps>) {
   return (
     <Card className="p-6">
       <h3 className="text-lg font-semibold mb-6">Signatures</h3>

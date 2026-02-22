@@ -9,7 +9,7 @@ interface QuickActionsProps {
   onReceive: () => void
 }
 
-export function QuickActions({ onSendToCNGN, onSendToBank, onReceive }: QuickActionsProps) {
+export function QuickActions({ onSendToCNGN, onSendToBank, onReceive }: Readonly<QuickActionsProps>) {
   return (
     <div className="grid grid-cols-3 gap-4">
       <Button

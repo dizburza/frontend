@@ -12,7 +12,7 @@ interface SuccessModalProps {
   onClose: () => void
 }
 
-export function SuccessModal({ title, icon = "check", summary, onClose }: SuccessModalProps) {
+export function SuccessModal({ title, icon = "check", summary, onClose }: Readonly<SuccessModalProps>) {
   return (
     <TransactionModal title={title} onClose={onClose}>
       <div className="space-y-6">

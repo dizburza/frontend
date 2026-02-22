@@ -5,12 +5,12 @@ import { CheckCircle2, Circle } from "lucide-react"
 
 export function StatusTimeline() {
   const statuses = [
-    { label: "Draft Created", role: "CEO", timestamp: "Wed, Oct 8 - 10:42 AM", completed: true },
-    { label: "Submitted for Review", role: "", timestamp: "Wed, Oct 8 - 12:42 PM", completed: true },
-    { label: "Signing Started", role: "", timestamp: "Wed, Oct 10 - 10:42 AM", completed: true },
-    { label: "Signing ended", role: "", timestamp: "Wed, Oct 16 - 10:42 AM", completed: false },
-    { label: "Signed", role: "", timestamp: "Wed, Oct 16 - 10:43 AM", completed: false },
-    { label: "Disbursed", role: "", timestamp: "Wed, Oct 16 - 10:44 AM", completed: false },
+    { id: "draft-created", label: "Draft Created", role: "CEO", timestamp: "Wed, Oct 8 - 10:42 AM", completed: true },
+    { id: "submitted-for-review", label: "Submitted for Review", role: "", timestamp: "Wed, Oct 8 - 12:42 PM", completed: true },
+    { id: "signing-started", label: "Signing Started", role: "", timestamp: "Wed, Oct 10 - 10:42 AM", completed: true },
+    { id: "signing-ended", label: "Signing ended", role: "", timestamp: "Wed, Oct 16 - 10:42 AM", completed: false },
+    { id: "signed", label: "Signed", role: "", timestamp: "Wed, Oct 16 - 10:43 AM", completed: false },
+    { id: "disbursed", label: "Disbursed", role: "", timestamp: "Wed, Oct 16 - 10:44 AM", completed: false },
   ]
 
   return (
@@ -19,7 +19,7 @@ export function StatusTimeline() {
 
       <div className="space-y-4">
         {statuses.map((status, index) => (
-          <div key={index} className="flex gap-4">
+          <div key={status.id} className="flex gap-4">
             {/* Timeline dot */}
             <div className="flex flex-col items-center">
               {status.completed ? (

@@ -7,7 +7,7 @@ interface ReceiveFlowProps {
   onClose: () => void
 }
 
-export function ReceiveFlow({ isOpen, onClose }: ReceiveFlowProps) {
+export function ReceiveFlow({ isOpen, onClose }: Readonly<ReceiveFlowProps>) {
   if (!isOpen) return null
 
   return <QRCodeModal onClose={onClose} />

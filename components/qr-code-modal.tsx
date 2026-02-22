@@ -8,7 +8,7 @@ interface QRCodeModalProps {
   onClose: () => void
 }
 
-export function QRCodeModal({ onClose }: QRCodeModalProps) {
+export function QRCodeModal({ onClose }: Readonly<QRCodeModalProps>) {
   return (
     <TransactionModal title="Receive from others" onClose={onClose}>
       <div className="space-y-6">

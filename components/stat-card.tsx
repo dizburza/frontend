@@ -10,7 +10,7 @@ interface StatCardProps {
   lastUpdated?: string
 }
 
-export function StatCard({ label, value, trend, lastUpdated }: StatCardProps) {
+export function StatCard({ label, value, trend, lastUpdated }: Readonly<StatCardProps>) {
   return (
     <Card className="p-6 bg-white border border-gray-200">
       <p className="text-gray-600 text-sm mb-3">{label}</p>
