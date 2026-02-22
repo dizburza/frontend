@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Search, Filter, ArrowUpDown } from "lucide-react"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
+import Link from "next/link"
 
 const transactions = [
   {
@@ -45,14 +46,14 @@ const transactions = [
   },
 ]
 
-export function TransactionHistory() {
+export function TransactionHistory({ viewAllHref = "/" }: Readonly<{ viewAllHref?: string }>) {
   return (
     <Card className="p-6">
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-lg font-semibold">Transaction History</h3>
-        <a href="#" className="text-blue-600 text-sm font-medium">
+        <Link href={viewAllHref} className="text-blue-600 text-sm font-medium">
           View all
-        </a>
+        </Link>
       </div>
 
       <div className="flex items-center gap-4 mb-6">

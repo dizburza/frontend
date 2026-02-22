@@ -23,7 +23,7 @@ export default function WalletPage() {
           <AnalysisChart />
         </div>
       </div>
-      <TransactionHistory />
+      <TransactionHistory viewAllHref="/organization/transactions" />
     </div>
   );
 }
