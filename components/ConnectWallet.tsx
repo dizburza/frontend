@@ -7,6 +7,22 @@ import type { Account } from "thirdweb/wallets";
 import { useChainSwitch } from "@/hooks/useChainSwitch";
 import { baseSepolia } from "thirdweb/chains";
 import { getBasename } from "@superdevfavour/basename";
+import { useRouter } from "next/navigation";
+
+type ApiResponse<T> = {
+  success: boolean;
+  message?: string;
+  data?: T;
+  error?: string;
+  details?: unknown;
+};
+
+type AuthCheckData = {
+  isRegistered: boolean;
+  user?: {
+    role?: "employee" | "signer" | "admin";
+  };
+};
 
 const isHexPrefixedAddress = (address: string): address is `0x${string}` => {
   return address.startsWith("0x");
@@ -23,6 +39,7 @@ const ConnectWallet = ({
 }: ConnectWalletProps) => {
   const [mounted, setMounted] = useState(false);
   const account = useActiveAccount();
+  const router = useRouter();
   const [prevAccount, setPrevAccount] = useState<Account | undefined>(
     undefined,
   );
@@ -75,11 +92,58 @@ const ConnectWallet = ({
   }, [account?.address]);
 
   useEffect(() => {
-    if (account && !prevAccount && onConnect) {
-      onConnect();
-    }
+    const redirectForAccount = async () => {
+      if (!account || prevAccount) return;
+
+      if (onConnect) {
+        onConnect();
+      }
+
+      try {
+        const res = await fetch(
+          `/api/auth/check/${account.address}`,
+          {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+            },
+          }
+        );
+
+        if (!res.ok) {
+          router.push("/setup-profile");
+          return;
+        }
+
+        const payload = (await res.json()) as ApiResponse<AuthCheckData>;
+        const data = payload.data;
+        const isRegistered = Boolean(data?.isRegistered);
+        const role = data?.user?.role;
+
+        if (!isRegistered) {
+          router.push("/setup-profile");
+          return;
+        }
+
+        if (role === "admin" || role === "signer") {
+          router.push("/organization");
+          return;
+        }
+
+        if (role === "employee") {
+          router.push("/personal/wallet");
+          return;
+        }
+
+        router.push("/setup-profile");
+      } catch {
+        router.push("/setup-profile");
+      }
+    };
+
+    redirectForAccount();
     setPrevAccount(account);
-  }, [account, prevAccount, onConnect]);
+  }, [account, prevAccount, onConnect, router]);
 
   // Auto-switch to correct chain when wallet connects
   useEffect(() => {
@@ -124,7 +188,8 @@ const ConnectWallet = ({
           chains={[baseSepolia]}
           theme={darkTheme({
             colors: {
-              primaryButtonBg: "#FFD700",
+              primaryButtonBg: "#454ADE",
+              primaryButtonText: "hsl(0, 0%, 100%)",
             },
           })}
         />
@@ -142,7 +207,8 @@ const ConnectWallet = ({
           chains={[baseSepolia]}
           theme={darkTheme({
             colors: {
-              primaryButtonBg: "#FFD700",
+              primaryButtonBg: "#454ADE",
+              primaryButtonText: "hsl(0, 0%, 100%)",
             },
           })}
         />

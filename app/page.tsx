@@ -3,9 +3,8 @@ import Hero from "@/components/hero";
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-background">
-      <div className="relative z-10 bg-white">
-        {" "}
+    <div className="relative h-screen bg-background overflow-hidden flex flex-col">
+      <div className="relative z-10 bg-white shrink-0">
         <Header />
       </div>
 
@@ -21,7 +20,7 @@ export default function LandingPage() {
       <div className="absolute top-20 left-10 w-32 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
       <div className="absolute top-40 right-20 w-24 h-px bg-gradient-to-r from-transparent via-accent/20 to-transparent rotate-45" />
       <div className="absolute bottom-40 left-1/4 w-40 h-px bg-gradient-to-r from-transparent via-primary/15 to-transparent -rotate-12" />
-      <div className="relative z-10 ">
+      <div className="relative z-10 flex-1 min-h-0">
         <Hero />
       </div>
     </div>
