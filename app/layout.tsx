@@ -4,6 +4,7 @@ import "./globals.css"
 import { Inter } from "next/font/google"
 import localFont from "next/font/local"
 import Providers from "./providers"
+import { ThirdwebProvider } from "thirdweb/react"
 
 export const metadata: Metadata = {
   title: "Dizburza",
@@ -41,8 +42,10 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${inter.variable} ${nohemi.variable}`}>
       <body className="bg-white text-black font-inter antialiased">
-        <Providers>{children}</Providers>
+        <ThirdwebProvider>
+          <Providers>{children}</Providers>
+        </ThirdwebProvider>
       </body>
     </html>
-  )
+  );
 }
