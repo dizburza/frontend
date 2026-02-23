@@ -2,9 +2,9 @@ import Image from "next/image"
 import type React from "react"
 export default function OnboardingLayout({
   children,
-}: {
+}: Readonly<{
   children: React.ReactNode
-}) {
+}>) {
   return (
     <div className="h-screen bg-[#F9F9FE] relative overflow-hidden overflow-y-auto">
 
