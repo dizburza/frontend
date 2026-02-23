@@ -171,6 +171,18 @@ const ConnectWallet = ({
     return label;
   };
 
+  const renderConnectedDetailsButton = () => {
+    return (
+      <span
+        className="inline-flex h-10 min-w-[140px] max-w-[220px] items-center justify-center rounded-md bg-[#454ADE] px-3 text-sm font-medium text-white shadow-sm ring-1 ring-white/10 hover:bg-[#3f44d0] active:bg-[#373bba"
+      >
+        <span className="truncate">
+          {getDisplayName()}
+        </span>
+      </span>
+    );
+  };
+
   if (!mounted) return null;
 
   return (
@@ -181,6 +193,9 @@ const ConnectWallet = ({
           appMetadata={metadata}
           connectButton={{
             label: account ? getDisplayName() : label,
+          }}
+          detailsButton={{
+            render: renderConnectedDetailsButton,
           }}
           wallets={wallets}
           connectModal={{ size: "compact" }}
@@ -200,6 +215,9 @@ const ConnectWallet = ({
           appMetadata={metadata}
           connectButton={{
             label: account ? getDisplayName() : label,
+          }}
+          detailsButton={{
+            render: renderConnectedDetailsButton,
           }}
           wallets={wallets}
           connectModal={{ size: "compact" }}
