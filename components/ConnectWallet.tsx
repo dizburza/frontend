@@ -31,11 +31,13 @@ const isHexPrefixedAddress = (address: string): address is `0x${string}` => {
 interface ConnectWalletProps {
   onConnect?: () => void;
   label?: string;
+  connectButtonClassName?: string;
 }
 
 const ConnectWallet = ({
   onConnect,
   label = "Connect Wallet",
+  connectButtonClassName,
 }: ConnectWalletProps) => {
   const [mounted, setMounted] = useState(false);
   const account = useActiveAccount();
@@ -193,6 +195,7 @@ const ConnectWallet = ({
           appMetadata={metadata}
           connectButton={{
             label: account ? getDisplayName() : label,
+            className: connectButtonClassName,
           }}
           detailsButton={{
             render: renderConnectedDetailsButton,
@@ -215,6 +218,7 @@ const ConnectWallet = ({
           appMetadata={metadata}
           connectButton={{
             label: account ? getDisplayName() : label,
+            className: connectButtonClassName,
           }}
           detailsButton={{
             render: renderConnectedDetailsButton,

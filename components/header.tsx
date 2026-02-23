@@ -6,7 +6,9 @@ export default function Header() {
   return (
     <header className="flex h-20 items-center justify-between px-8 border-b border-gray-200">
       <div className="flex items-center gap-2">
-        <Image src="/logo.svg" alt="Logo" width={150} height={40} />
+        <Link href="/" className="inline-flex cursor-pointer">
+          <Image src="/logo.svg" alt="Logo" width={150} height={40} />
+        </Link>
       </div>
 
       <nav className="flex items-center gap-8">
@@ -24,7 +26,10 @@ export default function Header() {
         </Link>
       </nav>
 
-      <ConnectWallet label="Get Started" />
+      <ConnectWallet
+        label="Get Started"
+        connectButtonClassName="!h-9 !px-4 !text-sm"
+      />
     </header>
   );
 }

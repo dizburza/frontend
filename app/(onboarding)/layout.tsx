@@ -1,6 +1,7 @@
 import Image from "next/image"
 import type React from "react"
 import ConnectWallet from "@/components/ConnectWallet"
+import Link from "next/link"
 export default function OnboardingLayout({
   children,
 }: {
@@ -12,10 +13,12 @@ export default function OnboardingLayout({
       {/* Header */}
       <header className="relative z-10 bg-white flex items-center h-[80px] justify-between px-8 py-6 border-b border-gray-200">
         <div className="flex items-center gap-2">
-          <Image src="/logo.svg" alt="Logo" width="150" height="200"/>
+          <Link href="/" className="inline-flex cursor-pointer">
+            <Image src="/logo.svg" alt="Logo" width="150" height="200"/>
+          </Link>
         </div>
         <div className="flex items-center gap-4">
-          <ConnectWallet />
+          <ConnectWallet connectButtonClassName="!cursor-pointer" />
           {/* <button className="w-10 h-10 border border-gray-300 rounded-lg flex items-center justify-center hover:bg-gray-50">
             <span className="text-lg">👤</span>
           </button> */}
