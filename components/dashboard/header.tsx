@@ -15,7 +15,8 @@ export function DashboardHeader() {
   useEffect(() => {
     const stored = localStorage.getItem("accountType");
     if (stored) {
-      setAccountType(stored as "personal" | "organization");
+      const normalized = stored === "business" ? "organization" : stored;
+      setAccountType(normalized as "personal" | "organization");
     } else if (pathname.includes("/personal")) {
       setAccountType("personal");
     } else if (pathname.includes("/organization")) {
