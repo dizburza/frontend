@@ -1,5 +1,8 @@
 "use client"
 
+import Link from "next/link"
+import useOrgSlug from "@/hooks/useOrgSlug"
+
 interface ProposalTableProps {
   proposals: Array<{
     id: string
@@ -13,6 +16,9 @@ interface ProposalTableProps {
 }
 
 export function ProposalTable({ proposals }: Readonly<ProposalTableProps>) {
+  const orgSlug = useOrgSlug()
+  const proposalBase = orgSlug ? `/org/${orgSlug}/proposals` : "/org"
+
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
@@ -33,9 +39,12 @@ export function ProposalTable({ proposals }: Readonly<ProposalTableProps>) {
             <tr key={proposal.id} className="border-b border-gray-100 hover:bg-gray-50">
               <td className="py-4 px-4">{index + 1}</td>
               <td className="py-4 px-4">
-                <a href={`/organization/proposals/${proposal.id}`} className="text-blue-600 hover:underline font-medium">
+                <Link
+                  href={`${proposalBase}/${proposal.id}`}
+                  className="text-blue-600 hover:underline font-medium"
+                >
                   {proposal.title}
-                </a>
+                </Link>
               </td>
               <td className="py-4 px-4">{proposal.createdBy}</td>
               <td className="py-4 px-4">{proposal.timeLeft}</td>

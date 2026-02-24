@@ -14,10 +14,15 @@ import {
 import { getOrganizationSigners } from "@/lib/localStorage";
 import Image from "next/image";
 import { Copy, Info } from "lucide-react";
+import Link from "next/link";
+import useOrgSlug from "@/hooks/useOrgSlug";
 
 export default function OrganizationDashboardPage() {
   const [isAddSignersOpen, setIsAddSignersOpen] = useState(false);
   const [signers, setSigners] = useState(getOrganizationSigners());
+
+  const orgSlug = useOrgSlug();
+  const viewAllTransactionsHref = orgSlug ? `/org/${orgSlug}/transactions` : "/";
 
   const org = mockOrganizations.current;
   const wallet = mockWallet.organization;
@@ -109,8 +114,8 @@ export default function OrganizationDashboardPage() {
           </div>
         </div>
 
-         {/* Organization Info Card */}
-         <div className="pt-4 px-8">
+        {/* Organization Info Card */}
+        <div className="pt-4 px-8">
           <div className="flex items-start justify-between">
             <div className="flex items-start gap-x-4">
               <div className=" relative bottom-8 z-10">
@@ -136,16 +141,16 @@ export default function OrganizationDashboardPage() {
               </div>
             </div>
             <div className="flex gap-2">
-               <Button
-                 className="bg-blue-600 hover:bg-blue-700  border-b-2 border-[#8286E9]"
-                 onClick={() => setIsAddSignersOpen(true)}
-               >
-                 + Add Signers
-               </Button>
-               <Button variant="outline">Export ↓</Button>
+              <Button
+                className="bg-blue-600 hover:bg-blue-700  border-b-2 border-[#8286E9]"
+                onClick={() => setIsAddSignersOpen(true)}
+              >
+                + Add Signers
+              </Button>
+              <Button variant="outline">Export ↓</Button>
             </div>
           </div>
-         </div>
+        </div>
       </Card>
 
       {/* Main Content Grid */}
@@ -168,13 +173,13 @@ export default function OrganizationDashboardPage() {
                   <Info className="w-4 h-4 text-gray-400" />
                 </div>
                 <div className="flex gap-2">
-                <p className="text-3xl font-bold text-gray-900 mb-1">
-                  {wallet.balance.toLocaleString()}.00
-                </p>
-                <div className="flex items-center">
-                  <Image src={"/cngn.svg"} alt="cNGN" width={24} height={24} />
-                  <span className="text-[#26297A] text-center">cNGN</span>
-                </div>
+                  <p className="text-3xl font-bold text-gray-900 mb-1">
+                    {wallet.balance.toLocaleString()}.00
+                  </p>
+                  <div className="flex items-center">
+                    <Image src={"/cngn.svg"} alt="cNGN" width={24} height={24} />
+                    <span className="text-[#26297A] text-center">cNGN</span>
+                  </div>
                 </div>
                 <p className="text-sm text-green-600">
                   ▲ {wallet.changePercent}% than last month
@@ -212,13 +217,17 @@ export default function OrganizationDashboardPage() {
                 </div>
                 <div className="p-4 bg-gray-50 col-span-3 rounded-lg">
                   <p className="text-xs text-[#26297A] mb-2">Pending</p>
-                  <div className="flex gap-2"><Image src={"/cngn.svg"} alt="cNGN" width={24} height={24} />
-                  <p className="text-lg font-bold text-[#26297A]">275,000.00</p></div>
+                  <div className="flex gap-2">
+                    <Image src={"/cngn.svg"} alt="cNGN" width={24} height={24} />
+                    <p className="text-lg font-bold text-[#26297A]">275,000.00</p>
+                  </div>
                 </div>
                 <div className="p-4 bg-gray-50 rounded-lg col-span-3">
                   <p className="text-xs text-[#26297A] mb-2">Paid</p>
-                  <div className="flex gap-2"><Image src={"/cngn.svg"} alt="cNGN" width={24} height={24} />
-                  <p className="text-lg font-bold text-[#26297A]">275,000.00</p></div>
+                  <div className="flex gap-2">
+                    <Image src={"/cngn.svg"} alt="cNGN" width={24} height={24} />
+                    <p className="text-lg font-bold text-[#26297A]">275,000.00</p>
+                  </div>
                 </div>
               </div>
             </CardContent>
@@ -264,19 +273,13 @@ export default function OrganizationDashboardPage() {
                     {signers.map((signer: typeof org.signers[0], index: number) => (
                       <tr
                         key={signer.id}
-                        className={
-                          index < signers.length - 1
-                            ? "border-b border-gray-100"
-                            : ""
-                        }
+                        className={index < signers.length - 1 ? "border-b border-gray-100" : ""}
                       >
                         <td className="py-3 px-2 text-gray-900">{index + 1}</td>
                         <td className="py-3 px-2 text-gray-900">
                           {signer.username}
                         </td>
-                        <td className="py-3 px-2 text-gray-900">
-                          {signer.role}
-                        </td>
+                        <td className="py-3 px-2 text-gray-900">{signer.role}</td>
                         <td className="py-3 px-2">
                           <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded font-medium">
                             {signer.status}
@@ -295,7 +298,7 @@ export default function OrganizationDashboardPage() {
       {/* Analysis and Proposal History */}
       <div className="grid grid-cols-2 gap-6 mb-8">
         <Card className="h-96">
-           <AnalysisChart />
+          <AnalysisChart />
         </Card>
 
         <Card>
@@ -312,35 +315,21 @@ export default function OrganizationDashboardPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-200">
-                    <th className="text-left py-2 px-2 text-gray-600 font-medium">
-                      #
-                    </th>
-                    <th className="text-left py-2 px-2 text-gray-600 font-medium">
-                      Proposal
-                    </th>
-                    <th className="text-left py-2 px-2 text-gray-600 font-medium">
-                      Time Left
-                    </th>
-                    <th className="text-left py-2 px-2 text-gray-600 font-medium">
-                      Status
-                    </th>
+                    <th className="text-left py-2 px-2 text-gray-600 font-medium">#</th>
+                    <th className="text-left py-2 px-2 text-gray-600 font-medium">Proposal</th>
+                    <th className="text-left py-2 px-2 text-gray-600 font-medium">Time Left</th>
+                    <th className="text-left py-2 px-2 text-gray-600 font-medium">Status</th>
                   </tr>
                 </thead>
                 <tbody>
                   {proposals.map((proposal, index) => (
                     <tr
                       key={proposal.id}
-                      className={
-                        index < proposals.length - 1
-                          ? "border-b border-gray-100"
-                          : ""
-                      }
+                      className={index < proposals.length - 1 ? "border-b border-gray-100" : ""}
                     >
                       <td className="py-3 px-2">{index + 1}</td>
                       <td className="py-3 px-2">{proposal.title}</td>
-                      <td className="py-3 px-2 text-gray-600">
-                        {proposal.timeLeft}
-                      </td>
+                      <td className="py-3 px-2 text-gray-600">{proposal.timeLeft}</td>
                       <td className="py-3 px-2">
                         <span
                           className={`px-2 py-1 text-xs rounded ${
@@ -366,12 +355,9 @@ export default function OrganizationDashboardPage() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Transaction History</CardTitle>
-            <a
-              href="/organization/transactions"
-              className="text-blue-600 text-sm font-medium"
-            >
+            <Link href={viewAllTransactionsHref} className="text-blue-600 text-sm font-medium">
               View all
-            </a>
+            </Link>
           </div>
         </CardHeader>
         <CardContent>
@@ -379,27 +365,13 @@ export default function OrganizationDashboardPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-200">
-                  <th className="text-left py-2 px-2 text-gray-600 font-medium">
-                    #
-                  </th>
-                  <th className="text-left py-2 px-2 text-gray-600 font-medium">
-                    TNX HASH
-                  </th>
-                  <th className="text-left py-2 px-2 text-gray-600 font-medium">
-                    Batch Name
-                  </th>
-                  <th className="text-left py-2 px-2 text-gray-600 font-medium">
-                    Initiated By
-                  </th>
-                  <th className="text-left py-2 px-2 text-gray-600 font-medium">
-                    Amount
-                  </th>
-                  <th className="text-left py-2 px-2 text-gray-600 font-medium">
-                    Type
-                  </th>
-                  <th className="text-left py-2 px-2 text-gray-600 font-medium">
-                    Status
-                  </th>
+                  <th className="text-left py-2 px-2 text-gray-600 font-medium">#</th>
+                  <th className="text-left py-2 px-2 text-gray-600 font-medium">TNX HASH</th>
+                  <th className="text-left py-2 px-2 text-gray-600 font-medium">Batch Name</th>
+                  <th className="text-left py-2 px-2 text-gray-600 font-medium">Initiated By</th>
+                  <th className="text-left py-2 px-2 text-gray-600 font-medium">Amount</th>
+                  <th className="text-left py-2 px-2 text-gray-600 font-medium">Type</th>
+                  <th className="text-left py-2 px-2 text-gray-600 font-medium">Status</th>
                 </tr>
               </thead>
               <tbody>
@@ -413,14 +385,10 @@ export default function OrganizationDashboardPage() {
                     }
                   >
                     <td className="py-3 px-2">{index + 1}</td>
-                    <td className="py-3 px-2 text-gray-600 font-mono text-xs">
-                      {tx.transactionHash}
-                    </td>
+                    <td className="py-3 px-2 text-gray-600 font-mono text-xs">{tx.transactionHash}</td>
                     <td className="py-3 px-2">{tx.batchName}</td>
                     <td className="py-3 px-2">{tx.initiatedBy}</td>
-                    <td className="py-3 px-2">
-                      {tx.totalAmount.toLocaleString()} cNGN
-                    </td>
+                    <td className="py-3 px-2">{tx.totalAmount.toLocaleString()} cNGN</td>
                     <td className="py-3 px-2">
                       <span
                         className={`px-2 py-1 text-xs rounded ${
@@ -450,11 +418,11 @@ export default function OrganizationDashboardPage() {
           </div>
         </CardContent>
       </Card>
-       <AddSignersModal
-         isOpen={isAddSignersOpen}
-         onClose={() => setIsAddSignersOpen(false)}
-         onSignersAdded={handleSignersAdded}
-       />
+      <AddSignersModal
+        isOpen={isAddSignersOpen}
+        onClose={() => setIsAddSignersOpen(false)}
+        onSignersAdded={handleSignersAdded}
+      />
     </div>
   );
 }

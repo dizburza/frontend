@@ -14,6 +14,8 @@ export function DashboardHeader() {
     "personal" | "organization" | null
   >(null);
 
+  const [organizationSlug, setOrganizationSlug] = useState<string | null>(null);
+
   const [profile, setProfile] = useState<{
     initials: string;
     username: string;
@@ -28,7 +30,7 @@ export function DashboardHeader() {
       setAccountType(normalized as "personal" | "organization");
     } else if (pathname.includes("/personal")) {
       setAccountType("personal");
-    } else if (pathname.includes("/organization")) {
+    } else if (pathname.includes("/organization") || pathname.includes("/org/")) {
       setAccountType("organization");
     }
   }, [pathname]);
@@ -37,6 +39,7 @@ export function DashboardHeader() {
     const address = account?.address;
     if (!address) {
       setProfile(null);
+      setOrganizationSlug(null);
       return;
     }
 
@@ -70,6 +73,7 @@ export function DashboardHeader() {
           fullName?: string;
           avatar?: string;
           role?: string;
+          organizationSlug?: string;
         };
 
         const username = cached.username;
@@ -82,6 +86,8 @@ export function DashboardHeader() {
           role: roleLabel(role),
           avatar: cached.avatar,
         });
+
+        setOrganizationSlug(cached.organizationSlug || null);
         return true;
       } catch {
         return false;
@@ -118,6 +124,7 @@ export function DashboardHeader() {
               fullName?: string;
               avatar?: string;
               role?: string;
+              organizationSlug?: string;
             };
           };
         };
@@ -131,6 +138,8 @@ export function DashboardHeader() {
           role: roleLabel(user.role),
           avatar: user.avatar,
         });
+
+        setOrganizationSlug(user.organizationSlug || null);
       } catch {
         return;
       }
@@ -139,33 +148,36 @@ export function DashboardHeader() {
     fetchProfile();
   }, [account?.address]);
 
-  const tabs =
-    accountType === "personal"
-      ? [
-          { label: "Wallet", href: "/personal/wallet" },
-          { label: "Payments", href: "/personal/payments" },
-          { label: "Transactions", href: "/personal/transactions" },
-          { label: "QR Center", href: "/personal/qr-center" },
-        ]
-      : [
-          { label: "Dashboard", href: "/organization" },
-          { label: "Employees", href: "/organization/employees" },
-          { label: "Proposals", href: "/organization/proposals" },
-          { label: "Wallets", href: "/organization/wallet" },
-          { label: "Payments", href: "/organization/payments" },
-          { label: "Transactions", href: "/organization/transactions" },
-        ];
+  const tabs = (() => {
+    if (accountType === "personal") {
+      return [
+        { label: "Wallet", href: "/personal/wallet" },
+        { label: "Payments", href: "/personal/payments" },
+        { label: "Transactions", href: "/personal/transactions" },
+        { label: "QR Center", href: "/personal/qr-center" },
+      ];
+    }
+
+    const base = organizationSlug ? `/org/${organizationSlug}` : "/";
+    return [
+      { label: "Dashboard", href: base },
+      { label: "Employees", href: `${base}/employees` },
+      { label: "Proposals", href: `${base}/proposals` },
+      { label: "Wallets", href: `${base}/wallet` },
+      { label: "Payments", href: `${base}/payments` },
+      { label: "Transactions", href: `${base}/transactions` },
+    ];
+  })();
 
   const isActive = (href: string) => {
-    if (href === "/personal" && pathname === "/personal") return true;
-    if (href === "/organization" && pathname === "/organization") return true;
-    if (
-      href !== "/personal" &&
-      href !== "/organization" &&
-      pathname.startsWith(href)
-    )
-      return true;
-    return false;
+    if (!href || href === "/") return pathname === href;
+
+    const orgRoot = organizationSlug ? `/org/${organizationSlug}` : null;
+    if (orgRoot && href === orgRoot) {
+      return pathname === orgRoot || pathname === `${orgRoot}/`;
+    }
+
+    return pathname === href || pathname.startsWith(`${href}/`);
   };
 
   return (

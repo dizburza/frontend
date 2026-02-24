@@ -123,9 +123,7 @@ export default function PaymentsPage() {
                     <td className="py-4 px-4 text-sm font-semibold text-gray-900">
                       {formatAmount(batch.totalAmount)} cNGN
                     </td>
-                    <td className="py-4 px-4 text-sm text-gray-600">
-                      {batch.date}
-                    </td>
+                    <td className="py-4 px-4 text-sm text-gray-600">{batch.date}</td>
                     <td className="py-4 px-4 text-sm text-gray-900">{batch.employees}</td>
                     <td className="py-4 px-4 text-sm">
                       <span className="px-3 py-1 bg-gray-100 text-gray-700 rounded text-xs font-medium">

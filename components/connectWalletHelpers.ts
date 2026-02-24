@@ -22,6 +22,7 @@ type AuthCheckData = {
     fullName?: string;
     avatar?: string;
     role?: "employee" | "signer" | "admin";
+    organizationSlug?: string;
   };
 };
 
@@ -31,12 +32,18 @@ type CachedAuthCheck = {
   fullName?: string;
   avatar?: string;
   role?: "employee" | "signer" | "admin";
+  organizationSlug?: string;
   savedAt: number;
 };
 
-const getRedirectPathForRole = (role: CachedAuthCheck["role"] = "employee") => {
+const getRedirectPathForRole = (
+  role: CachedAuthCheck["role"] = "employee",
+  organizationSlug?: string
+) => {
   if (role === "admin" || role === "signer") {
-    return { path: "/organization", accountType: "organization" as const };
+    const slug = (organizationSlug || "").trim();
+    if (!slug) return null;
+    return { path: `/org/${slug}`, accountType: "organization" as const };
   }
   if (role === "employee") {
     return { path: "/personal/wallet", accountType: "personal" as const };
@@ -58,7 +65,7 @@ const tryRedirectFromCache = (params: {
     const isFresh = Date.now() - cached.savedAt < 5 * 60 * 1000;
     if (!isFresh || !cached.isRegistered) return false;
 
-    const redirect = getRedirectPathForRole(cached.role);
+    const redirect = getRedirectPathForRole(cached.role, cached.organizationSlug);
     if (!redirect) return false;
 
     localStorage.setItem("accountType", redirect.accountType);
@@ -105,6 +112,7 @@ const fetchAuthCheck = async (params: { address: string; router: AppRouter }) =>
       fullName: data?.user?.fullName,
       avatar: data?.user?.avatar,
       role: data?.user?.role || "employee",
+      organizationSlug: data?.user?.organizationSlug,
     };
   } catch {
     router.push("/setup-profile");
@@ -211,6 +219,7 @@ export const useRedirectOnFirstConnect = (params: {
           fullName: fetched.fullName,
           avatar: fetched.avatar,
           role: fetched.role || "employee",
+          organizationSlug: fetched.organizationSlug,
           savedAt: Date.now(),
         };
         localStorage.setItem(cacheKey, JSON.stringify(toCache));
@@ -223,7 +232,7 @@ export const useRedirectOnFirstConnect = (params: {
         return;
       }
 
-      const redirect = getRedirectPathForRole(fetched.role);
+      const redirect = getRedirectPathForRole(fetched.role, fetched.organizationSlug);
       if (redirect) {
         localStorage.setItem("accountType", redirect.accountType);
         router.push(redirect.path);

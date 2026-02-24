@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button"
 import { Search, Filter, ArrowUpDown } from "lucide-react"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import Link from "next/link"
+import { usePathname } from "next/navigation"
+import useOrgSlug from "@/hooks/useOrgSlug"
 
 const transactions = [
   {
@@ -47,11 +49,24 @@ const transactions = [
 ]
 
 export function TransactionHistory({ viewAllHref = "/" }: Readonly<{ viewAllHref?: string }>) {
+  const pathname = usePathname()
+
+  const orgSlug = useOrgSlug()
+
+  let resolvedViewAllHref = viewAllHref
+  if (viewAllHref === "/") {
+    if (orgSlug) {
+      resolvedViewAllHref = `/org/${orgSlug}/transactions`
+    } else if (pathname.startsWith("/personal")) {
+      resolvedViewAllHref = "/personal/transactions"
+    }
+  }
+
   return (
     <Card className="p-6">
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-lg font-semibold">Transaction History</h3>
-        <Link href={viewAllHref} className="text-blue-600 text-sm font-medium">
+        <Link href={resolvedViewAllHref} className="text-blue-600 text-sm font-medium">
           View all
         </Link>
       </div>
