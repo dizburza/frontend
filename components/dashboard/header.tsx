@@ -5,12 +5,21 @@ import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import Image from "next/image";
+import { useActiveAccount } from "thirdweb/react";
 
 export function DashboardHeader() {
   const pathname = usePathname();
+  const account = useActiveAccount();
   const [accountType, setAccountType] = useState<
     "personal" | "organization" | null
   >(null);
+
+  const [profile, setProfile] = useState<{
+    initials: string;
+    username: string;
+    role: string;
+    avatar?: string;
+  } | null>(null);
 
   useEffect(() => {
     const stored = localStorage.getItem("accountType");
@@ -23,6 +32,112 @@ export function DashboardHeader() {
       setAccountType("organization");
     }
   }, [pathname]);
+
+  useEffect(() => {
+    const address = account?.address;
+    if (!address) {
+      setProfile(null);
+      return;
+    }
+
+    const cacheKey = `authCheck:${address}`;
+
+    const computeInitials = (params: { fullName?: string; username?: string }) => {
+      const { fullName, username } = params;
+      const source = (fullName || "").trim();
+      if (source) {
+        const parts = source.split(/\s+/).filter(Boolean);
+        const first = parts[0]?.[0] || "";
+        const second = parts[1]?.[0] || "";
+        return `${first}${second}`.toUpperCase() || "?";
+      }
+      const u = (username || "").trim();
+      return (u.slice(0, 2).toUpperCase() || "?");
+    };
+
+    const roleLabel = (role: string = "user") => {
+      const normalized = role.trim() || "user";
+      return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+    };
+
+    const readFromCache = () => {
+      try {
+        const raw = localStorage.getItem(cacheKey);
+        if (!raw) return false;
+        const cached = JSON.parse(raw) as {
+          savedAt?: number;
+          username?: string;
+          fullName?: string;
+          avatar?: string;
+          role?: string;
+        };
+
+        const username = cached.username;
+        const role = cached.role;
+        if (!username) return false;
+
+        setProfile({
+          initials: computeInitials({ fullName: cached.fullName, username }),
+          username,
+          role: roleLabel(role),
+          avatar: cached.avatar,
+        });
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    const fetchProfile = async () => {
+      const hasCache = readFromCache();
+      if (hasCache) return;
+
+      try {
+        const backendUrl = process.env.BACKEND_URL;
+        const normalizedBackendBase = backendUrl
+          ? backendUrl.replace(/\/$/, "").replace(/\/api$/, "")
+          : null;
+
+        const upstream = normalizedBackendBase
+          ? `${normalizedBackendBase}/api/auth/check/${address}`
+          : `/api/auth/check/${address}`;
+
+        const res = await fetch(upstream, {
+          method: "GET",
+          headers: {
+            Accept: "application/json",
+          },
+        });
+
+        if (!res.ok) return;
+
+        const payload = (await res.json()) as {
+          data?: {
+            user?: {
+              username?: string;
+              fullName?: string;
+              avatar?: string;
+              role?: string;
+            };
+          };
+        };
+
+        const user = payload.data?.user;
+        if (!user?.username) return;
+
+        setProfile({
+          initials: computeInitials({ fullName: user.fullName, username: user.username }),
+          username: user.username,
+          role: roleLabel(user.role),
+          avatar: user.avatar,
+        });
+      } catch {
+        return;
+      }
+    };
+
+    fetchProfile();
+  }, [account?.address]);
 
   const tabs =
     accountType === "personal"
@@ -58,7 +173,9 @@ export function DashboardHeader() {
       <div className="flex items-center justify-between px-8 py-4">
         {/* Logo */}
         <div className="flex items-center gap-2">
-          <Image src="/logo.svg" alt="Logo" width="100" height="100"/>
+          <Link href="/" className="inline-flex cursor-pointer">
+            <Image src="/logo.svg" alt="Logo" width="100" height="100" />
+          </Link>
         </div>
 
         {/* Navigation Tabs */}
@@ -90,14 +207,25 @@ export function DashboardHeader() {
 
           {/* User Profile */}
           <div className="flex items-center gap-3 pl-4 border-l border-gray-200">
-            <div className="w-8 h-8 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full flex items-center justify-center text-white text-xs font-semibold">
-              BD
+            <div className="w-8 h-8 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full flex items-center justify-center text-white text-xs font-semibold overflow-hidden relative">
+              {profile?.avatar ? (
+                <Image
+                  src={profile.avatar}
+                  alt={profile.username ? `@${profile.username}` : "Profile"}
+                  fill
+                  sizes="32px"
+                  unoptimized={/^https?:\/\//.test(profile.avatar)}
+                  className="object-cover"
+                />
+              ) : (
+                (profile?.initials || "--")
+              )}
             </div>
             <div className="hidden sm:block">
               <p className="text-sm font-medium text-gray-900">
-                @bello_dami_6fad
+                {profile?.username ? `@${profile.username}` : ""}
               </p>
-              <p className="text-xs text-gray-500">Admin</p>
+              <p className="text-xs text-gray-500">{profile?.role || ""}</p>
             </div>
           </div>
         </div>

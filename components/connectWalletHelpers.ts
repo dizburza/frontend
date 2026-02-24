@@ -16,17 +16,25 @@ type ApiResponse<T> = {
 type AuthCheckData = {
   isRegistered: boolean;
   user?: {
+    username?: string;
+    surname?: string;
+    firstname?: string;
+    fullName?: string;
+    avatar?: string;
     role?: "employee" | "signer" | "admin";
   };
 };
 
 type CachedAuthCheck = {
   isRegistered: boolean;
+  username?: string;
+  fullName?: string;
+  avatar?: string;
   role?: "employee" | "signer" | "admin";
   savedAt: number;
 };
 
-const getRedirectPathForRole = (role: CachedAuthCheck["role"] | undefined) => {
+const getRedirectPathForRole = (role: CachedAuthCheck["role"] = "employee") => {
   if (role === "admin" || role === "signer") {
     return { path: "/organization", accountType: "organization" as const };
   }
@@ -93,7 +101,10 @@ const fetchAuthCheck = async (params: { address: string; router: AppRouter }) =>
     const data = payload.data;
     return {
       isRegistered: Boolean(data?.isRegistered),
-      role: data?.user?.role,
+      username: data?.user?.username,
+      fullName: data?.user?.fullName,
+      avatar: data?.user?.avatar,
+      role: data?.user?.role || "employee",
     };
   } catch {
     router.push("/setup-profile");
@@ -196,7 +207,10 @@ export const useRedirectOnFirstConnect = (params: {
       try {
         const toCache: CachedAuthCheck = {
           isRegistered: fetched.isRegistered,
-          role: fetched.role,
+          username: fetched.username,
+          fullName: fetched.fullName,
+          avatar: fetched.avatar,
+          role: fetched.role || "employee",
           savedAt: Date.now(),
         };
         localStorage.setItem(cacheKey, JSON.stringify(toCache));
