@@ -10,7 +10,7 @@ export default function WalletPage() {
   return (
     <div className="space-y-8 px-6 py-8 w-full grid">
       <div><OrganizationPromotionCard /></div>
-      <div className="grid lg:grid-cols-9 max-h-[300px]  w-full gap-x-4">
+      <div className="grid lg:grid-cols-9 min-h-[300px] w-full gap-x-4">
         <div className="w-full col-span-3 h-full">
           <BalanceCard />
         </div>

@@ -26,8 +26,8 @@ export function AnalysisChart() {
         </select>
       </div>
 
-      <div className="flex-1">
-        <ResponsiveContainer width="100%" height="100%">
+      <div className="flex-1 min-h-[220px]">
+        <ResponsiveContainer width="100%" height={220}>
           <BarChart data={data}>
             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
             <XAxis dataKey="month" />
