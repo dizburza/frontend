@@ -7,6 +7,12 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { useGlobalLoading } from "@/lib/global-loading"
 import { toast } from "sonner"
+import { useActiveAccount, useSendTransaction, useWalletBalance } from "thirdweb/react"
+import { getContract } from "thirdweb"
+import { prepareContractCall } from "thirdweb/transaction"
+import { baseSepolia } from "thirdweb/chains"
+import { thirdwebClient } from "@/app/client"
+import { parseUnits } from "viem"
 
 interface SendToCNGNFlowProps {
   isOpen: boolean
@@ -22,27 +28,86 @@ export function SendToCNGNFlow({ isOpen, onClose }: Readonly<SendToCNGNFlowProps
   const [isLoading, setIsLoading] = useState(false)
   const { showLoading, hideLoading } = useGlobalLoading()
 
+  const account = useActiveAccount()
+  const { mutateAsync: sendTx } = useSendTransaction()
+
+  const tokenAddress = process.env.NEXT_PUBLIC_CNGN_ADDRESS as `0x${string}` | undefined
+  const contract = tokenAddress
+    ? getContract({
+        address: tokenAddress,
+        chain: baseSepolia,
+        client: thirdwebClient,
+      })
+    : null
+
+  const { data: balanceData } = useWalletBalance({
+    address: account?.address,
+    chain: baseSepolia,
+    client: thirdwebClient,
+    tokenAddress,
+  })
+
   if (!isOpen) return null
 
-  const handleNext = async () => {
-    if (step === "recipient" && recipient) {
-      setStep("amount")
-    } else if (step === "amount" && amount) {
-      if (isLoading) return
+  const isHexAddress = (value: string): value is `0x${string}` => {
+    return /^0x[a-fA-F0-9]{40}$/.test(value)
+  }
 
-      try {
-        setIsLoading(true)
-        showLoading("Confirming transfer...")
-        toast.success("Transfer submitted")
-        setStep("success")
-      } catch (error) {
-        console.error(error)
-        toast.error("Could not send. Please try again.")
-      } finally {
-        hideLoading()
-        setIsLoading(false)
+  const submitTransfer = async () => {
+    try {
+      if (!account?.address) {
+        toast.error("Connect wallet to continue")
+        return
       }
+
+      if (!contract) {
+        toast.error("Token contract not configured")
+        return
+      }
+
+      if (!isHexAddress(recipient.trim())) {
+        toast.error("Recipient must be a wallet address (0x...)")
+        return
+      }
+
+      const parsedAmount = Number.parseFloat(amount)
+      if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+        toast.error("Enter a valid amount")
+        return
+      }
+
+      setIsLoading(true)
+      showLoading("Confirming transfer...")
+
+      const tx = prepareContractCall({
+        contract,
+        method: "function transfer(address to, uint256 value)",
+        params: [recipient.trim(), parseUnits(amount, 6)],
+      })
+
+      await sendTx(tx)
+
+      toast.success("Transfer submitted")
+      setStep("success")
+    } catch (error) {
+      console.error(error)
+      toast.error("Could not send. Please try again.")
+    } finally {
+      hideLoading()
+      setIsLoading(false)
     }
+  }
+
+  const handleNext = async () => {
+    if (step === "recipient") {
+      if (recipient) setStep("amount")
+      return
+    }
+
+    if (step !== "amount" || !amount) return
+    if (isLoading) return
+
+    await submitTransfer()
   }
 
   const handleBack = () => {
@@ -119,7 +184,7 @@ export function SendToCNGNFlow({ isOpen, onClose }: Readonly<SendToCNGNFlowProps
                 onChange={(e) => setAmount(e.target.value)}
               />
               <div className="mt-4 text-sm text-gray-600">
-                Available balance: <span className="font-semibold">25 cNGN</span>
+                Available balance: <span className="font-semibold">{balanceData?.displayValue || "--"} cNGN</span>
               </div>
             </div>
             <Button onClick={handleNext} disabled={!amount || isLoading} className="w-full">
