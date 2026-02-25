@@ -18,10 +18,7 @@ export function QuickActions({ onSendToCNGN, onSendToBank, onReceive }: Readonly
         onClick={onSendToCNGN}
       >
        <Image src={"/send-to-cngn.svg"} alt="Send cNGN" width={54} height={54} />
-        <div className="text-center leading-tight">
-          <div className="text-sm font-medium">Send cNGN</div>
-          <div className="text-xs text-gray-500">@username or 0x</div>
-        </div>
+        <span className="text-sm">To cNGN</span>
       </Button>
       <Button
         variant="outline"
