@@ -1,20 +1,14 @@
 import { createThirdwebClient } from "thirdweb";
 import { inAppWallet, createWallet } from "thirdweb/wallets";
 
-const clientId = process.env.THIRDWEB_CLIENT_ID;
-const secretKey = process.env.THIRDWEB_SECRET_KEY;
+const clientId = process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID;
 
 if (!clientId) {
   throw new Error("No client ID provided");
 }
 
-if (!secretKey) {
-  throw new Error("No secret key provided");
-}
-
 export const thirdwebClient = createThirdwebClient({
   clientId: clientId,
-  secretKey: secretKey,
 });
 
 export const wallets = [
