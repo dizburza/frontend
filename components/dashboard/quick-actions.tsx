@@ -2,16 +2,18 @@
 
 import { Button } from "@/components/ui/button"
 import Image from "next/image"
+import { ScanQrCode } from "lucide-react"
 
 interface QuickActionsProps {
   onSendToCNGN: () => void
   onSendToBank: () => void
   onReceive: () => void
+  onScan: () => void
 }
 
-export function QuickActions({ onSendToCNGN, onSendToBank, onReceive }: Readonly<QuickActionsProps>) {
+export function QuickActions({ onSendToCNGN, onSendToBank, onReceive, onScan }: Readonly<QuickActionsProps>) {
   return (
-    <div className="grid grid-cols-3 gap-4">
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
       <Button
         variant="outline"
         className="h-24 flex flex-col items-center justify-center gap-2 bg-transparent"
@@ -35,6 +37,16 @@ export function QuickActions({ onSendToCNGN, onSendToBank, onReceive }: Readonly
       >
         <Image src={"/receive.svg"} alt="Receive" width={54} height={54} />
         <span className="text-sm">Receive</span>
+      </Button>
+      <Button
+        variant="outline"
+        className="h-24 flex flex-col items-center justify-center gap-2 bg-transparent"
+        onClick={onScan}
+      >
+        <div className="h-[54px] w-[54px] rounded-[4px] bg-[#F9F9FE] flex items-center justify-center">
+          <ScanQrCode className="h-8 w-8 text-[#454ADE]" />
+        </div>
+        <span className="text-sm">Scan</span>
       </Button>
     </div>
   )

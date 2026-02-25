@@ -4,12 +4,18 @@ import { useState } from "react"
 import { StatCard } from "@/components/stat-card"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
 import { ChevronDown, Search, MoreVertical } from "lucide-react"
 import useCngnTransferActivity from "@/hooks/ERC20/useCngnTransferActivity"
 import useAddressUsernames from "@/hooks/useAddressUsernames"
+import { QRScanModal } from "@/components/qr-scan-modal"
+import { SendToCNGNFlow } from "@/components/send-to-cngn-flow"
 
 export default function PersonalPaymentsPage() {
   const [searchTerm, setSearchTerm] = useState("")
+  const [showScan, setShowScan] = useState(false)
+  const [showSend, setShowSend] = useState(false)
+  const [scanRecipient, setScanRecipient] = useState<string | undefined>(undefined)
 
   const { rows, outgoingTotal, isLoading, error, toShortAddress, lastUpdatedAt } = useCngnTransferActivity()
 
@@ -47,6 +53,9 @@ export default function PersonalPaymentsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold text-gray-900">Payments</h1>
+        <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => setShowScan(true)}>
+          Scan to Send
+        </Button>
       </div>
 
       {/* Stat Cards */}
@@ -175,6 +184,21 @@ export default function PersonalPaymentsPage() {
           </table>
         </div>
       </Card>
+
+      <QRScanModal
+        isOpen={showScan}
+        onClose={() => setShowScan(false)}
+        onDetected={({ recipient }) => {
+          setScanRecipient(recipient)
+          setShowSend(true)
+        }}
+      />
+
+      <SendToCNGNFlow
+        isOpen={showSend}
+        onClose={() => setShowSend(false)}
+        initialRecipient={scanRecipient}
+      />
     </div>
   )
 }

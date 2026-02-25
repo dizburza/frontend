@@ -7,6 +7,7 @@ import { QuickActions } from "./quick-actions";
 import { SendToCNGNFlow } from "@/components/send-to-cngn-flow";
 import { SendToBankFlow } from "@/components/send-to-bank-flow";
 import { ReceiveFlow } from "@/components/receive-flow";
+import { QRScanModal } from "@/components/qr-scan-modal";
 import Image from "next/image";
 import { useActiveAccount } from "thirdweb/react";
 import useGetTokenBalance from "@/hooks/ERC20/useGetBalance";
@@ -20,6 +21,8 @@ export function BalanceCard() {
   const [showSendToCNGN, setShowSendToCNGN] = useState(false);
   const [showSendToBank, setShowSendToBank] = useState(false);
   const [showReceive, setShowReceive] = useState(false);
+  const [showScan, setShowScan] = useState(false);
+  const [scanRecipient, setScanRecipient] = useState<string | undefined>(undefined);
 
   const lastUpdatedDisplay = lastUpdatedAt ? new Date(lastUpdatedAt).toLocaleString() : " ";
 
@@ -80,21 +83,35 @@ export function BalanceCard() {
 
       <div className="py-2">
         <QuickActions
-          onSendToCNGN={() => setShowSendToCNGN(true)}
+          onSendToCNGN={() => {
+            setScanRecipient(undefined);
+            setShowSendToCNGN(true);
+          }}
           onSendToBank={() => setShowSendToBank(true)}
           onReceive={() => setShowReceive(true)}
+          onScan={() => setShowScan(true)}
         />
       </div>
 
       <SendToCNGNFlow
         isOpen={showSendToCNGN}
         onClose={() => setShowSendToCNGN(false)}
+        initialRecipient={scanRecipient}
       />
       <SendToBankFlow
         isOpen={showSendToBank}
         onClose={() => setShowSendToBank(false)}
       />
       <ReceiveFlow isOpen={showReceive} onClose={() => setShowReceive(false)} />
+
+      <QRScanModal
+        isOpen={showScan}
+        onClose={() => setShowScan(false)}
+        onDetected={({ recipient }) => {
+          setScanRecipient(recipient);
+          setShowSendToCNGN(true);
+        }}
+      />
     </Card>
   );
 }

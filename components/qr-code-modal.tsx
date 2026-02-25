@@ -16,6 +16,8 @@ export function QRCodeModal({ onClose }: Readonly<QRCodeModalProps>) {
   const account = useActiveAccount()
   const address = account?.address || ""
 
+  const appOrigin = (process.env.NEXT_PUBLIC_APP_ORIGIN) || ""
+
   const username = useMemo(() => {
     if (!address) return ""
     try {
@@ -42,13 +44,33 @@ export function QRCodeModal({ onClose }: Readonly<QRCodeModalProps>) {
     return `${value.slice(0, 4)}...${value.slice(-4)}`
   }
 
-  const qrValue = selected === "address" ? address : username
+  const [origin, setOrigin] = useState("")
+
+  useEffect(() => {
+    try {
+      setOrigin(globalThis.location.origin)
+    } catch {
+      setOrigin("")
+    }
+  }, [])
+
+  const deepLink = useMemo(() => {
+    const base = appOrigin || origin
+    if (!base) return ""
+
+    const url = new URL("/receive", base)
+    if (address) url.searchParams.set("address", address)
+    if (username) url.searchParams.set("username", username)
+
+    const dappTarget = `${url.host}${url.pathname}${url.search}`
+    return `https://metamask.app.link/dapp/${dappTarget}`
+  }, [address, appOrigin, origin, username])
+
+  const qrValue = deepLink
 
   const shareValue = useMemo(() => {
-    if (selected === "address") return address
-    if (!username) return ""
-    return `@${username}`
-  }, [address, selected, username])
+    return deepLink
+  }, [deepLink])
 
   const copyToClipboard = async (value: string, key: "address" | "username") => {
     if (!value) return

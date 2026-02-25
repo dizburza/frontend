@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { TransactionModal } from "@/components/transaction-modal"
 import { SuccessModal } from "@/components/success-modal"
 import { Input } from "@/components/ui/input"
@@ -17,11 +17,12 @@ import { parseUnits } from "viem"
 interface SendToCNGNFlowProps {
   isOpen: boolean
   onClose: () => void
+  initialRecipient?: string
 }
 
 type Step = "recipient" | "amount" | "success"
 
-export function SendToCNGNFlow({ isOpen, onClose }: Readonly<SendToCNGNFlowProps>) {
+export function SendToCNGNFlow({ isOpen, onClose, initialRecipient }: Readonly<SendToCNGNFlowProps>) {
   const [step, setStep] = useState<Step>("recipient")
   const [recipient, setRecipient] = useState("")
   const [resolvedRecipient, setResolvedRecipient] = useState<`0x${string}` | null>(null)
@@ -48,6 +49,21 @@ export function SendToCNGNFlow({ isOpen, onClose }: Readonly<SendToCNGNFlowProps
     client: thirdwebClient,
     tokenAddress,
   })
+
+  useEffect(() => {
+    if (!isOpen) return
+
+    setStep("recipient")
+    setAmount("")
+    setResolvedRecipient(null)
+    setResolvedUsername(null)
+
+    if (typeof initialRecipient === "string") {
+      setRecipient(initialRecipient)
+    } else {
+      setRecipient("")
+    }
+  }, [initialRecipient, isOpen])
 
   if (!isOpen) return null
 
