@@ -55,29 +55,41 @@ export function SendToCNGNFlow({ isOpen, onClose }: Readonly<SendToCNGNFlowProps
     return /^0x[a-fA-F0-9]{40}$/.test(value)
   }
 
-  const isUsername = (value: string) => {
-    return value.trim().startsWith("@")
+  const parseUsername = (value: string) => {
+    const trimmed = value.trim()
+    if (!trimmed) return null
+
+    if (trimmed.startsWith("@@")) {
+      return null
+    }
+
+    const cleaned = trimmed.startsWith("@") ? trimmed.slice(1) : trimmed
+    const username = cleaned.trim().toLowerCase()
+    if (!username) return null
+
+    // Keep it simple + compatible with existing generated usernames (letters/numbers/underscore)
+    if (!/^[a-z0-9_]{3,32}$/.test(username)) {
+      return null
+    }
+
+    return username
   }
 
-  const resolveRecipient = async () => {
+  const resolveRecipient = async (): Promise<
+    | { address: `0x${string}`; username: string | null }
+    | null
+  > => {
     const input = recipient.trim()
-    if (!input) return
+    if (!input) return null
 
     if (isHexAddress(input)) {
-      setResolvedRecipient(input)
-      setResolvedUsername(null)
-      return
+      return { address: input, username: null }
     }
 
-    if (!isUsername(input)) {
-      toast.error("Enter a wallet address (0x...) or a username (@...)")
-      return
-    }
-
-    const cleaned = input.slice(1).trim()
-    if (cleaned.length < 3) {
-      toast.error("Username must be at least 3 characters")
-      return
+    const username = parseUsername(input)
+    if (!username) {
+      toast.error("Enter a valid @username or 0x address")
+      return null
     }
 
     try {
@@ -85,28 +97,31 @@ export function SendToCNGNFlow({ isOpen, onClose }: Readonly<SendToCNGNFlowProps
       const backend = process.env.BACKEND_URL
       if (!backend) {
         toast.error("Backend URL not configured")
-        return
+        return null
       }
 
-      const res = await fetch(`${backend}/api/users/resolve/${encodeURIComponent(cleaned)}`)
+      const res = await fetch(`${backend}/api/users/resolve/${encodeURIComponent(username)}`)
       const body = (await res.json()) as { success?: boolean; data?: { username?: string; walletAddress?: string }; error?: string }
 
       if (!res.ok || !body?.data?.walletAddress) {
         toast.error(body?.error || "Could not resolve username")
-        return
+        return null
       }
 
       const addr = body.data.walletAddress.trim()
       if (!isHexAddress(addr)) {
         toast.error("Resolved address is invalid")
-        return
+        return null
       }
 
-      setResolvedRecipient(addr)
-      setResolvedUsername(body.data.username || cleaned.toLowerCase())
+      return {
+        address: addr,
+        username: body.data.username || username,
+      }
     } catch (e) {
       console.error(e)
       toast.error("Could not resolve username")
+      return null
     } finally {
       hideLoading()
     }
@@ -162,8 +177,11 @@ export function SendToCNGNFlow({ isOpen, onClose }: Readonly<SendToCNGNFlowProps
       if (!recipient) return
       if (isLoading) return
 
-      await resolveRecipient()
-      if (!resolvedRecipient) return
+      const result = await resolveRecipient()
+      if (!result) return
+
+      setResolvedRecipient(result.address)
+      setResolvedUsername(result.username)
       setStep("amount")
       return
     }
@@ -229,7 +247,11 @@ export function SendToCNGNFlow({ isOpen, onClose }: Readonly<SendToCNGNFlowProps
               <Input
                 placeholder="Enter @username or 0x address"
                 value={recipient}
-                onChange={(e) => setRecipient(e.target.value)}
+                onChange={(e) => {
+                  setRecipient(e.target.value)
+                  setResolvedRecipient(null)
+                  setResolvedUsername(null)
+                }}
               />
             </div>
             <Button onClick={handleNext} disabled={!recipient || isLoading} className="w-full">
