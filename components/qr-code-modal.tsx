@@ -2,24 +2,96 @@
 
 import { TransactionModal } from "@/components/transaction-modal"
 import { Button } from "@/components/ui/button"
-import { Share2 } from "lucide-react"
+import { Check, Copy, Share2 } from "lucide-react"
+import { useActiveAccount } from "thirdweb/react"
+import { useEffect, useMemo, useState } from "react"
+import QRCode from "react-qr-code"
+import { toast } from "sonner"
 
 interface QRCodeModalProps {
   onClose: () => void
 }
 
 export function QRCodeModal({ onClose }: Readonly<QRCodeModalProps>) {
+  const account = useActiveAccount()
+  const address = account?.address || ""
+
+  const username = useMemo(() => {
+    if (!address) return ""
+    try {
+      const raw = localStorage.getItem(`authCheck:${address}`)
+      if (!raw) return ""
+      const parsed = JSON.parse(raw) as { username?: string }
+      return parsed.username || ""
+    } catch {
+      return ""
+    }
+  }, [address])
+
+  const [selected, setSelected] = useState<"address" | "username">("address")
+  const [copied, setCopied] = useState<"address" | "username" | null>(null)
+
+  useEffect(() => {
+    if (!copied) return
+    const t = setTimeout(() => setCopied(null), 1500)
+    return () => clearTimeout(t)
+  }, [copied])
+
+  const shortAddress = (value: string) => {
+    if (!value) return "--"
+    return `${value.slice(0, 4)}...${value.slice(-4)}`
+  }
+
+  const qrValue = selected === "address" ? address : username
+
+  const shareValue = useMemo(() => {
+    if (selected === "address") return address
+    if (!username) return ""
+    return `@${username}`
+  }, [address, selected, username])
+
+  const copyToClipboard = async (value: string, key: "address" | "username") => {
+    if (!value) return
+    try {
+      await navigator.clipboard.writeText(value)
+      setCopied(key)
+    } catch {
+      toast.error("Could not copy")
+      return
+    }
+  }
+
+  const share = async () => {
+    if (!shareValue) return
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: "Dizburza Receive",
+          text: `Send cNGN to: ${shareValue}`,
+        })
+        toast.success("Shared")
+        return
+      }
+
+      await navigator.clipboard.writeText(shareValue)
+      setCopied(selected)
+      toast.success("Copied")
+    } catch {
+      toast.error("Could not share")
+      return
+    }
+  }
+
   return (
     <TransactionModal title="Receive from others" onClose={onClose}>
       <div className="space-y-6">
         <div className="flex justify-center">
-          <div className="w-48 h-48 bg-gray-100 rounded flex items-center justify-center">
-            <svg viewBox="0 0 200 200" className="w-full h-full p-4">
-              <rect x="20" y="20" width="50" height="50" fill="black" />
-              <rect x="130" y="20" width="50" height="50" fill="black" />
-              <rect x="20" y="130" width="50" height="50" fill="black" />
-              <circle cx="100" cy="100" r="15" fill="black" />
-            </svg>
+          <div className="w-48 h-48 bg-white rounded flex items-center justify-center border border-gray-200 p-3">
+            {qrValue ? (
+              <QRCode value={qrValue} size={180} />
+            ) : (
+              <div className="text-sm text-gray-500">Connect wallet</div>
+            )}
           </div>
         </div>
 
@@ -32,13 +104,50 @@ export function QRCodeModal({ onClose }: Readonly<QRCodeModalProps>) {
 
         <div className="space-y-3">
           <p className="text-center text-sm text-gray-600">OR</p>
-          <div className="flex gap-2">
-            <div className="flex-1 p-3 bg-gray-50 rounded text-center text-sm font-mono">0xf2...6fad</div>
-            <div className="flex-1 p-3 bg-gray-50 rounded text-center text-sm">@bello_dami_6fad</div>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setSelected("address")}
+              className={`p-3 bg-gray-50 rounded text-center text-sm font-mono border ${
+                selected === "address" ? "border-blue-500" : "border-transparent"
+              }`}
+            >
+              {shortAddress(address)}
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelected("username")}
+              className={`p-3 bg-gray-50 rounded text-center text-sm border ${
+                selected === "username" ? "border-blue-500" : "border-transparent"
+              }`}
+            >
+              {username ? `@${username}` : "--"}
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              variant="outline"
+              className="gap-2 bg-transparent"
+              onClick={() => copyToClipboard(address, "address")}
+              disabled={!address}
+            >
+              {copied === "address" ? <Check size={16} /> : <Copy size={16} />}
+              Copy address
+            </Button>
+            <Button
+              variant="outline"
+              className="gap-2 bg-transparent"
+              onClick={() => copyToClipboard(username ? `@${username}` : "", "username")}
+              disabled={!username}
+            >
+              {copied === "username" ? <Check size={16} /> : <Copy size={16} />}
+              Copy username
+            </Button>
           </div>
         </div>
 
-        <Button className="w-full bg-blue-600 hover:bg-blue-700 gap-2">
+        <Button className="w-full bg-blue-600 hover:bg-blue-700 gap-2" onClick={share} disabled={!shareValue}>
           <Share2 size={18} />
           Share
         </Button>
