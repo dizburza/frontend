@@ -82,11 +82,12 @@ const fetchContractEventsChunked = async (
 const enrichWithBlockAndGas = async (
   contract: NonNullable<ReturnType<typeof getContract>>,
   rows: CngnTransferRow[],
+  enrichLimit: number,
   shouldCancel: () => boolean,
 ) => {
   const rpcRequest = getRpcClient(contract);
   const blockTimestampCache = new Map<string, number>();
-  const target = rows.slice(0, 50);
+  const target = rows.slice(0, Math.max(0, enrichLimit));
 
   const enriched = await Promise.all(
     target.map(async (r) => {
@@ -128,6 +129,7 @@ const enrichWithBlockAndGas = async (
 export default function useCngnTransferActivity(params?: {
   blockRange?: bigint;
   decimals?: number;
+  enrichLimit?: number;
 }) {
   const account = useActiveAccount();
   const walletAddress = account?.address as `0x${string}` | undefined;
@@ -136,6 +138,7 @@ export default function useCngnTransferActivity(params?: {
     | `0x${string}`
     | undefined;
   const decimals = params?.decimals ?? 6;
+  const enrichLimit = params?.enrichLimit ?? 3;
   // ~50k blocks covers roughly a week on Base Sepolia (~2s block time).
   // Increase if you need more history, but be aware of RPC call volume.
   const blockRange = params?.blockRange ?? BigInt(50000);
@@ -238,7 +241,7 @@ export default function useCngnTransferActivity(params?: {
           .sort((a, b) =>
             Number((b.blockNumber ?? BigInt(0)) - (a.blockNumber ?? BigInt(0))),
           );
-        const withMeta = await enrichWithBlockAndGas(contract, normalized, shouldCancel);
+        const withMeta = await enrichWithBlockAndGas(contract, normalized, enrichLimit, shouldCancel);
         if (cancelled) return;
         setRows(withMeta);
       } catch (e) {
@@ -259,7 +262,7 @@ export default function useCngnTransferActivity(params?: {
     return () => {
       cancelled = true;
     };
-  }, [blockRange, contract, decimals, walletAddress]);
+  }, [blockRange, contract, decimals, enrichLimit, walletAddress]);
 
   const incomingTotal = rows
     .filter((r) => r.direction === "incoming")

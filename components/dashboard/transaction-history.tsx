@@ -19,6 +19,16 @@ export function TransactionHistory({
   const { rows, isLoading, error, toShortAddress } = useCngnTransferActivity()
   const recent = rows.slice(0, limit)
 
+  const gasFeeDisplay = (gasFeeEth?: number) => {
+    if (typeof gasFeeEth !== "number" || !Number.isFinite(gasFeeEth)) return "--"
+    if (gasFeeEth === 0) return "0 ETH"
+    if (gasFeeEth < 0.000001) return "<0.000001 ETH"
+    return `${gasFeeEth.toLocaleString(undefined, {
+      minimumFractionDigits: 6,
+      maximumFractionDigits: 6,
+    })} ETH`
+  }
+
   const orgSlug = useOrgSlug()
 
   let resolvedViewAllHref = viewAllHref
@@ -71,10 +81,7 @@ export function TransactionHistory({
               <AvatarImage src={"/placeholder.svg"} />
               <AvatarFallback>{tx.counterparty[2] || "?"}</AvatarFallback>
             </Avatar>
-            <span>
-              {tx.direction === "incoming" ? "Inflow from " : "Outflow to "}
-              {toShortAddress(tx.counterparty)}
-            </span>
+            <span>{toShortAddress(tx.counterparty)}</span>
           </div>
         </td>
         <td className="py-4 px-4">
@@ -83,14 +90,7 @@ export function TransactionHistory({
             maximumFractionDigits: 2,
           })} cNGN
         </td>
-        <td className="py-4 px-4">
-          {typeof tx.gasFeeEth === "number"
-            ? `${tx.gasFeeEth.toLocaleString(undefined, {
-                minimumFractionDigits: 6,
-                maximumFractionDigits: 6,
-              })} ETH`
-            : "--"}
-        </td>
+        <td className="py-4 px-4">{gasFeeDisplay(tx.gasFeeEth)}</td>
         <td className="py-4 px-4">
           <div>
             <p>{tx.timestamp ? new Date(tx.timestamp * 1000).toLocaleDateString() : "--"}</p>
