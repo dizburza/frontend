@@ -5,57 +5,26 @@ import { StatCard } from "@/components/stat-card"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { ChevronDown, Search, MoreVertical } from "lucide-react"
-
-const paymentHistory = [
-  {
-    id: 1,
-    recipient: "John Doe",
-    amount: "50,000",
-    date: "25 Oct, 2025",
-    time: "At 7:45 AM",
-    type: "Sent",
-    status: "Completed",
-  },
-  {
-    id: 2,
-    recipient: "Jane Smith",
-    amount: "75,000",
-    date: "24 Oct, 2025",
-    time: "At 3:20 PM",
-    type: "Sent",
-    status: "Completed",
-  },
-  {
-    id: 3,
-    recipient: "Tech Company Ltd",
-    amount: "150,000",
-    date: "23 Oct, 2025",
-    time: "At 10:15 AM",
-    type: "Sent",
-    status: "Completed",
-  },
-  {
-    id: 4,
-    recipient: "Sarah Johnson",
-    amount: "30,000",
-    date: "22 Oct, 2025",
-    time: "At 2:30 PM",
-    type: "Sent",
-    status: "Failed",
-  },
-  {
-    id: 5,
-    recipient: "Mike Wilson",
-    amount: "100,000",
-    date: "21 Oct, 2025",
-    time: "At 9:00 AM",
-    type: "Sent",
-    status: "Completed",
-  },
-]
+import useCngnTransferActivity from "@/hooks/ERC20/useCngnTransferActivity"
 
 export default function PersonalPaymentsPage() {
   const [searchTerm, setSearchTerm] = useState("")
+
+  const { rows, outgoingTotal, isLoading, error, toShortAddress } = useCngnTransferActivity()
+
+  // Treat outgoing cNGN transfers as "payments" for this page.
+  const payments = rows.filter((r) => r.direction === "outgoing")
+
+  const filtered = (() => {
+    const q = searchTerm.trim().toLowerCase()
+    if (!q) return payments
+
+    return payments.filter((p) => {
+      const counterparty = p.counterparty.toLowerCase()
+      const txHash = p.transactionHash.toLowerCase()
+      return counterparty.includes(q) || txHash.includes(q)
+    })
+  })()
 
   const getStatusColor = (status: string) => {
     return status === "Completed" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
@@ -77,10 +46,14 @@ export default function PersonalPaymentsPage() {
 
       {/* Stat Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Total Payments" value="5" trend={{ value: "+1 this month", direction: "up" }} />
-        <StatCard label="Total Sent" value="405,000 cNGN" lastUpdated="1 min ago" />
-        <StatCard label="Completed" value="4" trend={{ value: "+1 this month", direction: "up" }} />
-        <StatCard label="Failed" value="1" lastUpdated="1 min ago" />
+        <StatCard label="Total Payments" value={String(payments.length)} trend={{ value: " ", direction: "up" }} />
+        <StatCard
+          label="Total Sent"
+          value={`${outgoingTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} cNGN`}
+          lastUpdated={isLoading ? "Updating..." : " "}
+        />
+        <StatCard label="Completed" value={String(payments.length)} trend={{ value: " ", direction: "up" }} />
+        <StatCard label="Failed" value="0" lastUpdated=" " />
       </div>
 
       {/* Payment History Table */}
@@ -125,29 +98,65 @@ export default function PersonalPaymentsPage() {
               </tr>
             </thead>
             <tbody>
-              {paymentHistory.map((payment) => (
-                <tr key={payment.id} className="border-b border-gray-100 hover:bg-gray-50">
-                  <td className="py-4 px-4 text-sm text-gray-900">{payment.id}</td>
-                  <td className="py-4 px-4 text-sm text-gray-900">{payment.recipient}</td>
-                  <td className="py-4 px-4 text-sm font-semibold text-gray-900">{payment.amount}</td>
-                  <td className="py-4 px-4 text-sm text-gray-600">
-                    {payment.date}
-                    <br />
-                    <span className="text-xs text-gray-500">{payment.time}</span>
-                  </td>
-                  <td className="py-4 px-4 text-sm text-gray-600">{payment.type}</td>
-                  <td className="py-4 px-4 text-sm">
-                    <span className={`px-3 py-1 rounded text-xs font-medium ${getStatusColor(payment.status)}`}>
-                      {payment.status}
-                    </span>
-                  </td>
-                  <td className="py-4 px-4 text-sm">
-                    <button className="text-gray-400 hover:text-gray-600">
-                      <MoreVertical className="w-5 h-5" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {(() => {
+                if (isLoading) {
+                  return (
+                    <tr>
+                      <td colSpan={7} className="py-8 text-center text-gray-500">
+                        Loading...
+                      </td>
+                    </tr>
+                  )
+                }
+
+                if (error) {
+                  return (
+                    <tr>
+                      <td colSpan={7} className="py-8 text-center text-gray-500">
+                        Failed to load payments.
+                      </td>
+                    </tr>
+                  )
+                }
+
+                if (filtered.length === 0) {
+                  return (
+                    <tr>
+                      <td colSpan={7} className="py-8 text-center text-gray-500">
+                        No payments yet.
+                      </td>
+                    </tr>
+                  )
+                }
+
+                return filtered.map((payment, idx) => (
+                  <tr key={payment.id} className="border-b border-gray-100 hover:bg-gray-50">
+                    <td className="py-4 px-4 text-sm text-gray-900">{idx + 1}</td>
+                    <td className="py-4 px-4 text-sm text-gray-900">{toShortAddress(payment.counterparty)}</td>
+                    <td className="py-4 px-4 text-sm font-semibold text-gray-900">
+                      {payment.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    <td className="py-4 px-4 text-sm text-gray-600">
+                      {payment.timestamp ? new Date(payment.timestamp * 1000).toLocaleDateString() : "--"}
+                      <br />
+                      <span className="text-xs text-gray-500">
+                        {payment.timestamp ? new Date(payment.timestamp * 1000).toLocaleTimeString() : ""}
+                      </span>
+                    </td>
+                    <td className="py-4 px-4 text-sm text-gray-600">Sent</td>
+                    <td className="py-4 px-4 text-sm">
+                      <span className={`px-3 py-1 rounded text-xs font-medium ${getStatusColor("Completed")}`}>
+                        Completed
+                      </span>
+                    </td>
+                    <td className="py-4 px-4 text-sm">
+                      <button className="text-gray-400 hover:text-gray-600">
+                        <MoreVertical className="w-5 h-5" />
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              })()}
             </tbody>
           </table>
         </div>
