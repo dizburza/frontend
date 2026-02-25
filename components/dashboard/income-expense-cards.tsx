@@ -6,18 +6,18 @@ import Image from "next/image";
 import useCngnTransferActivity from "@/hooks/ERC20/useCngnTransferActivity";
 
 export function IncomeExpenseCards() {
-  const { incomingTotal, outgoingTotal, isLoading } = useCngnTransferActivity();
+  const { latestIncomingAmount, latestOutgoingAmount, isLoading } = useCngnTransferActivity();
 
   const incomingDisplay = isLoading
     ? "Loading..."
-    : incomingTotal.toLocaleString(undefined, {
+    : latestIncomingAmount.toLocaleString(undefined, {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       });
 
   const outgoingDisplay = isLoading
     ? "Loading..."
-    : outgoingTotal.toLocaleString(undefined, {
+    : latestOutgoingAmount.toLocaleString(undefined, {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       });
@@ -27,7 +27,7 @@ export function IncomeExpenseCards() {
       <Card className="p-6 flex-1">
         <div className="flex items-start justify-between">
           <div>
-            <p className="text-gray-600 text-sm mb-2">Incoming</p>
+            <p className="text-gray-600 text-sm mb-2">Inflow</p>
             <div className="flex items-baseline gap-2">
               <span className="text-2xl font-bold">{incomingDisplay}</span>
               <div className="flex items-center">
@@ -44,7 +44,7 @@ export function IncomeExpenseCards() {
       <Card className="p-6 flex-1">
         <div className="flex items-start justify-between">
           <div>
-            <p className="text-gray-600 text-sm mb-2">Outgoing</p>
+            <p className="text-gray-600 text-sm mb-2">Outflow</p>
             <div className="flex items-baseline gap-2">
               <span className="text-2xl font-bold">{outgoingDisplay}</span>
                <div className="flex items-center">

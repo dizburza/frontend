@@ -10,11 +10,14 @@ import { usePathname } from "next/navigation"
 import useOrgSlug from "@/hooks/useOrgSlug"
 import useCngnTransferActivity from "@/hooks/ERC20/useCngnTransferActivity"
 
-export function TransactionHistory({ viewAllHref = "/" }: Readonly<{ viewAllHref?: string }>) {
+export function TransactionHistory({
+  viewAllHref = "/",
+  limit = 10,
+}: Readonly<{ viewAllHref?: string; limit?: number }>) {
   const pathname = usePathname()
 
-  const { rows, isLoading, toShortAddress } = useCngnTransferActivity()
-  const recent = rows.slice(0, 10)
+  const { rows, isLoading, error, toShortAddress } = useCngnTransferActivity()
+  const recent = rows.slice(0, limit)
 
   const orgSlug = useOrgSlug()
 
@@ -33,6 +36,16 @@ export function TransactionHistory({ viewAllHref = "/" }: Readonly<{ viewAllHref
         <tr>
           <td colSpan={8} className="py-8 text-center text-gray-500">
             Loading...
+          </td>
+        </tr>
+      )
+    }
+
+    if (error) {
+      return (
+        <tr>
+          <td colSpan={8} className="py-8 text-center text-gray-500">
+            Could not load transactions{error.message ? `: ${error.message}` : "."}
           </td>
         </tr>
       )
@@ -70,7 +83,14 @@ export function TransactionHistory({ viewAllHref = "/" }: Readonly<{ viewAllHref
             maximumFractionDigits: 2,
           })} cNGN
         </td>
-        <td className="py-4 px-4">--</td>
+        <td className="py-4 px-4">
+          {typeof tx.gasFeeEth === "number"
+            ? `${tx.gasFeeEth.toLocaleString(undefined, {
+                minimumFractionDigits: 6,
+                maximumFractionDigits: 6,
+              })} ETH`
+            : "--"}
+        </td>
         <td className="py-4 px-4">
           <div>
             <p>{tx.timestamp ? new Date(tx.timestamp * 1000).toLocaleDateString() : "--"}</p>
@@ -80,7 +100,16 @@ export function TransactionHistory({ viewAllHref = "/" }: Readonly<{ viewAllHref
         <td className="py-4 px-4">
           <span className="px-3 py-1 rounded text-xs font-medium bg-green-100 text-green-700">Completed</span>
         </td>
-        <td className="py-4 px-4 text-blue-600">{toShortAddress(tx.transactionHash)}</td>
+        <td className="py-4 px-4">
+          <a
+            href={`https://sepolia.basescan.org/tx/${tx.transactionHash}`}
+            target="_blank"
+            rel="noreferrer"
+            className="text-blue-600 cursor-pointer hover:underline"
+          >
+            {toShortAddress(tx.transactionHash)}
+          </a>
+        </td>
       </tr>
     ))
   })()
@@ -97,7 +126,7 @@ export function TransactionHistory({ viewAllHref = "/" }: Readonly<{ viewAllHref
       <div className="flex items-center gap-4 mb-6">
         <div className="flex-1 relative">
           <Search size={18} className="absolute left-3 top-3 text-gray-400" />
-          <Input placeholder="Search for proposals" className="pl-10" />
+          <Input placeholder="Search transactions" className="pl-10" />
         </div>
         <Button variant="outline" size="sm" className="gap-2 bg-transparent">
           <Filter size={16} />
