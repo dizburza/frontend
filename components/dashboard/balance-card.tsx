@@ -8,12 +8,45 @@ import { SendToCNGNFlow } from "@/components/send-to-cngn-flow";
 import { SendToBankFlow } from "@/components/send-to-bank-flow";
 import { ReceiveFlow } from "@/components/receive-flow";
 import Image from "next/image";
+import { useActiveAccount } from "thirdweb/react";
+import useGetTokenBalance from "@/hooks/ERC20/useGetBalance";
+import useCngnTransferActivity from "@/hooks/ERC20/useCngnTransferActivity";
 
 export function BalanceCard() {
+  const account = useActiveAccount();
+  const balance = useGetTokenBalance();
+  const { monthly } = useCngnTransferActivity();
   const [showBalance, setShowBalance] = useState(true);
   const [showSendToCNGN, setShowSendToCNGN] = useState(false);
   const [showSendToBank, setShowSendToBank] = useState(false);
   const [showReceive, setShowReceive] = useState(false);
+
+  const address = account?.address;
+  const shortAddress = address
+    ? `${address.slice(0, 4)}...${address.slice(-4)}`
+    : "--";
+
+  const balanceDisplay = (() => {
+    if (!showBalance) return "••••••";
+    if (balance === null) {
+      return account ? "Loading..." : "0.00";
+    }
+    return balance.toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  })();
+
+  const changeDisplay = (() => {
+    if (!monthly || monthly.length < 2) return " ";
+    const current = monthly.at(-1);
+    const previous = monthly.at(-2);
+    const currentNet = (current?.incoming || 0) - (current?.outgoing || 0);
+    const previousNet = (previous?.incoming || 0) - (previous?.outgoing || 0);
+    if (previousNet === 0) return " ";
+    const pct = (Math.abs(currentNet - previousNet) / Math.abs(previousNet)) * 100;
+    return `${pct.toFixed(2)}% than last month`;
+  })();
 
   return (
     <Card className="p-6 bg-white h-full">
@@ -27,19 +60,19 @@ export function BalanceCard() {
             {showBalance ? <Eye size={18} /> : <EyeOff size={18} />}
           </button>
         </div>
-        <span className="text-sm text-gray-500">Wallet: 0x23...6fad</span>
+        <span className="text-sm text-gray-500">Wallet: {shortAddress}</span>
       </div>
 
       <div className="space-y-2">
         <div className="flex items-baseline gap-2">
           <span className="text-4xl font-bold">
-            {showBalance ? "450,000.00" : "••••••"}
+            {balanceDisplay}
           </span>
           <div className="flex">
           <Image src={"/cngn.svg"} alt="cNGN" width={24} height={24} />
           <span className="text-gray-600">cNGN</span></div>
         </div>
-        <p className="text-sm text-green-600"> 0.08% than last month</p>
+        <p className="text-sm text-green-600"> {changeDisplay}</p>
       </div>
 
       <div className="py-2">

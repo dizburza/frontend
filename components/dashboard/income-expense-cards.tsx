@@ -3,22 +3,39 @@
 import { Card } from "@/components/ui/card";
 import { ArrowDownLeft, ArrowUpRight } from "lucide-react";
 import Image from "next/image";
+import useCngnTransferActivity from "@/hooks/ERC20/useCngnTransferActivity";
 
 export function IncomeExpenseCards() {
+  const { incomingTotal, outgoingTotal, isLoading } = useCngnTransferActivity();
+
+  const incomingDisplay = isLoading
+    ? "Loading..."
+    : incomingTotal.toLocaleString(undefined, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+
+  const outgoingDisplay = isLoading
+    ? "Loading..."
+    : outgoingTotal.toLocaleString(undefined, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+
   return (
     <div className="flex flex-col gap-4 h-full">
       <Card className="p-6 flex-1">
         <div className="flex items-start justify-between">
           <div>
-            <p className="text-gray-600 text-sm mb-2">Income</p>
+            <p className="text-gray-600 text-sm mb-2">Incoming</p>
             <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold">23,000.05</span>
+              <span className="text-2xl font-bold">{incomingDisplay}</span>
               <div className="flex items-center">
                 <Image src={"/cngn.svg"} alt="cNGN" width={24} height={24} />
                 <span className="text-gray-600">cNGN</span>
               </div>
             </div>
-            <p className="text-red-600 text-xs mt-2">2.13% than last month</p>
+            <p className="text-red-600 text-xs mt-2"> </p>
           </div>
           <ArrowDownLeft className="text-green-600" size={24} />
         </div>
@@ -27,15 +44,15 @@ export function IncomeExpenseCards() {
       <Card className="p-6 flex-1">
         <div className="flex items-start justify-between">
           <div>
-            <p className="text-gray-600 text-sm mb-2">Expense</p>
+            <p className="text-gray-600 text-sm mb-2">Outgoing</p>
             <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold">45,000.23</span>
+              <span className="text-2xl font-bold">{outgoingDisplay}</span>
                <div className="flex items-center">
                 <Image src={"/cngn.svg"} alt="cNGN" width={24} height={24} />
                 <span className="text-gray-600">cNGN</span>
               </div>
             </div>
-            <p className="text-red-600 text-xs mt-2">0.01% than last month</p>
+            <p className="text-red-600 text-xs mt-2"> </p>
           </div>
           <ArrowUpRight className="text-red-600" size={24} />
         </div>

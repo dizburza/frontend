@@ -8,48 +8,13 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import useOrgSlug from "@/hooks/useOrgSlug"
-
-const transactions = [
-  {
-    id: 1,
-    type: "Transfer from",
-    recipient: "@eze_adeeze_hg54",
-    amount: "234 cNGN",
-    gasFee: "0.02 cNGN",
-    date: "25 Oct 2025",
-    time: "At 7:45 AM",
-    status: "Completed",
-    hash: "0x7j228hg...",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=eze",
-  },
-  {
-    id: 2,
-    type: "Transfer to",
-    recipient: "@pope_rika_ye28",
-    amount: "450 cNGN",
-    gasFee: "0.00 cNGN",
-    date: "19 Oct 2025",
-    time: "At 12:45 PM",
-    status: "Completed",
-    hash: "0x9aa43df...",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=pope",
-  },
-  {
-    id: 3,
-    type: "Transfer from",
-    recipient: "@Jahid_eric_6aaf",
-    amount: "234 cNGN",
-    gasFee: "0.02 cNGN",
-    date: "10 Oct 2025",
-    time: "At 7:45 AM",
-    status: "Failed",
-    hash: "0x5fe23bc...",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=jahid",
-  },
-]
+import useCngnTransferActivity from "@/hooks/ERC20/useCngnTransferActivity"
 
 export function TransactionHistory({ viewAllHref = "/" }: Readonly<{ viewAllHref?: string }>) {
   const pathname = usePathname()
+
+  const { rows, isLoading, toShortAddress } = useCngnTransferActivity()
+  const recent = rows.slice(0, 10)
 
   const orgSlug = useOrgSlug()
 
@@ -61,6 +26,64 @@ export function TransactionHistory({ viewAllHref = "/" }: Readonly<{ viewAllHref
       resolvedViewAllHref = "/personal/transactions"
     }
   }
+
+  const tableBody = (() => {
+    if (isLoading) {
+      return (
+        <tr>
+          <td colSpan={8} className="py-8 text-center text-gray-500">
+            Loading...
+          </td>
+        </tr>
+      )
+    }
+
+    if (recent.length === 0) {
+      return (
+        <tr>
+          <td colSpan={8} className="py-8 text-center text-gray-500">
+            No transactions yet.
+          </td>
+        </tr>
+      )
+    }
+
+    return recent.map((tx, idx) => (
+      <tr key={tx.id} className="border-b border-gray-100 hover:bg-gray-50">
+        <td className="py-4 px-4">{idx + 1}</td>
+        <td className="py-4 px-4">{tx.direction === "incoming" ? "Inflow" : "Outflow"}</td>
+        <td className="py-4 px-4">
+          <div className="flex items-center gap-2">
+            <Avatar className="h-8 w-8">
+              <AvatarImage src={"/placeholder.svg"} />
+              <AvatarFallback>{tx.counterparty[2] || "?"}</AvatarFallback>
+            </Avatar>
+            <span>
+              {tx.direction === "incoming" ? "Inflow from " : "Outflow to "}
+              {toShortAddress(tx.counterparty)}
+            </span>
+          </div>
+        </td>
+        <td className="py-4 px-4">
+          {tx.amount.toLocaleString(undefined, {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          })} cNGN
+        </td>
+        <td className="py-4 px-4">--</td>
+        <td className="py-4 px-4">
+          <div>
+            <p>{tx.timestamp ? new Date(tx.timestamp * 1000).toLocaleDateString() : "--"}</p>
+            <p className="text-gray-500 text-xs"> </p>
+          </div>
+        </td>
+        <td className="py-4 px-4">
+          <span className="px-3 py-1 rounded text-xs font-medium bg-green-100 text-green-700">Completed</span>
+        </td>
+        <td className="py-4 px-4 text-blue-600">{toShortAddress(tx.transactionHash)}</td>
+      </tr>
+    ))
+  })()
 
   return (
     <Card className="p-6">
@@ -101,39 +124,7 @@ export function TransactionHistory({ viewAllHref = "/" }: Readonly<{ viewAllHref
             </tr>
           </thead>
           <tbody>
-            {transactions.map((tx) => (
-              <tr key={tx.id} className="border-b border-gray-100 hover:bg-gray-50">
-                <td className="py-4 px-4">{tx.id}</td>
-                <td className="py-4 px-4">{tx.type}</td>
-                <td className="py-4 px-4">
-                  <div className="flex items-center gap-2">
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage src={tx.avatar || "/placeholder.svg"} />
-                      <AvatarFallback>{tx.recipient[0]}</AvatarFallback>
-                    </Avatar>
-                    <span>{tx.recipient}</span>
-                  </div>
-                </td>
-                <td className="py-4 px-4">{tx.amount}</td>
-                <td className="py-4 px-4">{tx.gasFee}</td>
-                <td className="py-4 px-4">
-                  <div>
-                    <p>{tx.date}</p>
-                    <p className="text-gray-500 text-xs">{tx.time}</p>
-                  </div>
-                </td>
-                <td className="py-4 px-4">
-                  <span
-                    className={`px-3 py-1 rounded text-xs font-medium ${
-                      tx.status === "Completed" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
-                    }`}
-                  >
-                    {tx.status}
-                  </span>
-                </td>
-                <td className="py-4 px-4 text-blue-600">{tx.hash}</td>
-              </tr>
-            ))}
+            {tableBody}
           </tbody>
         </table>
       </div>
