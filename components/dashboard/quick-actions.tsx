@@ -17,8 +17,11 @@ export function QuickActions({ onSendToCNGN, onSendToBank, onReceive }: Readonly
         className="h-24 flex flex-col items-center justify-center gap-2 bg-transparent"
         onClick={onSendToCNGN}
       >
-       <Image src={"/send-to-cngn.svg"} alt="Send to cNGN" width={54} height={54} />
-        <span className="text-sm">To cNGN</span>
+       <Image src={"/send-to-cngn.svg"} alt="Send cNGN" width={54} height={54} />
+        <div className="text-center leading-tight">
+          <div className="text-sm font-medium">Send cNGN</div>
+          <div className="text-xs text-gray-500">@username or 0x</div>
+        </div>
       </Button>
       <Button
         variant="outline"

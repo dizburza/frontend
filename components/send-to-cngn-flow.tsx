@@ -187,7 +187,7 @@ export function SendToCNGNFlow({ isOpen, onClose }: Readonly<SendToCNGNFlowProps
   if (step === "success") {
     return (
       <SuccessModal
-        title="Send to cNGN Account"
+        title="Send cNGN"
         icon="check"
         summary={[
           {
@@ -214,7 +214,7 @@ export function SendToCNGNFlow({ isOpen, onClose }: Readonly<SendToCNGNFlowProps
 
   return (
     <TransactionModal
-      title="Send to cNGN Account"
+      title="Send cNGN"
       onClose={onClose}
       onBack={step === "recipient" ? undefined : handleBack}
     >
@@ -224,10 +224,10 @@ export function SendToCNGNFlow({ isOpen, onClose }: Readonly<SendToCNGNFlowProps
             <div>
               <h3 className="font-semibold mb-2">Recipient Information</h3>
               <p className="text-sm text-gray-600 mb-4">
-                Enter the recipient&apos;s Dizburza username or wallet ID to send cNGN securely.
+                Enter the recipient&apos;s Dizburza username (@username) or wallet address (0x...) to send cNGN.
               </p>
               <Input
-                placeholder="Enter Username or Wallet Address"
+                placeholder="Enter @username or 0x address"
                 value={recipient}
                 onChange={(e) => setRecipient(e.target.value)}
               />
