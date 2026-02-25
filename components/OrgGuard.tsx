@@ -75,13 +75,7 @@ export default function OrgGuard(
 
     const fetchAuthCheck = async () => {
       try {
-        const backendUrl = process.env.BACKEND_URL;
-        const normalizedBackendBase = backendUrl
-          ? backendUrl.replace(/\/$/, "").replace(/\/api$/, "")
-          : null;
-        const upstream = normalizedBackendBase
-          ? `${normalizedBackendBase}/api/auth/check/${address}`
-          : `/api/auth/check/${address}`;
+        const upstream = `/api/auth/check/${address}`;
 
         const res = await fetch(upstream, {
           method: "GET",
