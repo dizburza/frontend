@@ -2,12 +2,13 @@ import type React from "react";
 
 import OrgGuard from "@/components/OrgGuard";
 
-export default function OrgLayout({
+export default async function OrgLayout({
   children,
   params,
 }: {
   children: React.ReactNode;
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }) {
-  return <OrgGuard slug={params.slug}>{children}</OrgGuard>;
+  const { slug } = await params;
+  return <OrgGuard slug={slug}>{children}</OrgGuard>;
 }

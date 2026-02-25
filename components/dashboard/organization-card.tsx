@@ -4,8 +4,41 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import Image from "next/image"
 import Link from "next/link"
+import { useActiveAccount } from "thirdweb/react"
+import { useEffect, useMemo, useState } from "react"
 
 export function OrganizationPromotionCard() {
+  const account = useActiveAccount()
+  const [displayName, setDisplayName] = useState<string | null>(null)
+
+  const shortAddress = useMemo(() => {
+    const address = account?.address
+    if (!address) return null
+    return `${address.slice(0, 4)}...${address.slice(-4)}`
+  }, [account?.address])
+
+  useEffect(() => {
+    const address = account?.address
+    if (!address) {
+      setDisplayName(null)
+      return
+    }
+
+    const cacheKey = `authCheck:${address}`
+    try {
+      const raw = localStorage.getItem(cacheKey)
+      if (!raw) {
+        setDisplayName(null)
+        return
+      }
+      const cached = JSON.parse(raw) as { fullName?: string; username?: string }
+      const name = (cached.fullName || cached.username || "").trim()
+      setDisplayName(name || null)
+    } catch {
+      setDisplayName(null)
+    }
+  }, [account?.address])
+
   return (
       <Card className="relative space-y-2 h-44 w-full bg-white rounded-2xl px-4 overflow-hidden shadow-md shadow-[#454ADE24]">
         <div className="absolute inset-0 bg-[#F9F9FE] opacity-10">
@@ -63,7 +96,7 @@ export function OrganizationPromotionCard() {
         <main className="flex justify-between items-center w-full h-full">
           <div className="flex flex-col bg-white z-10  justify-end self-end h-12 py-4">
             <h1 className="text-2xl text-[#1D1F5D] font-bold">
-              Welcome, Damilola
+              Welcome{displayName || shortAddress ? "," : ""} {displayName || shortAddress || ""}
             </h1>
             <p className="text-gray-600">
               Your wallet is active and ready to go.
