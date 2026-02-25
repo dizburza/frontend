@@ -9,6 +9,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import useOrgSlug from "@/hooks/useOrgSlug"
 import useCngnTransferActivity from "@/hooks/ERC20/useCngnTransferActivity"
+import useAddressUsernames from "@/hooks/useAddressUsernames"
 
 export function TransactionHistory({
   viewAllHref = "/",
@@ -18,6 +19,8 @@ export function TransactionHistory({
 
   const { rows, isLoading, error, toShortAddress } = useCngnTransferActivity()
   const recent = rows.slice(0, limit)
+
+  const { getUsername } = useAddressUsernames(recent.map((r) => r.counterparty))
 
   const gasFeeDisplay = (gasFeeEth?: number) => {
     if (typeof gasFeeEth !== "number" || !Number.isFinite(gasFeeEth)) return "--"
@@ -81,7 +84,12 @@ export function TransactionHistory({
               <AvatarImage src={"/placeholder.svg"} />
               <AvatarFallback>{tx.counterparty[2] || "?"}</AvatarFallback>
             </Avatar>
-            <span>{toShortAddress(tx.counterparty)}</span>
+            <span>
+              {(() => {
+                const username = getUsername(tx.counterparty)
+                return username ? `@${username}` : toShortAddress(tx.counterparty)
+              })()}
+            </span>
           </div>
         </td>
         <td className="py-4 px-4">

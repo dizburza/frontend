@@ -7,9 +7,7 @@ import useCngnTransferActivity from "@/hooks/ERC20/useCngnTransferActivity";
 import { useEffect, useState } from "react";
 
 export function IncomeExpenseCards() {
-  const { latestIncomingAmount, latestOutgoingAmount, isLoading, lastUpdatedAt } = useCngnTransferActivity();
-
-  const lastUpdatedDisplay = lastUpdatedAt ? new Date(lastUpdatedAt).toLocaleString() : " ";
+  const { latestIncomingAmount, latestOutgoingAmount, isLoading } = useCngnTransferActivity();
 
   const [lastIncomingAmount, setLastIncomingAmount] = useState<number | null>(null);
   const [lastOutgoingAmount, setLastOutgoingAmount] = useState<number | null>(null);
@@ -54,7 +52,6 @@ export function IncomeExpenseCards() {
               </div>
             </div>
             <p className="text-gray-500 text-xs mt-2">{showUpdating ? "Updating..." : " "}</p>
-            <p className="text-gray-500 text-xs">Last updated: {showUpdating ? "Updating..." : lastUpdatedDisplay}</p>
           </div>
           <ArrowDownLeft className="text-green-600" size={24} />
         </div>
@@ -72,7 +69,6 @@ export function IncomeExpenseCards() {
               </div>
             </div>
             <p className="text-gray-500 text-xs mt-2">{showUpdating ? "Updating..." : " "}</p>
-            <p className="text-gray-500 text-xs">Last updated: {showUpdating ? "Updating..." : lastUpdatedDisplay}</p>
           </div>
           <ArrowUpRight className="text-red-600" size={24} />
         </div>

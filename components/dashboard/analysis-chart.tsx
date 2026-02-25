@@ -5,19 +5,14 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import useCngnTransferActivity from "@/hooks/ERC20/useCngnTransferActivity"
 
 export function AnalysisChart() {
-  const { monthly, lastUpdatedAt, isLoading } = useCngnTransferActivity()
-
-  const lastUpdatedDisplay = lastUpdatedAt ? new Date(lastUpdatedAt).toLocaleString() : " "
+  const { monthly } = useCngnTransferActivity()
 
   const hasEnoughData = monthly.length >= 2
 
   return (
     <Card className="p-6 h-full flex flex-col">
       <div className="flex items-center justify-between mb-6">
-        <div>
-          <h3 className="text-lg font-semibold">Analysis</h3>
-          <p className="text-xs text-gray-500">Last updated: {isLoading ? "Updating..." : lastUpdatedDisplay}</p>
-        </div>
+        <h3 className="text-lg font-semibold">Analysis</h3>
         <select className="text-sm border border-gray-200 rounded px-3 py-1">
           <option>Monthly</option>
         </select>

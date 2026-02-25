@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { ChevronDown, Search, MoreVertical } from "lucide-react"
 import useCngnTransferActivity from "@/hooks/ERC20/useCngnTransferActivity"
+import useAddressUsernames from "@/hooks/useAddressUsernames"
 
 export default function PersonalPaymentsPage() {
   const [searchTerm, setSearchTerm] = useState("")
@@ -27,6 +28,8 @@ export default function PersonalPaymentsPage() {
       return counterparty.includes(q) || txHash.includes(q)
     })
   })()
+
+  const { getUsername } = useAddressUsernames(filtered.map((p) => p.counterparty))
 
   const getStatusColor = (status: string) => {
     return status === "Completed" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
@@ -54,7 +57,7 @@ export default function PersonalPaymentsPage() {
           value={`${outgoingTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} cNGN`}
           lastUpdated={isLoading ? "Updating..." : " "}
         />
-        <StatCard label="Completed" value={String(payments.length)} lastUpdated={lastUpdatedDisplay} />
+        <StatCard label="Completed" value={String(payments.length)} trend={{ value: " ", direction: "up" }} />
         <StatCard label="Failed" value="0" lastUpdated=" " />
       </div>
 
@@ -134,7 +137,12 @@ export default function PersonalPaymentsPage() {
                 return filtered.map((payment, idx) => (
                   <tr key={payment.id} className="border-b border-gray-100 hover:bg-gray-50">
                     <td className="py-4 px-4 text-sm text-gray-900">{idx + 1}</td>
-                    <td className="py-4 px-4 text-sm text-gray-900">{toShortAddress(payment.counterparty)}</td>
+                    <td className="py-4 px-4 text-sm text-gray-900">
+                      {(() => {
+                        const username = getUsername(payment.counterparty)
+                        return username ? `@${username}` : toShortAddress(payment.counterparty)
+                      })()}
+                    </td>
                     <td className="py-4 px-4 text-sm font-semibold text-gray-900">
                       {payment.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </td>
