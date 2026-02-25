@@ -24,6 +24,8 @@ type Step = "recipient" | "amount" | "success"
 export function SendToCNGNFlow({ isOpen, onClose }: Readonly<SendToCNGNFlowProps>) {
   const [step, setStep] = useState<Step>("recipient")
   const [recipient, setRecipient] = useState("")
+  const [resolvedRecipient, setResolvedRecipient] = useState<`0x${string}` | null>(null)
+  const [resolvedUsername, setResolvedUsername] = useState<string | null>(null)
   const [amount, setAmount] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const { showLoading, hideLoading } = useGlobalLoading()
@@ -53,6 +55,63 @@ export function SendToCNGNFlow({ isOpen, onClose }: Readonly<SendToCNGNFlowProps
     return /^0x[a-fA-F0-9]{40}$/.test(value)
   }
 
+  const isUsername = (value: string) => {
+    return value.trim().startsWith("@")
+  }
+
+  const resolveRecipient = async () => {
+    const input = recipient.trim()
+    if (!input) return
+
+    if (isHexAddress(input)) {
+      setResolvedRecipient(input)
+      setResolvedUsername(null)
+      return
+    }
+
+    if (!isUsername(input)) {
+      toast.error("Enter a wallet address (0x...) or a username (@...)")
+      return
+    }
+
+    const cleaned = input.slice(1).trim()
+    if (cleaned.length < 3) {
+      toast.error("Username must be at least 3 characters")
+      return
+    }
+
+    try {
+      showLoading("Resolving username...")
+      const backend = process.env.BACKEND_URL
+      if (!backend) {
+        toast.error("Backend URL not configured")
+        return
+      }
+
+      const res = await fetch(`${backend}/api/users/resolve/${encodeURIComponent(cleaned)}`)
+      const body = (await res.json()) as { success?: boolean; data?: { username?: string; walletAddress?: string }; error?: string }
+
+      if (!res.ok || !body?.data?.walletAddress) {
+        toast.error(body?.error || "Could not resolve username")
+        return
+      }
+
+      const addr = body.data.walletAddress.trim()
+      if (!isHexAddress(addr)) {
+        toast.error("Resolved address is invalid")
+        return
+      }
+
+      setResolvedRecipient(addr)
+      setResolvedUsername(body.data.username || cleaned.toLowerCase())
+    } catch (e) {
+      console.error(e)
+      toast.error("Could not resolve username")
+    } finally {
+      hideLoading()
+    }
+  }
+
   const submitTransfer = async () => {
     try {
       if (!account?.address) {
@@ -65,8 +124,8 @@ export function SendToCNGNFlow({ isOpen, onClose }: Readonly<SendToCNGNFlowProps
         return
       }
 
-      if (!isHexAddress(recipient.trim())) {
-        toast.error("Recipient must be a wallet address (0x...)")
+      if (!resolvedRecipient) {
+        toast.error("Recipient not resolved")
         return
       }
 
@@ -82,7 +141,7 @@ export function SendToCNGNFlow({ isOpen, onClose }: Readonly<SendToCNGNFlowProps
       const tx = prepareContractCall({
         contract,
         method: "function transfer(address to, uint256 value)",
-        params: [recipient.trim(), parseUnits(amount, 6)],
+        params: [resolvedRecipient, parseUnits(amount, 6)],
       })
 
       await sendTx(tx)
@@ -100,7 +159,12 @@ export function SendToCNGNFlow({ isOpen, onClose }: Readonly<SendToCNGNFlowProps
 
   const handleNext = async () => {
     if (step === "recipient") {
-      if (recipient) setStep("amount")
+      if (!recipient) return
+      if (isLoading) return
+
+      await resolveRecipient()
+      if (!resolvedRecipient) return
+      setStep("amount")
       return
     }
 
@@ -113,6 +177,8 @@ export function SendToCNGNFlow({ isOpen, onClose }: Readonly<SendToCNGNFlowProps
   const handleBack = () => {
     if (step === "amount") {
       setStep("recipient")
+      setResolvedRecipient(null)
+      setResolvedUsername(null)
     } else if (step === "success") {
       setStep("amount")
     }
@@ -130,7 +196,7 @@ export function SendToCNGNFlow({ isOpen, onClose }: Readonly<SendToCNGNFlowProps
           },
           {
             label: "To",
-            value: recipient,
+            value: resolvedUsername ? `@${resolvedUsername}` : resolvedRecipient || recipient,
           },
           {
             label: "Network",
@@ -177,6 +243,9 @@ export function SendToCNGNFlow({ isOpen, onClose }: Readonly<SendToCNGNFlowProps
             <div>
               <h3 className="font-semibold mb-2">Enter Amount</h3>
               <p className="text-sm text-gray-600 mb-4">Specify the amount you want to send to this account.</p>
+              <div className="text-sm text-gray-600 mb-4">
+                Sending to: <span className="font-semibold">{resolvedUsername ? `@${resolvedUsername}` : resolvedRecipient || "--"}</span>
+              </div>
               <Input
                 placeholder="Enter amount"
                 type="number"
