@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useActiveAccount } from "thirdweb/react";
 import { getContract } from "thirdweb";
 import { baseSepolia } from "thirdweb/chains";
@@ -126,10 +126,109 @@ const enrichWithBlockAndGas = async (
   return [...enriched, ...rows.slice(target.length)];
 };
 
+const logIndexToString = (logIndex: unknown): string => {
+  if (logIndex === null || logIndex === undefined) return "";
+  if (typeof logIndex === "string") return logIndex;
+  if (
+    typeof logIndex === "number" ||
+    typeof logIndex === "bigint" ||
+    typeof logIndex === "boolean"
+  ) {
+    return String(logIndex);
+  }
+
+  if (typeof logIndex === "object") {
+    const maybeToString = (logIndex as { toString?: unknown }).toString;
+    if (typeof maybeToString === "function" && maybeToString !== Object.prototype.toString) {
+      return maybeToString.call(logIndex) as string;
+    }
+
+    try {
+      return JSON.stringify(logIndex);
+    } catch {
+      return "";
+    }
+  }
+
+  if (typeof logIndex === "symbol") return logIndex.description ?? "";
+
+  return "";
+};
+
+const dedupeContractEvents = <T extends { transactionHash?: string; logIndex?: unknown }>(
+  events: T[],
+) => {
+  const deduped = new Map<string, T>();
+  for (const e of events) {
+    const txHash = (e.transactionHash || "");
+    const logIndex = logIndexToString(e.logIndex);
+    const key = `${txHash}:${logIndex}`;
+    if (!deduped.has(key)) deduped.set(key, e);
+  }
+  return Array.from(deduped.values());
+};
+
+const normalizeTransferEventsToRows = (
+  events: Array<{
+    args?: unknown;
+    transactionHash: `0x${string}`;
+    logIndex?: unknown;
+    blockNumber?: bigint;
+    blockTimestamp?: string;
+  }>,
+  walletAddress: `0x${string}`,
+  decimals: number,
+): CngnTransferRow[] => {
+  const walletLower = walletAddress.toLowerCase();
+
+  return events
+    .map((e) => {
+      const args = e.args as
+        | { from?: string; to?: string; value?: bigint }
+        | undefined;
+      const from = ((args?.from || "") as `0x${string}`) || "";
+      const to = ((args?.to || "") as `0x${string}`) || "";
+      const value = args?.value ?? BigInt(0);
+
+      const direction: CngnTransferRow["direction"] =
+        to.toLowerCase() === walletLower ? "incoming" : "outgoing";
+
+      const counterparty = direction === "incoming" ? from : to;
+      const amount = Number.parseFloat(formatUnits(value, decimals));
+
+      const timestamp = e.blockTimestamp
+        ? Math.floor(new Date(e.blockTimestamp).getTime() / 1000)
+        : undefined;
+
+      return {
+        id: `${e.transactionHash}:${logIndexToString(e.logIndex)}`,
+        direction,
+        counterparty,
+        amount,
+        transactionHash: e.transactionHash,
+        blockNumber: e.blockNumber,
+        timestamp,
+      } satisfies CngnTransferRow;
+    })
+    .filter((r) => r.counterparty && r.transactionHash)
+    .sort((a, b) =>
+      Number((b.blockNumber ?? BigInt(0)) - (a.blockNumber ?? BigInt(0))),
+    );
+};
+
+type ActivityCacheEntry = {
+  rows: CngnTransferRow[];
+  lastUpdatedAt: number | null;
+  fetchedAt: number;
+};
+
+const ACTIVITY_CACHE = new Map<string, ActivityCacheEntry>();
+
 export default function useCngnTransferActivity(params?: {
   blockRange?: bigint;
   decimals?: number;
   enrichLimit?: number;
+  staleTimeMs?: number;
 }) {
   const account = useActiveAccount();
   const walletAddress = account?.address as `0x${string}` | undefined;
@@ -139,6 +238,7 @@ export default function useCngnTransferActivity(params?: {
     | undefined;
   const decimals = params?.decimals ?? 6;
   const enrichLimit = params?.enrichLimit ?? 3;
+  const staleTimeMs = params?.staleTimeMs ?? 60_000;
   // ~50k blocks covers roughly a week on Base Sepolia (~2s block time).
   // Increase if you need more history, but be aware of RPC call volume.
   const blockRange = params?.blockRange ?? BigInt(50000);
@@ -152,11 +252,21 @@ export default function useCngnTransferActivity(params?: {
     });
   }, [tokenAddress]);
 
-  const [rows, setRows] = useState<CngnTransferRow[]>([]);
+  const cacheKey = useMemo(() => {
+    const w = (walletAddress || "").toLowerCase();
+    const t = (tokenAddress || "").toLowerCase();
+    return `cngn:activity:${t}:${w}:${blockRange.toString()}:${decimals}:${enrichLimit}`;
+  }, [walletAddress, tokenAddress, blockRange, decimals, enrichLimit]);
+
+  const cached = ACTIVITY_CACHE.get(cacheKey);
+
+  const [rows, setRows] = useState<CngnTransferRow[]>(() => cached?.rows ?? []);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [refreshNonce, setRefreshNonce] = useState(0);
-  const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(() => cached?.lastUpdatedAt ?? null);
+
+  const lastRefreshNonceRef = useRef<number>(refreshNonce);
 
   useEffect(() => {
     const handler = () => {
@@ -178,6 +288,19 @@ export default function useCngnTransferActivity(params?: {
         return;
       }
       const shouldCancel = () => cancelled;
+
+      const forceRefresh = refreshNonce !== lastRefreshNonceRef.current;
+      lastRefreshNonceRef.current = refreshNonce;
+
+      const existing = ACTIVITY_CACHE.get(cacheKey);
+      const isFresh =
+        existing && Date.now() - existing.fetchedAt < staleTimeMs;
+
+      if (!forceRefresh && isFresh) {
+        setRows(existing.rows);
+        setLastUpdatedAt(existing.lastUpdatedAt);
+        return;
+      }
 
       setIsLoading(true);
       setError(null);
@@ -211,53 +334,28 @@ export default function useCngnTransferActivity(params?: {
 
         const raw = [...incomingEvents, ...outgoingEvents];
 
-        const deduped = new Map<string, (typeof raw)[number]>();
-        for (const e of raw) {
-          const txHash = (e.transactionHash || "") as string;
-          const logIndex = String(e.logIndex ?? "");
-          const key = `${txHash}:${logIndex}`;
-          if (!deduped.has(key)) deduped.set(key, e);
-        }
-
-        const normalized: CngnTransferRow[] = Array.from(deduped.values())
-          .map((e) => {
-            const args = e.args as unknown as { from?: string; to?: string; value?: bigint } | undefined;
-            const from = ((args?.from || "") as `0x${string}`) || "";
-            const to = ((args?.to || "") as `0x${string}`) || "";
-            const value = args?.value ?? BigInt(0);
-
-            const direction: CngnTransferRow["direction"] =
-              to.toLowerCase() === walletAddress.toLowerCase()
-                ? "incoming"
-                : "outgoing";
-
-            const counterparty = (direction === "incoming" ? from : to);
-            const amount = Number.parseFloat(formatUnits(value, decimals));
-
-            const maybeTimestamp = (e as unknown as { blockTimestamp?: string })
-              .blockTimestamp;
-            const timestamp = maybeTimestamp
-              ? Math.floor(new Date(maybeTimestamp).getTime() / 1000)
-              : undefined;
-
-            return {
-              id: `${e.transactionHash}:${String(e.logIndex ?? "")}`,
-              direction,
-              counterparty,
-              amount,
-              transactionHash: e.transactionHash,
-              blockNumber: e.blockNumber,
-              timestamp,
-            };
-          })
-          .filter((r) => r.counterparty && r.transactionHash)
-          .sort((a, b) =>
-            Number((b.blockNumber ?? BigInt(0)) - (a.blockNumber ?? BigInt(0))),
-          );
+        const deduped = dedupeContractEvents(raw);
+        const normalized = normalizeTransferEventsToRows(
+          deduped as unknown as Array<{
+            args?: unknown;
+            transactionHash: `0x${string}`;
+            logIndex?: unknown;
+            blockNumber?: bigint;
+            blockTimestamp?: string;
+          }>,
+          walletAddress,
+          decimals,
+        );
         const withMeta = await enrichWithBlockAndGas(contract, normalized, enrichLimit, shouldCancel);
         if (cancelled) return;
         setRows(withMeta);
-        setLastUpdatedAt(Date.now());
+        const now = Date.now();
+        setLastUpdatedAt(now);
+        ACTIVITY_CACHE.set(cacheKey, {
+          rows: withMeta,
+          lastUpdatedAt: now,
+          fetchedAt: now,
+        });
       } catch (e) {
         if (cancelled) return;
         const err =
@@ -276,7 +374,7 @@ export default function useCngnTransferActivity(params?: {
     return () => {
       cancelled = true;
     };
-  }, [walletAddress, contract, blockRange, decimals, enrichLimit, refreshNonce]);
+  }, [walletAddress, contract, cacheKey, staleTimeMs, blockRange, decimals, enrichLimit, refreshNonce]);
 
   const incomingTotal = rows
     .filter((r) => r.direction === "incoming")

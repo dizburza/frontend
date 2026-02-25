@@ -13,6 +13,14 @@ export default function PersonalTransactionsPage() {
   const { rows, incomingTotal, outgoingTotal, isLoading, toShortAddress } = useCngnTransferActivity()
   const transactions = rows
 
+  const copyToClipboard = async (value: string) => {
+    try {
+      await navigator.clipboard.writeText(value)
+    } catch {
+      // ignore
+    }
+  }
+
   const getStatusColor = (status: string) => {
     return status === "Completed" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
   }
@@ -54,9 +62,25 @@ export default function PersonalTransactionsPage() {
         <td className="py-4 px-4 text-sm">
           <span className={`px-3 py-1 rounded text-xs font-medium ${getStatusColor("Completed")}`}>Completed</span>
         </td>
-        <td className="py-4 px-4 text-sm text-gray-600 flex items-center gap-2">
-          {toShortAddress(tx.transactionHash)}
-          <Copy className="w-4 h-4 text-gray-400 cursor-pointer hover:text-gray-600" />
+        <td className="py-4 px-4 text-sm text-gray-600">
+          <div className="flex items-center gap-2">
+            <a
+              href={`https://sepolia.basescan.org/tx/${tx.transactionHash}`}
+              target="_blank"
+              rel="noreferrer"
+              className="text-blue-600 hover:underline"
+            >
+              {toShortAddress(tx.transactionHash)}
+            </a>
+            <button
+              type="button"
+              onClick={() => void copyToClipboard(tx.transactionHash)}
+              className="text-gray-400 hover:text-gray-600"
+              aria-label="Copy transaction hash"
+            >
+              <Copy className="w-4 h-4" />
+            </button>
+          </div>
         </td>
         <td className="py-4 px-4 text-sm">
           <button className="text-gray-400 hover:text-gray-600">
@@ -87,13 +111,15 @@ export default function PersonalTransactionsPage() {
 
       {/* Stat Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Total Transactions" value={String(transactions.length)} trend={{ value: " ", direction: "up" }} />
+        <StatCard label="Total Transactions" value={String(transactions.length)} />
         <StatCard
-          label="Total Outflow"
-          value={`${outgoingTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} cNGN`}
-          trend={{ value: " ", direction: "down" }}
+          label="Total Outflow (cNGN)"
+          value={outgoingTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         />
-        <StatCard label="Total Inflow" value={`${incomingTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} cNGN`} trend={{ value: " ", direction: "up" }} />
+        <StatCard
+          label="Total Inflow"
+          value={`${incomingTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} cNGN`}
+        />
         <StatCard label="Completed" value={String(transactions.length)} lastUpdated="1 min ago" />
       </div>
 

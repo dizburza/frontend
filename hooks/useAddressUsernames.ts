@@ -25,6 +25,27 @@ export default function useAddressUsernames(addresses: string[]) {
   useEffect(() => {
     let cancelled = false;
 
+    const bumpVersion = () => {
+      if (!cancelled) setVersion((v) => v + 1);
+    };
+
+    const setMissingAsNull = (missing: string[]) => {
+      for (const addr of missing) cacheRef.current.set(addr, null);
+    };
+
+    const upsertResults = (results: ResultRow[]) => {
+      for (const row of results) {
+        if (!row?.walletAddress) continue;
+        cacheRef.current.set(row.walletAddress.toLowerCase(), row.username ?? null);
+      }
+    };
+
+    const ensureAllMissingHaveEntries = (missing: string[]) => {
+      for (const addr of missing) {
+        if (!cacheRef.current.has(addr)) cacheRef.current.set(addr, null);
+      }
+    };
+
     const run = async () => {
       const backend = process.env.BACKEND_URL;
       if (!backend) return;
@@ -46,24 +67,17 @@ export default function useAddressUsernames(addresses: string[]) {
 
         const results = body?.data?.results;
         if (!res.ok || !Array.isArray(results)) {
-          for (const addr of missing) cacheRef.current.set(addr, null);
-          if (!cancelled) setVersion((v) => v + 1);
+          setMissingAsNull(missing);
+          bumpVersion();
           return;
         }
 
-        for (const row of results) {
-          if (!row?.walletAddress) continue;
-          cacheRef.current.set(row.walletAddress.toLowerCase(), row.username ?? null);
-        }
-
-        for (const addr of missing) {
-          if (!cacheRef.current.has(addr)) cacheRef.current.set(addr, null);
-        }
-
-        if (!cancelled) setVersion((v) => v + 1);
+        upsertResults(results);
+        ensureAllMissingHaveEntries(missing);
+        bumpVersion();
       } catch {
-        for (const addr of missing) cacheRef.current.set(addr, null);
-        if (!cancelled) setVersion((v) => v + 1);
+        setMissingAsNull(missing);
+        bumpVersion();
       }
     };
 

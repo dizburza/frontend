@@ -17,7 +17,7 @@ export function StatCard({ label, value, trend, lastUpdated }: Readonly<StatCard
       <p className="text-3xl font-bold mb-2">{value}</p>
       {trend && (
         <p className={`text-xs ${trend.direction === "up" ? "text-green-600" : "text-red-600"}`}>
-          {trend.direction === "up" ? "▲" : "▼"} {trend.value}
+          {trend.value}
         </p>
       )}
       {lastUpdated && <p className="text-xs text-gray-500">Last updated: {lastUpdated}</p>}

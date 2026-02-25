@@ -13,7 +13,7 @@ export default function PersonalPaymentsPage() {
 
   const { rows, outgoingTotal, isLoading, error, toShortAddress, lastUpdatedAt } = useCngnTransferActivity()
 
-  const lastUpdatedDisplay = lastUpdatedAt ? new Date(lastUpdatedAt).toLocaleString() : " "
+  const lastUpdatedDisplay = lastUpdatedAt ? new Date(lastUpdatedAt).toLocaleString() : undefined
 
   // Treat outgoing cNGN transfers as "payments" for this page.
   const payments = rows.filter((r) => r.direction === "outgoing")
@@ -51,14 +51,17 @@ export default function PersonalPaymentsPage() {
 
       {/* Stat Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Total Payments" value={String(payments.length)} lastUpdated={lastUpdatedDisplay} />
+        <StatCard
+          label="Total Payments"
+          value={String(payments.length)}
+          lastUpdated={isLoading ? "Updating..." : lastUpdatedDisplay}
+        />
         <StatCard
           label="Total Sent"
           value={`${outgoingTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} cNGN`}
-          lastUpdated={isLoading ? "Updating..." : " "}
         />
-        <StatCard label="Completed" value={String(payments.length)} trend={{ value: " ", direction: "up" }} />
-        <StatCard label="Failed" value="0" lastUpdated=" " />
+        <StatCard label="Completed" value={String(payments.length)} />
+        <StatCard label="Failed" value="0" />
       </div>
 
       {/* Payment History Table */}
@@ -140,7 +143,8 @@ export default function PersonalPaymentsPage() {
                     <td className="py-4 px-4 text-sm text-gray-900">
                       {(() => {
                         const username = getUsername(payment.counterparty)
-                        return username ? `@${username}` : toShortAddress(payment.counterparty)
+                        const name = username?.trim()
+                        return name ? name : toShortAddress(payment.counterparty)
                       })()}
                     </td>
                     <td className="py-4 px-4 text-sm font-semibold text-gray-900">
