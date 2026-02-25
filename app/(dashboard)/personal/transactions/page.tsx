@@ -117,10 +117,10 @@ export default function PersonalTransactionsPage() {
           value={outgoingTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         />
         <StatCard
-          label="Total Inflow"
-          value={`${incomingTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} cNGN`}
+          label="Total Inflow (cNGN)"
+          value={incomingTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         />
-        <StatCard label="Completed" value={String(transactions.length)} lastUpdated="1 min ago" />
+        <StatCard label="Completed" value={String(transactions.length)} />
       </div>
 
       {/* Recent Transactions Table */}
