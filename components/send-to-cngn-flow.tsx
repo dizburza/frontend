@@ -63,6 +63,10 @@ export function SendToCNGNFlow({ isOpen, onClose }: Readonly<SendToCNGNFlowProps
       return null
     }
 
+    if (trimmed.startsWith("@") && (trimmed.length === 1 || /\s/.test(trimmed[1] ?? ""))) {
+      return null
+    }
+
     const cleaned = trimmed.startsWith("@") ? trimmed.slice(1) : trimmed
     const username = cleaned.trim().toLowerCase()
     if (!username) return null
