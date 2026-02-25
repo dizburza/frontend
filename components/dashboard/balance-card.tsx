@@ -15,11 +15,13 @@ import useCngnTransferActivity from "@/hooks/ERC20/useCngnTransferActivity";
 export function BalanceCard() {
   const account = useActiveAccount();
   const balance = useGetTokenBalance();
-  const { monthly } = useCngnTransferActivity();
+  const { monthly, lastUpdatedAt, isLoading } = useCngnTransferActivity();
   const [showBalance, setShowBalance] = useState(true);
   const [showSendToCNGN, setShowSendToCNGN] = useState(false);
   const [showSendToBank, setShowSendToBank] = useState(false);
   const [showReceive, setShowReceive] = useState(false);
+
+  const lastUpdatedDisplay = lastUpdatedAt ? new Date(lastUpdatedAt).toLocaleString() : " ";
 
   const address = account?.address;
   const shortAddress = address
@@ -73,6 +75,7 @@ export function BalanceCard() {
           <span className="text-gray-600">cNGN</span></div>
         </div>
         <p className="text-sm text-green-600"> {changeDisplay}</p>
+        <p className="text-xs text-gray-500">Last updated: {isLoading ? "Updating..." : lastUpdatedDisplay}</p>
       </div>
 
       <div className="py-2">

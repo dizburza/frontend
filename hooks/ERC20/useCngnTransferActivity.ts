@@ -156,15 +156,16 @@ export default function useCngnTransferActivity(params?: {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [refreshNonce, setRefreshNonce] = useState(0);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null);
 
   useEffect(() => {
     const handler = () => {
       setRefreshNonce((n) => n + 1);
     };
 
-    window.addEventListener("cngn:activity:refresh", handler);
+    globalThis.addEventListener("cngn:activity:refresh", handler);
     return () => {
-      window.removeEventListener("cngn:activity:refresh", handler);
+      globalThis.removeEventListener("cngn:activity:refresh", handler);
     };
   }, []);
 
@@ -256,6 +257,7 @@ export default function useCngnTransferActivity(params?: {
         const withMeta = await enrichWithBlockAndGas(contract, normalized, enrichLimit, shouldCancel);
         if (cancelled) return;
         setRows(withMeta);
+        setLastUpdatedAt(Date.now());
       } catch (e) {
         if (cancelled) return;
         const err =
@@ -316,6 +318,7 @@ export default function useCngnTransferActivity(params?: {
     tokenAddress,
     isLoading,
     error,
+    lastUpdatedAt,
     rows,
     incomingTotal,
     outgoingTotal,

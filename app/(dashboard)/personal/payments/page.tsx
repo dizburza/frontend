@@ -10,7 +10,9 @@ import useCngnTransferActivity from "@/hooks/ERC20/useCngnTransferActivity"
 export default function PersonalPaymentsPage() {
   const [searchTerm, setSearchTerm] = useState("")
 
-  const { rows, outgoingTotal, isLoading, error, toShortAddress } = useCngnTransferActivity()
+  const { rows, outgoingTotal, isLoading, error, toShortAddress, lastUpdatedAt } = useCngnTransferActivity()
+
+  const lastUpdatedDisplay = lastUpdatedAt ? new Date(lastUpdatedAt).toLocaleString() : " "
 
   // Treat outgoing cNGN transfers as "payments" for this page.
   const payments = rows.filter((r) => r.direction === "outgoing")
@@ -46,13 +48,13 @@ export default function PersonalPaymentsPage() {
 
       {/* Stat Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Total Payments" value={String(payments.length)} trend={{ value: " ", direction: "up" }} />
+        <StatCard label="Total Payments" value={String(payments.length)} lastUpdated={lastUpdatedDisplay} />
         <StatCard
           label="Total Sent"
           value={`${outgoingTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} cNGN`}
           lastUpdated={isLoading ? "Updating..." : " "}
         />
-        <StatCard label="Completed" value={String(payments.length)} trend={{ value: " ", direction: "up" }} />
+        <StatCard label="Completed" value={String(payments.length)} lastUpdated={lastUpdatedDisplay} />
         <StatCard label="Failed" value="0" lastUpdated=" " />
       </div>
 
