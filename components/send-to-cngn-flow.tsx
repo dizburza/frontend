@@ -166,6 +166,7 @@ export function SendToCNGNFlow({ isOpen, onClose }: Readonly<SendToCNGNFlowProps
       await sendTx(tx)
 
       toast.success("Transfer submitted")
+      window.dispatchEvent(new Event("cngn:activity:refresh"))
       setStep("success")
     } catch (error) {
       console.error(error)
@@ -222,7 +223,7 @@ export function SendToCNGNFlow({ isOpen, onClose }: Readonly<SendToCNGNFlowProps
           },
           {
             label: "Network",
-            value: "Base",
+            value: "Base Sepolia",
           },
           {
             label: "Gas Fee",

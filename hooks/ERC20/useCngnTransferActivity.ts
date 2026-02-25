@@ -155,6 +155,18 @@ export default function useCngnTransferActivity(params?: {
   const [rows, setRows] = useState<CngnTransferRow[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+  const [refreshNonce, setRefreshNonce] = useState(0);
+
+  useEffect(() => {
+    const handler = () => {
+      setRefreshNonce((n) => n + 1);
+    };
+
+    window.addEventListener("cngn:activity:refresh", handler);
+    return () => {
+      window.removeEventListener("cngn:activity:refresh", handler);
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -262,7 +274,7 @@ export default function useCngnTransferActivity(params?: {
     return () => {
       cancelled = true;
     };
-  }, [blockRange, contract, decimals, enrichLimit, walletAddress]);
+  }, [walletAddress, contract, blockRange, decimals, enrichLimit, refreshNonce]);
 
   const incomingTotal = rows
     .filter((r) => r.direction === "incoming")
