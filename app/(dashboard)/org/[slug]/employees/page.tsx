@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -54,6 +55,7 @@ export default function EmployeesPage() {
   const [filterBy, setFilterBy] = useState<"all" | "new" | "high-salary">("all")
   const [sortBy, setSortBy] = useState<"name" | "salary" | "date">("name")
   const [showAddEmployeeModal, setShowAddEmployeeModal] = useState(false)
+  const [pendingDeleteUsername, setPendingDeleteUsername] = useState<string | null>(null)
   const [editingEmployee, setEditingEmployee] = useState<null | {
     id: string
     username: string
@@ -93,6 +95,20 @@ export default function EmployeesPage() {
   const employees = employeesData?.employees?.map(mapApiEmployeeToEmployee) || []
   const totalEmployees = employeesData?.totalEmployees || 0
 
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null)
+  useEffect(() => {
+    if (!employeesLoading && employeesData) {
+      setLastUpdatedAt(new Date())
+    }
+  }, [employeesLoading, employeesData])
+
+  let lastUpdatedText = "-"
+  if (employeesLoading) {
+    lastUpdatedText = "updating ..."
+  } else if (lastUpdatedAt) {
+    lastUpdatedText = lastUpdatedAt.toLocaleString()
+  }
+
   // Calculate stats from real data
   const totalSalaryPayout = employees.reduce((sum, emp) => sum + emp.salary, 0)
   const newEmployeesCount = employees.filter(emp => {
@@ -105,26 +121,22 @@ export default function EmployeesPage() {
 
   const stats = [
     { 
-      label: "Total Salary Payout", 
-      value: totalSalaryPayout.toLocaleString(), 
-      unit: "cNGN", 
-      lastUpdated: "1 min ago" 
+      label: "Total Salary Payout (cNGN)", 
+      value: totalSalaryPayout.toLocaleString(),
+      lastUpdated: lastUpdatedText,
     },
     { 
       label: "Total Employees", 
       value: totalEmployees.toString(), 
-      lastUpdated: "1 min ago" 
     },
     { 
       label: "New Employees", 
       value: newEmployeesCount.toString(), 
-      change: "+" + newEmployeesCount + " than last month", 
       lastUpdated: "" 
     },
     { 
       label: "Proposal Contributors", 
       value: "0", 
-      lastUpdated: "1 min ago" 
     },
   ]
 
@@ -209,6 +221,19 @@ export default function EmployeesPage() {
   const getFilterLabel = () => filterOptions.find(opt => opt.value === filterBy)?.label || "All Employees"
   const getSortLabel = () => sortOptions.find(opt => opt.value === sortBy)?.label || "Name"
 
+  const toChainSalary = (humanSalary: string) => {
+    const trimmed = (humanSalary || "").trim()
+    if (!trimmed) return undefined
+
+    try {
+      const asNumber = Number(trimmed)
+      if (!Number.isFinite(asNumber)) return trimmed
+      return String(Math.round(asNumber * 1_000_000))
+    } catch {
+      return trimmed
+    }
+  }
+
   const handleEmployeeAdded = () => {
     refresh()
     setShowAddEmployeeModal(false)
@@ -222,15 +247,16 @@ export default function EmployeesPage() {
     try {
       await updateOrganizationEmployee(organization._id, editingEmployee.username, {
         jobRole: editingEmployee.jobRole,
-        salary: editingEmployee.salary,
+        salary: toChainSalary(editingEmployee.salary),
         department: editingEmployee.department,
         employeeId: editingEmployee.employeeId,
       })
       setEditingEmployee(null)
       refresh()
+      toast.success("Employee updated")
     } catch (err) {
       console.error("Failed to update employee:", err)
-      alert(err instanceof Error ? err.message : "Failed to update employee")
+      toast.error(err instanceof Error ? err.message : "Failed to update employee")
     } finally {
       setIsSavingEdit(false)
     }
@@ -239,16 +265,14 @@ export default function EmployeesPage() {
   const handleDeleteEmployee = async (username: string) => {
     if (!organization?._id) return
 
-    const confirmed = confirm(`Remove @${username} from this organization?`)
-    if (!confirmed) return
-
     setIsDeleting(true)
     try {
       await removeOrganizationEmployee(organization._id, username)
       refresh()
+      toast.success("Employee removed")
     } catch (err) {
       console.error("Failed to remove employee:", err)
-      alert(err instanceof Error ? err.message : "Failed to remove employee")
+      toast.error(err instanceof Error ? err.message : "Failed to remove employee")
     } finally {
       setIsDeleting(false)
     }
@@ -390,6 +414,51 @@ export default function EmployeesPage() {
         </div>
       )}
 
+      {pendingDeleteUsername && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg w-full max-w-md overflow-hidden">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <h2 className="text-xl font-semibold text-gray-900">Remove Employee</h2>
+              <button onClick={() => setPendingDeleteUsername(null)} className="text-gray-400 hover:text-gray-600">
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-2">
+              <p className="text-sm text-gray-700">Are you sure you want to remove this employee from the organization?</p>
+              <p className="text-sm text-gray-900 font-medium">@{pendingDeleteUsername}</p>
+            </div>
+
+            <div className="p-6 border-t border-gray-200 flex gap-3 justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setPendingDeleteUsername(null)}
+                disabled={isDeleting}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={async () => {
+                  const username = pendingDeleteUsername
+                  setPendingDeleteUsername(null)
+                  await handleDeleteEmployee(username)
+                }}
+                disabled={isDeleting}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                {isDeleting ? (
+                  <span className="inline-flex items-center"><Loader2 size={16} className="animate-spin mr-2" />Removing...</span>
+                ) : (
+                  "Remove"
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -416,8 +485,6 @@ export default function EmployeesPage() {
           <Card key={stat.label} className="p-6">
             <p className="text-sm text-gray-600 mb-2">{stat.label}</p>
             <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
-            {stat.unit && <p className="text-xs text-gray-500 mt-1">{stat.unit}</p>}
-            {stat.change && <p className="text-xs text-green-600 mt-1">▲ {stat.change}</p>}
             {stat.lastUpdated && <p className="text-xs text-gray-500 mt-2">Last updated: {stat.lastUpdated}</p>}
           </Card>
         ))}
@@ -576,7 +643,7 @@ export default function EmployeesPage() {
                           type="button"
                           className="p-1 hover:bg-gray-100 rounded transition-colors disabled:opacity-50"
                           title={employee.isSigner ? "Signers cannot be removed" : "Remove"}
-                          onClick={() => handleDeleteEmployee(employee.username)}
+                          onClick={() => setPendingDeleteUsername(employee.username)}
                           disabled={employee.isSigner || isDeleting}
                         >
                           <Trash2 size={16} className={employee.isSigner ? "text-gray-400" : "text-red-600"} />
