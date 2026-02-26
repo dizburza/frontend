@@ -5,7 +5,7 @@ import { StatCard } from "@/components/stat-card"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { ChevronDown, Search, MoreVertical, Loader2 } from "lucide-react"
+import { ChevronDown, Search, MoreVertical } from "lucide-react"
 import { BatchPaymentCreationModal } from "@/components/payments/batch-payment-creation-modal"
 import { 
   useOrganizationBySlug, 
@@ -19,7 +19,7 @@ export default function PaymentsPage() {
   const [showBatchModal, setShowBatchModal] = useState(false)
 
   const orgSlug = useOrgSlug()
-  const { data: organization, loading: orgLoading } = useOrganizationBySlug(orgSlug)
+  const { data: organization } = useOrganizationBySlug(orgSlug)
   const { data: batchesData, loading: batchesLoading, error, refresh } = useOrganizationBatches(organization?._id || null)
 
   const paymentBatches = batchesData?.batches?.map(mapApiBatchToPaymentBatch) || []
@@ -44,14 +44,12 @@ export default function PaymentsPage() {
     return amount.toLocaleString()
   }
 
-  const loading = orgLoading || batchesLoading
-
-  if (loading) {
-    return (
-      <div className="py-4 sm:py-6 lg:py-8 px-4 sm:px-6 lg:px-8 flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-      </div>
-    )
+  let totalBatchesUpdatedText = "--"
+  const latestBatchUpdatedAt = batchesData?.batches?.[0]?.updatedAt
+  if (batchesLoading) {
+    totalBatchesUpdatedText = "updating ..."
+  } else if (latestBatchUpdatedAt) {
+    totalBatchesUpdatedText = new Date(latestBatchUpdatedAt).toLocaleString()
   }
 
   if (error) {
@@ -96,10 +94,14 @@ export default function PaymentsPage() {
 
       {/* Stat Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Total Batches" value={totalBatches.toString()} trend={{ value: "+2 than last month", direction: "up" }} />
-        <StatCard label="Pending Approval" value={stats.pending.toString()} lastUpdated="1 min ago" />
-        <StatCard label="Executed This Month" value={stats.executed.toString()} trend={{ value: "+2 than last month", direction: "up" }} />
-        <StatCard label="Employees Paid" value={employeesPaid.toString()} lastUpdated="1 min ago" />
+        <StatCard
+          label="Total Batches"
+          value={totalBatches.toString()}
+          lastUpdated={totalBatchesUpdatedText}
+        />
+        <StatCard label="Pending Approval" value={stats.pending.toString()} />
+        <StatCard label="Executed This Month" value={stats.executed.toString()} />
+        <StatCard label="Employees Paid" value={employeesPaid.toString()} />
       </div>
 
       {/* Payment Batches Table */}
@@ -164,7 +166,7 @@ export default function PaymentsPage() {
                     <td className="py-4 px-4 text-sm text-gray-900">{index + 1}</td>
                     <td className="py-4 px-4 text-sm text-gray-900">{batch.batchName}</td>
                     <td className="py-4 px-4 text-sm font-semibold text-gray-900">
-                      {formatAmount(batch.totalAmount)} cNGN
+                      {formatAmount(batch.totalAmount)}
                     </td>
                     <td className="py-4 px-4 text-sm text-gray-600">{batch.date}</td>
                     <td className="py-4 px-4 text-sm text-gray-900">{batch.employees}</td>

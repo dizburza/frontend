@@ -1,12 +1,13 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { X, ChevronLeft } from "lucide-react"
+import { X, ChevronLeft, Loader2 } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { SuccessModal } from "@/components/success-modal"
+import { mapApiEmployeeToEmployee, useOrganizationEmployees } from "@/lib/api/organization"
 
 interface BatchPaymentCreationModalProps {
   onClose: () => void
@@ -14,112 +15,58 @@ interface BatchPaymentCreationModalProps {
   organizationId?: string
 }
 
-const employees = [
-  {
-    id: 1,
-    surname: "Adeoye",
-    firstName: "Adetola",
-    salary: "500,000",
-    username: "@ade_ade_41fd",
-    wallet: "0x54...41fd",
-    role: "HR Manager",
-  },
-  {
-    id: 2,
-    surname: "Balogun",
-    firstName: "Timi",
-    salary: "420,000",
-    username: "@tim_bal_932a",
-    wallet: "0x19b...aa34",
-    role: "Graphics Designer",
-  },
-  {
-    id: 3,
-    surname: "Hassan",
-    firstName: "Amina",
-    salary: "600,000",
-    username: "@ami_has_782c",
-    wallet: "0x32f...bb12",
-    role: "Finance Officer",
-  },
-  {
-    id: 4,
-    surname: "Eze",
-    firstName: "Chidera",
-    salary: "750,000",
-    username: "@chi_eze_621b",
-    wallet: "0x91d...441a",
-    role: "Product Manager",
-  },
-  {
-    id: 5,
-    surname: "Johnson",
-    firstName: "Femi",
-    salary: "850,000",
-    username: "@fem_joh_703e",
-    wallet: "0x82f...c913",
-    role: "Software Engineer",
-  },
-  {
-    id: 6,
-    surname: "Uche",
-    firstName: "Kelechi",
-    salary: "700,000",
-    username: "@kel_uch_584a",
-    wallet: "0x66d...193b",
-    role: "Operations Lead",
-  },
-  {
-    id: 7,
-    surname: "Ojo",
-    firstName: "Tolu",
-    salary: "580,000",
-    username: "@tol_ojo_298d",
-    wallet: "0x92f...77bc",
-    role: "Business Analyst",
-  },
-  {
-    id: 8,
-    surname: "Yusuf",
-    firstName: "Mariam",
-    salary: "620,000",
-    username: "@mar_yus_613b",
-    wallet: "0x15d...ac22",
-    role: "Accountant",
-  },
-  {
-    id: 9,
-    surname: "Adebayo",
-    firstName: "Ridwan",
-    salary: "800,000",
-    username: "@rid_ade_990f",
-    wallet: "0x48b...f61d",
-    role: "Backend Developer",
-  },
-]
-
-export function BatchPaymentCreationModal({ onClose, onPaymentCreated }: Readonly<BatchPaymentCreationModalProps>) {
+export function BatchPaymentCreationModal({ onClose, onPaymentCreated, organizationId }: Readonly<BatchPaymentCreationModalProps>) {
   const [step, setStep] = useState<"details" | "employees" | "preview" | "success">("details")
-  const [selectedEmployees, setSelectedEmployees] = useState<number[]>([])
+  const [selectedEmployees, setSelectedEmployees] = useState<string[]>([])
+  const [employeeSearch, setEmployeeSearch] = useState("")
   const [formData, setFormData] = useState({
     batchName: "",
     paymentDate: "Oct 21,2025",
   })
+
+  const { data: employeesData, loading: employeesLoading, error: employeesError } = useOrganizationEmployees(organizationId || null)
+
+  const employees = useMemo(() => {
+    const apiEmployees = employeesData?.employees || []
+    return apiEmployees
+      .map(mapApiEmployeeToEmployee)
+      .filter((e) => !e.isSigner)
+  }, [employeesData])
+
+  const filteredEmployees = useMemo(() => {
+    const q = employeeSearch.trim().toLowerCase()
+    if (!q) return employees
+    return employees.filter((e) => {
+      return (
+        e.surname.toLowerCase().includes(q) ||
+        e.firstName.toLowerCase().includes(q) ||
+        e.username.toLowerCase().includes(q) ||
+        e.walletAddress.toLowerCase().includes(q)
+      )
+    })
+  }, [employeeSearch, employees])
+
+  const formatAmount = (amount: number) => {
+    if (amount >= 1000000) {
+      return `${(amount / 1000000).toFixed(3)}M`
+    }
+    return amount.toLocaleString()
+  }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
     setFormData((prev) => ({ ...prev, [name]: value }))
   }
 
-  const handleEmployeeToggle = (id: number) => {
+  const handleEmployeeToggle = (id: string) => {
     setSelectedEmployees((prev) => (prev.includes(id) ? prev.filter((empId) => empId !== id) : [...prev, id]))
   }
 
   const handleSelectAll = () => {
-    if (selectedEmployees.length === employees.length) {
+    if (selectedEmployees.length === filteredEmployees.length) {
       setSelectedEmployees([])
     } else {
-      setSelectedEmployees(employees.map((e) => e.id))
+      setSelectedEmployees(filteredEmployees.map((e) => e.id))
     }
   }
 
@@ -148,38 +95,41 @@ export function BatchPaymentCreationModal({ onClose, onPaymentCreated }: Readonl
   }
 
   const selectedEmployeeData = employees.filter((e) => selectedEmployees.includes(e.id))
-  const totalAmount = selectedEmployeeData.reduce((sum, emp) => sum + Number.parseInt(emp.salary.replaceAll(',', "")), 0)
+  const totalAmount = selectedEmployeeData.reduce((sum, emp) => sum + Number(emp.salary || 0), 0)
 
-  const renderStepIndicator = () => (
-    <div className="flex items-center justify-center gap-8 mb-8">
-      <div className="flex flex-col items-center">
-        <div
-          className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold ${step === "details" || step === "employees" || step === "preview" ? "bg-blue-600 text-white" : "bg-gray-300 text-gray-600"}`}
-        >
-          ✓
+  const renderStepIndicator = () => {
+    const detailsActive = step === "details" || step === "employees" || step === "preview"
+    const employeesActive = step === "employees" || step === "preview"
+    const previewActive = step === "preview"
+
+    const baseCircleClass = "w-10 h-10 rounded-full flex items-center justify-center font-semibold"
+    const activeCircleClass = "bg-blue-600 text-white"
+    const inactiveCircleClass = "bg-gray-300 text-gray-600"
+
+    const detailsCircleClass = `${baseCircleClass} ${detailsActive ? activeCircleClass : inactiveCircleClass}`
+    const employeesCircleClass = `${baseCircleClass} ${employeesActive ? activeCircleClass : inactiveCircleClass}`
+    const previewCircleClass = `${baseCircleClass} ${previewActive ? activeCircleClass : inactiveCircleClass}`
+    const employeesCircleText = employeesActive ? "✓" : "2"
+
+    return (
+      <div className="flex items-center justify-center gap-8 mb-8">
+        <div className="flex flex-col items-center">
+          <div className={detailsCircleClass}>✓</div>
+          <span className="text-xs mt-2 text-gray-600">Details</span>
         </div>
-        <span className="text-xs mt-2 text-gray-600">Details</span>
-      </div>
-      <div className="w-12 h-1 bg-gray-300"></div>
-      <div className="flex flex-col items-center">
-        <div
-          className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold ${step === "employees" || step === "preview" ? "bg-blue-600 text-white" : "bg-gray-300 text-gray-600"}`}
-        >
-          {step === "employees" || step === "preview" ? "✓" : "2"}
+        <div className="w-12 h-1 bg-gray-300"></div>
+        <div className="flex flex-col items-center">
+          <div className={employeesCircleClass}>{employeesCircleText}</div>
+          <span className="text-xs mt-2 text-gray-600">Select Employees</span>
         </div>
-        <span className="text-xs mt-2 text-gray-600">Select Employees</span>
-      </div>
-      <div className="w-12 h-1 bg-gray-300"></div>
-      <div className="flex flex-col items-center">
-        <div
-          className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold ${step === "preview" ? "bg-blue-600 text-white" : "bg-gray-300 text-gray-600"}`}
-        >
-          3
+        <div className="w-12 h-1 bg-gray-300"></div>
+        <div className="flex flex-col items-center">
+          <div className={previewCircleClass}>3</div>
+          <span className="text-xs mt-2 text-gray-600">Preview</span>
         </div>
-        <span className="text-xs mt-2 text-gray-600">Preview</span>
       </div>
-    </div>
-  )
+    )
+  }
 
   // Show success modal
   if (step === "success") {
@@ -194,7 +144,7 @@ export function BatchPaymentCreationModal({ onClose, onPaymentCreated }: Readonl
           },
           {
             label: "Total Amount",
-            value: `${(totalAmount / 1000000).toFixed(3)}M cNGN`,
+            value: formatAmount(totalAmount),
           },
           {
             label: "Employees",
@@ -208,6 +158,62 @@ export function BatchPaymentCreationModal({ onClose, onPaymentCreated }: Readonl
         onClose={onClose}
       />
     )
+  }
+
+  let employeesTableBody: React.ReactNode
+  if (employeesLoading) {
+    employeesTableBody = (
+      <tr>
+        <td colSpan={7} className="py-10 text-center text-gray-500">
+          <div className="flex items-center justify-center gap-2">
+            <Loader2 className="w-5 h-5 animate-spin" />
+            Loading employees...
+          </div>
+        </td>
+      </tr>
+    )
+  } else if (employeesError) {
+    employeesTableBody = (
+      <tr>
+        <td colSpan={7} className="py-10 text-center text-gray-500">
+          Failed to load employees: {employeesError}
+        </td>
+      </tr>
+    )
+  } else if (filteredEmployees.length === 0) {
+    employeesTableBody = (
+      <tr>
+        <td colSpan={7} className="py-10 text-center text-gray-500">
+          No employees found.
+        </td>
+      </tr>
+    )
+  } else {
+    employeesTableBody = filteredEmployees.map((emp) => (
+      <tr
+        key={emp.id}
+        className="border-b border-gray-100 hover:bg-gray-50"
+      >
+        <td className="py-4 px-4">
+          <input
+            type="checkbox"
+            checked={selectedEmployees.includes(emp.id)}
+            onChange={() => handleEmployeeToggle(emp.id)}
+            className="w-4 h-4"
+          />
+        </td>
+        <td className="py-4 px-4 text-sm text-gray-900">{emp.surname}</td>
+        <td className="py-4 px-4 text-sm text-gray-900">{emp.firstName}</td>
+        <td className="py-4 px-4 text-sm text-gray-900">
+          {formatAmount(Number(emp.salary || 0))}
+        </td>
+        <td className="py-4 px-4 text-sm text-gray-600">
+          {emp.displayUsername ? `@${emp.displayUsername}` : `@${emp.username}`}
+        </td>
+        <td className="py-4 px-4 text-sm text-gray-600">{emp.walletAddress}</td>
+        <td className="py-4 px-4 text-sm text-gray-900">{emp.role}</td>
+      </tr>
+    ))
   }
 
   return (
@@ -298,12 +304,17 @@ export function BatchPaymentCreationModal({ onClose, onPaymentCreated }: Readonl
               {/* Search and Select All */}
               <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-2 flex-1 max-w-md">
-                  <Input placeholder="Search for Employee" className="w-full" />
+                  <Input
+                    placeholder="Search for Employee"
+                    className="w-full"
+                    value={employeeSearch}
+                    onChange={(e) => setEmployeeSearch(e.target.value)}
+                  />
                 </div>
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
-                    checked={selectedEmployees.length === employees.length}
+                    checked={filteredEmployees.length > 0 && selectedEmployees.length === filteredEmployees.length}
                     onChange={handleSelectAll}
                     className="w-4 h-4"
                   />
@@ -340,39 +351,7 @@ export function BatchPaymentCreationModal({ onClose, onPaymentCreated }: Readonl
                     </tr>
                   </thead>
                   <tbody>
-                    {employees.map((emp) => (
-                      <tr
-                        key={emp.id}
-                        className="border-b border-gray-100 hover:bg-gray-50"
-                      >
-                        <td className="py-4 px-4">
-                          <input
-                            type="checkbox"
-                            checked={selectedEmployees.includes(emp.id)}
-                            onChange={() => handleEmployeeToggle(emp.id)}
-                            className="w-4 h-4"
-                          />
-                        </td>
-                        <td className="py-4 px-4 text-sm text-gray-900">
-                          {emp.surname}
-                        </td>
-                        <td className="py-4 px-4 text-sm text-gray-900">
-                          {emp.firstName}
-                        </td>
-                        <td className="py-4 px-4 text-sm text-gray-900">
-                          {emp.salary}
-                        </td>
-                        <td className="py-4 px-4 text-sm text-gray-600">
-                          {emp.username}
-                        </td>
-                        <td className="py-4 px-4 text-sm text-gray-600">
-                          {emp.wallet}
-                        </td>
-                        <td className="py-4 px-4 text-sm text-gray-900">
-                          {emp.role}
-                        </td>
-                      </tr>
-                    ))}
+                    {employeesTableBody}
                   </tbody>
                 </table>
               </div>
@@ -397,10 +376,9 @@ export function BatchPaymentCreationModal({ onClose, onPaymentCreated }: Readonl
                   </p>
                 </Card>
                 <Card className="p-4">
-                  <p className="text-gray-600 text-sm mb-1">Total Amount</p>
+                  <p className="text-gray-600 text-sm mb-1">Total Amount (cNGN)</p>
                   <p className="text-2xl font-bold text-gray-900">
-                    {(totalAmount / 1000000).toFixed(3)}M
-                    <span className="text-sm">cNGN</span>
+                    {formatAmount(totalAmount)}
                   </p>
                 </Card>
                 <Card className="p-4">
@@ -427,11 +405,11 @@ export function BatchPaymentCreationModal({ onClose, onPaymentCreated }: Readonl
                           {emp.surname} {emp.firstName}
                         </p>
                         <p className="text-xs text-gray-600">
-                          {emp.username} • {emp.role}
+                          @{emp.displayUsername || emp.username} • {emp.role}
                         </p>
                       </div>
                       <p className="font-semibold text-gray-900">
-                        {emp.salary}
+                        {formatAmount(Number(emp.salary || 0))}
                       </p>
                     </div>
                   ))}
