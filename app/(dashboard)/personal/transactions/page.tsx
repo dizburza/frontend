@@ -92,7 +92,7 @@ export default function PersonalTransactionsPage() {
   })()
 
   return (
-    <div className="p-8 space-y-6">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-6">
       {/* Breadcrumb */}
       <div className="text-sm text-gray-600">
         <span>Dashboard</span>
@@ -101,7 +101,7 @@ export default function PersonalTransactionsPage() {
       </div>
 
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <h1 className="text-3xl font-bold text-gray-900">Transaction History</h1>
         <button className="text-blue-600 hover:text-blue-700 font-medium flex items-center gap-2">
           Export
@@ -109,8 +109,8 @@ export default function PersonalTransactionsPage() {
         </button>
       </div>
 
-      {/* Stat Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Stat Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard label="Total Transactions" value={String(transactions.length)} />
         <StatCard
           label="Total Outflow (cNGN)"
@@ -128,8 +128,8 @@ export default function PersonalTransactionsPage() {
         <h2 className="text-lg font-semibold mb-4">Recent Transactions</h2>
 
         {/* Search and Filters */}
-        <div className="flex items-center justify-between mb-6 gap-4">
-          <div className="flex items-center gap-2 flex-1 max-w-md">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
+          <div className="flex items-center gap-2 flex-1 max-w-full sm:max-w-md">
             <Search className="w-5 h-5 text-gray-400" />
             <Input
               placeholder="Search transactions"

@@ -124,15 +124,15 @@ export function TransactionHistory({
 
   return (
     <Card className="p-6">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
         <h3 className="text-lg font-semibold">Transaction History</h3>
         <Link href={resolvedViewAllHref} className="text-blue-600 text-sm font-medium">
           View all
         </Link>
       </div>
 
-      <div className="flex items-center gap-4 mb-6">
-        <div className="flex-1 relative">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-6">
+        <div className="flex-1 relative w-full sm:w-auto">
           <Search size={18} className="absolute left-3 top-3 text-gray-400" />
           <Input placeholder="Search transactions" className="pl-10" />
         </div>

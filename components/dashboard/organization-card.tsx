@@ -40,7 +40,7 @@ export function OrganizationPromotionCard() {
   }, [account?.address])
 
   return (
-      <Card className="relative space-y-2 h-44 w-full bg-white rounded-2xl px-4 overflow-hidden shadow-md shadow-[#454ADE24]">
+      <Card className="relative space-y-2 h-auto sm:h-44 w-full bg-white rounded-2xl px-4 overflow-hidden shadow-md shadow-[#454ADE24]">
         <div className="absolute inset-0 bg-[#F9F9FE] opacity-10">
           <svg
             className="w-full h-full"
@@ -93,8 +93,8 @@ export function OrganizationPromotionCard() {
             <rect width="2000" height="1000" fill="url(#parallelogram-lines)" />
           </svg>
         </div>
-        <main className="flex justify-between items-center w-full h-full">
-          <div className="flex flex-col bg-white z-10  justify-end self-end h-12 py-4">
+        <main className="flex flex-col sm:flex-row justify-between items-center sm:items-center w-full h-full gap-4 py-4">
+          <div className="flex flex-col bg-white z-10 justify-center sm:justify-end self-start sm:self-end h-auto sm:h-12 py-2 sm:py-4 w-full sm:w-auto">
             <h1 className="text-2xl text-[#1D1F5D] font-bold">
               Welcome{displayName || shortAddress ? "," : ""} {displayName || shortAddress || ""}
             </h1>
@@ -102,11 +102,11 @@ export function OrganizationPromotionCard() {
               Your wallet is active and ready to go.
             </p>
           </div>
-          <Card className=" rounded-lg relative bottom-2 flex  justify-between  bg-gradient-to-br  w-[40%] from-[#454ADE] to-[#5B63F0] self-center h-[90%] z-10">
-        <div className="space-y-1 p-4 h-full ">
+          <Card className="rounded-lg relative sm:bottom-2 flex justify-between bg-gradient-to-br w-full sm:w-[45%] lg:w-[40%] from-[#454ADE] to-[#5B63F0] self-center h-auto sm:h-[90%] z-10">
+        <div className="space-y-1 p-3 sm:p-4 h-full flex flex-col">
           <h2 className="text-base font-bold text-white">Create an Organization Account</h2>
           <p className="text-xs text-white/90 text-balance">Manage batch payments, and approve transactions with your team.</p>
-          <div className="flex self-end"><Link href={"/organization-setup/organization-details"} ><Button className="bg-white self-end  text-[#454ADE] hover:bg-white/90 font-semibold">+ Create Organization Now</Button></Link></div>
+          <div className="flex flex-col sm:flex-row self-start sm:self-end gap-2 mt-auto"><Link href={"/organization-setup/organization-details"} ><Button className="bg-white text-[#454ADE] hover:bg-white/90 font-semibold text-xs sm:text-sm">+ Create Organization Now</Button></Link></div>
         </div>
 
         <div className="flex items-end justify-between">

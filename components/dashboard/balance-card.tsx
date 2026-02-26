@@ -54,7 +54,7 @@ export function BalanceCard() {
   })();
 
   return (
-    <Card className="p-6 bg-white h-full">
+    <Card className="p-4 sm:p-6 bg-white h-full">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <h2 className="text-gray-600">Total Balance</h2>
@@ -69,8 +69,8 @@ export function BalanceCard() {
       </div>
 
       <div className="space-y-2">
-        <div className="flex items-baseline gap-2">
-          <span className="text-4xl font-bold">
+        <div className="flex items-baseline gap-2 flex-wrap">
+          <span className="text-3xl sm:text-4xl font-bold">
             {balanceDisplay}
           </span>
           <div className="flex">

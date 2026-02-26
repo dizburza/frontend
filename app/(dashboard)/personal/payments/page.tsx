@@ -42,7 +42,7 @@ export default function PersonalPaymentsPage() {
   }
 
   return (
-    <div className="p-8 space-y-6">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-6">
       {/* Breadcrumb */}
       <div className="text-sm text-gray-600">
         <span>Dashboard</span>
@@ -51,23 +51,23 @@ export default function PersonalPaymentsPage() {
       </div>
 
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <h1 className="text-3xl font-bold text-gray-900">Payments</h1>
-        <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => setShowScan(true)}>
+        <Button className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto" onClick={() => setShowScan(true)}>
           Scan to Send
         </Button>
       </div>
 
       {/* Stat Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         <StatCard
           label="Total Payments"
           value={String(payments.length)}
           lastUpdated={isLoading ? "Updating..." : lastUpdatedDisplay}
         />
         <StatCard
-          label="Total Sent"
-          value={`${outgoingTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} cNGN`}
+          label="Total Sent (cNGN)"
+          value={`${outgoingTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
         />
         <StatCard label="Completed" value={String(payments.length)} />
         <StatCard label="Failed" value="0" />
@@ -78,8 +78,8 @@ export default function PersonalPaymentsPage() {
         <h2 className="text-lg font-semibold mb-4">Payment History</h2>
 
         {/* Search and Filters */}
-        <div className="flex items-center justify-between mb-6 gap-4">
-          <div className="flex items-center gap-2 flex-1 max-w-md">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
+          <div className="flex items-center gap-2 flex-1 max-w-full sm:max-w-md">
             <Search className="w-5 h-5 text-gray-400" />
             <Input
               placeholder="Search payments"
@@ -153,7 +153,7 @@ export default function PersonalPaymentsPage() {
                       {(() => {
                         const username = getUsername(payment.counterparty)
                         const name = username?.trim()
-                        return name ? name : toShortAddress(payment.counterparty)
+                        return name || toShortAddress(payment.counterparty)
                       })()}
                     </td>
                     <td className="py-4 px-4 text-sm font-semibold text-gray-900">

@@ -8,18 +8,16 @@ import { OrganizationPromotionCard } from "@/components/dashboard/organization-c
 
 export default function WalletPage() {
   return (
-    <div className="space-y-8 px-6 py-8 w-full grid">
+    <div className="space-y-6 px-4 py-6 sm:px-6 sm:py-8 lg:px-6 w-full">
       <div><OrganizationPromotionCard /></div>
-      <div className="grid lg:grid-cols-9 min-h-[300px] w-full gap-x-4">
-        <div className="w-full col-span-3 h-full">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-9 min-h-[300px] w-full gap-4">
+        <div className="w-full md:col-span-2 lg:col-span-3 h-full">
           <BalanceCard />
         </div>
-        <div className="w-full col-span-2 h-full">
-          {" "}
+        <div className="w-full md:col-span-2 lg:col-span-2 h-full">
           <IncomeExpenseCards />
         </div>
-        <div className="w-full col-span-4 h-full">
-          {" "}
+        <div className="w-full md:col-span-2 lg:col-span-4 h-full">
           <AnalysisChart />
         </div>
       </div>

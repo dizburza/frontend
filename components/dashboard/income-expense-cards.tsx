@@ -40,12 +40,12 @@ export function IncomeExpenseCards() {
 
   return (
     <div className="flex flex-col gap-4 h-full">
-      <Card className="p-6 flex-1">
+      <Card className="p-4 sm:p-6 flex-1">
         <div className="flex items-start justify-between">
           <div>
             <p className="text-gray-600 text-sm mb-2">Inflow</p>
             <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold">{incomingDisplay}</span>
+              <span className="text-xl sm:text-2xl font-bold">{incomingDisplay}</span>
               <div className="flex items-center">
                 <Image src={"/cngn.svg"} alt="cNGN" width={24} height={24} />
                 <span className="text-gray-600">cNGN</span>
@@ -57,12 +57,12 @@ export function IncomeExpenseCards() {
         </div>
       </Card>
 
-      <Card className="p-6 flex-1">
+      <Card className="p-4 sm:p-6 flex-1">
         <div className="flex items-start justify-between">
           <div>
             <p className="text-gray-600 text-sm mb-2">Outflow</p>
             <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold">{outgoingDisplay}</span>
+              <span className="text-xl sm:text-2xl font-bold">{outgoingDisplay}</span>
                <div className="flex items-center">
                 <Image src={"/cngn.svg"} alt="cNGN" width={24} height={24} />
                 <span className="text-gray-600">cNGN</span>
