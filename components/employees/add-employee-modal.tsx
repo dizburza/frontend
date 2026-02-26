@@ -26,8 +26,17 @@ async function apiFetch(endpoint: string, options: RequestInit = {}) {
   })
   
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({ message: "Unknown error" }))
-    throw new Error(errorData.message || `HTTP ${response.status}`)
+    const errorData = await response
+      .json()
+      .catch(() => ({ error: "Request failed", message: "Request failed" }))
+
+    const message =
+      (typeof errorData?.message === "string" && errorData.message) ||
+      (typeof errorData?.error === "string" && errorData.error) ||
+      (typeof errorData?.details === "string" && errorData.details) ||
+      `Request failed (HTTP ${response.status})`
+
+    throw new Error(message)
   }
   
   return response.json()
@@ -639,7 +648,6 @@ Doe,John,0x1234567890abcdef1234567890abcdef12345678,Software Engineer,500000,Eng
         onEmployeeAdded()
       }
     } catch (err) {
-      console.error("Failed to upload CSV:", err)
       setUploadError(err instanceof Error ? err.message : "Failed to process CSV")
     } finally {
       setIsUploading(false)
