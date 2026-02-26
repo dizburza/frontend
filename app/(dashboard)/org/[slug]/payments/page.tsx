@@ -1,30 +1,40 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { StatCard } from "@/components/stat-card"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { ChevronDown, Search, MoreVertical } from "lucide-react"
+import { ChevronDown, Search, MoreVertical, Loader2 } from "lucide-react"
 import { BatchPaymentCreationModal } from "@/components/payments/batch-payment-creation-modal"
-import { getSessionPaymentBatches } from "@/lib/localStorage"
-import type { PaymentBatch } from "@/lib/types/payloads"
+import { 
+  useOrganizationBySlug, 
+  useOrganizationBatches,
+  mapApiBatchToPaymentBatch 
+} from "@/lib/api/organization"
+import useOrgSlug from "@/hooks/useOrgSlug"
 
 export default function PaymentsPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [showBatchModal, setShowBatchModal] = useState(false)
-  const [paymentBatches, setPaymentBatches] = useState(getSessionPaymentBatches())
 
-  // Refresh batches when modal closes after creating a new one
+  const orgSlug = useOrgSlug()
+  const { data: organization, loading: orgLoading } = useOrganizationBySlug(orgSlug)
+  const { data: batchesData, loading: batchesLoading, error, refresh } = useOrganizationBatches(organization?._id || null)
+
+  const paymentBatches = batchesData?.batches?.map(mapApiBatchToPaymentBatch) || []
+  const stats = batchesData?.stats || { pending: 0, approved: 0, executed: 0, cancelled: 0 }
+  const totalBatches = batchesData?.totalBatches || 0
+
   const handlePaymentCreated = () => {
-    setPaymentBatches(getSessionPaymentBatches())
+    refresh()
     setShowBatchModal(false)
   }
 
-  // Load batches on mount
-  useEffect(() => {
-    setPaymentBatches(getSessionPaymentBatches())
-  }, [])
+  // Calculate employees paid from executed batches
+  const employeesPaid = batchesData?.batches
+    ?.filter(b => b.status === "executed")
+    ?.reduce((sum, b) => sum + b.recipients.length, 0) || 0
 
   // Format amount for display
   const formatAmount = (amount: number) => {
@@ -33,6 +43,39 @@ export default function PaymentsPage() {
     }
     return amount.toLocaleString()
   }
+
+  const loading = orgLoading || batchesLoading
+
+  if (loading) {
+    return (
+      <div className="py-4 sm:py-6 lg:py-8 px-4 sm:px-6 lg:px-8 flex items-center justify-center min-h-[400px]">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="py-4 sm:py-6 lg:py-8 px-4 sm:px-6 lg:px-8">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <p className="text-red-600">Failed to load payment batches: {error}</p>
+          <Button onClick={refresh} className="mt-2" variant="outline">Try Again</Button>
+        </div>
+      </div>
+    )
+  }
+
+  const filteredBatches = paymentBatches.filter(batch =>
+    batch.batchName.toLowerCase().includes(searchTerm.toLowerCase())
+  )
+
+  const getStatusStyle = (status: string) => {
+    const normalizedStatus = status.toLowerCase();
+    if (normalizedStatus === "executed") return "bg-green-100 text-green-700";
+    if (normalizedStatus === "pending") return "bg-yellow-100 text-yellow-700";
+    if (normalizedStatus === "approved") return "bg-blue-100 text-blue-700";
+    return "bg-gray-100 text-gray-700";
+  };
 
   return (
     <div className="py-4 sm:py-6 lg:py-8 px-4 sm:px-6 lg:px-8 space-y-6">
@@ -53,10 +96,10 @@ export default function PaymentsPage() {
 
       {/* Stat Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Total Batches" value={paymentBatches.length.toString()} trend={{ value: "+2 than last month", direction: "up" }} />
-        <StatCard label="Pending Approval" value="0" lastUpdated="1 min ago" />
-        <StatCard label="Executed This Month" value="2" trend={{ value: "+2 than last month", direction: "up" }} />
-        <StatCard label="Employees Paid" value="3" lastUpdated="1 min ago" />
+        <StatCard label="Total Batches" value={totalBatches.toString()} trend={{ value: "+2 than last month", direction: "up" }} />
+        <StatCard label="Pending Approval" value={stats.pending.toString()} lastUpdated="1 min ago" />
+        <StatCard label="Executed This Month" value={stats.executed.toString()} trend={{ value: "+2 than last month", direction: "up" }} />
+        <StatCard label="Employees Paid" value={employeesPaid.toString()} lastUpdated="1 min ago" />
       </div>
 
       {/* Payment Batches Table */}
@@ -109,14 +152,14 @@ export default function PaymentsPage() {
               </tr>
             </thead>
             <tbody>
-              {paymentBatches.length === 0 ? (
+              {filteredBatches.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="py-8 text-center text-gray-500">
                     No payment batches yet. Create your first batch to get started.
                   </td>
                 </tr>
               ) : (
-                paymentBatches.map((batch: PaymentBatch, index: number) => (
+                filteredBatches.map((batch, index) => (
                   <tr key={batch.id} className="border-b border-gray-100 hover:bg-gray-50">
                     <td className="py-4 px-4 text-sm text-gray-900">{index + 1}</td>
                     <td className="py-4 px-4 text-sm text-gray-900">{batch.batchName}</td>
@@ -126,7 +169,7 @@ export default function PaymentsPage() {
                     <td className="py-4 px-4 text-sm text-gray-600">{batch.date}</td>
                     <td className="py-4 px-4 text-sm text-gray-900">{batch.employees}</td>
                     <td className="py-4 px-4 text-sm">
-                      <span className="px-3 py-1 bg-gray-100 text-gray-700 rounded text-xs font-medium">
+                      <span className={`px-3 py-1 rounded text-xs font-medium ${getStatusStyle(batch.status)}`}>
                         {batch.status}
                       </span>
                     </td>
@@ -145,6 +188,7 @@ export default function PaymentsPage() {
 
       {showBatchModal && (
         <BatchPaymentCreationModal 
+          organizationId={organization?._id}
           onClose={() => setShowBatchModal(false)} 
           onPaymentCreated={handlePaymentCreated}
         />

@@ -11,7 +11,7 @@ import { addEmployeeToSession } from "@/lib/localStorage"
 // Local apiFetch helper
 async function apiFetch(endpoint: string, options: RequestInit = {}) {
   const token = localStorage.getItem("token")
-  const backendBaseUrl = (process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5050").replace(/\/$/, "").replace(/\/api$/, "")
+  const backendBaseUrl = (process.env.BACKEND_URL || "http://localhost:5050").replace(/\/$/, "").replace(/\/api$/, "")
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...(options.headers as Record<string, string>),
@@ -35,7 +35,7 @@ async function apiFetch(endpoint: string, options: RequestInit = {}) {
 
 async function backendFetchBlob(endpoint: string, options: RequestInit = {}) {
   const token = localStorage.getItem("token")
-  const backendBaseUrl = (process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5050").replace(/\/$/, "").replace(/\/api$/, "")
+  const backendBaseUrl = (process.env.BACKEND_URL || "http://localhost:5050").replace(/\/$/, "").replace(/\/api$/, "")
   const headers: Record<string, string> = {
     ...(options.headers as Record<string, string>),
   }

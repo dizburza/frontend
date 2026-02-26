@@ -11,6 +11,7 @@ import { SuccessModal } from "@/components/success-modal"
 interface BatchPaymentCreationModalProps {
   onClose: () => void
   onPaymentCreated?: () => void
+  organizationId?: string
 }
 
 const employees = [

@@ -1,40 +1,200 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Search, Filter, ArrowUpDown, MoreVertical } from "lucide-react"
+import { Search, Filter, ArrowUpDown, MoreVertical, Loader2, ChevronDown, Copy, Check } from "lucide-react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { AddEmployeeModal } from "@/components/employees/add-employee-modal"
-import { getSessionEmployees } from "@/lib/localStorage"
-import type { Employee } from "@/lib/types/payloads"
+import { 
+  useOrganizationBySlug, 
+  useOrganizationEmployees,
+  mapApiEmployeeToEmployee 
+} from "@/lib/api/organization"
+import useOrgSlug from "@/hooks/useOrgSlug"
+
+// Helper component for copyable wallet address
+function WalletAddress({ address }: { address: string }) {
+  const [copied, setCopied] = useState(false)
+  
+  const shortenAddress = (addr: string) => {
+    if (!addr || addr.length < 12) return addr
+    return `${addr.slice(0, 6)}...${addr.slice(-4)}`
+  }
+  
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(address)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch (err) {
+      console.error("Failed to copy:", err)
+    }
+  }
+  
+  return (
+    <div className="flex items-center gap-2">
+      <span className="font-mono text-sm">{shortenAddress(address)}</span>
+      <button
+        onClick={handleCopy}
+        className="p-1 hover:bg-gray-100 rounded transition-colors"
+        title="Copy full address"
+      >
+        {copied ? <Check size={14} className="text-green-600" /> : <Copy size={14} className="text-gray-400" />}
+      </button>
+    </div>
+  )
+}
 
 export default function EmployeesPage() {
   const [searchTerm, setSearchTerm] = useState("")
-  const [filterBy] = useState("New Employees")
-  const [sortBy] = useState("Date")
+  const [filterBy, setFilterBy] = useState<"all" | "new" | "high-salary">("all")
+  const [sortBy, setSortBy] = useState<"name" | "salary" | "date">("name")
   const [showAddEmployeeModal, setShowAddEmployeeModal] = useState(false)
-  const [employees, setEmployees] = useState<Employee[]>(getSessionEmployees())
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false)
+  const [showSortDropdown, setShowSortDropdown] = useState(false)
 
-  // Refresh employees when modal closes after adding
-  const handleEmployeeAdded = () => {
-    setEmployees(getSessionEmployees())
-  }
+  const filterRef = useRef<HTMLDivElement>(null)
+  const sortRef = useRef<HTMLDivElement>(null)
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
+        setShowFilterDropdown(false)
+      }
+      if (sortRef.current && !sortRef.current.contains(event.target as Node)) {
+        setShowSortDropdown(false)
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [])
+
+  const orgSlug = useOrgSlug()
+  const { data: organization, loading: orgLoading } = useOrganizationBySlug(orgSlug)
+  const { data: employeesData, loading: employeesLoading, error, refresh } = useOrganizationEmployees(organization?._id || null)
+
+  const employees = employeesData?.employees?.map(mapApiEmployeeToEmployee) || []
+  const totalEmployees = employeesData?.totalEmployees || 0
+
+  // Calculate stats from real data
+  const totalSalaryPayout = employees.reduce((sum, emp) => sum + emp.salary, 0)
+  const newEmployeesCount = employees.filter(emp => {
+    if (!emp.joinedAt) return false
+    const joinedDate = new Date(emp.joinedAt)
+    const oneMonthAgo = new Date()
+    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1)
+    return joinedDate > oneMonthAgo
+  }).length
 
   const stats = [
-    { label: "Total Salary Payout", value: "5,820,000", unit: "cNGN", lastUpdated: "1 min ago" },
-    { label: "Total Employees", value: employees.length.toString(), lastUpdated: "1 min ago" },
-    { label: "New Employees", value: "2", change: "+2 than last month", lastUpdated: "" },
-    { label: "Proposal Contributors", value: "3", lastUpdated: "1 min ago" },
+    { 
+      label: "Total Salary Payout", 
+      value: totalSalaryPayout.toLocaleString(), 
+      unit: "cNGN", 
+      lastUpdated: "1 min ago" 
+    },
+    { 
+      label: "Total Employees", 
+      value: totalEmployees.toString(), 
+      lastUpdated: "1 min ago" 
+    },
+    { 
+      label: "New Employees", 
+      value: newEmployeesCount.toString(), 
+      change: "+" + newEmployeesCount + " than last month", 
+      lastUpdated: "" 
+    },
+    { 
+      label: "Proposal Contributors", 
+      value: "0", 
+      lastUpdated: "1 min ago" 
+    },
   ]
 
-  const filteredEmployees = employees.filter(
-    (emp: Employee) =>
-      emp.surname.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      emp.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      emp.username.toLowerCase().includes(searchTerm.toLowerCase()),
-  )
+  // Filter employees based on selected filter
+  const getFilteredEmployees = () => {
+    let filtered = employees.filter(
+      (emp) =>
+        emp.surname.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        emp.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        emp.username.toLowerCase().includes(searchTerm.toLowerCase()),
+    )
+
+    // Apply filter
+    if (filterBy === "new") {
+      const oneMonthAgo = new Date()
+      oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1)
+      filtered = filtered.filter(emp => {
+        if (!emp.joinedAt) return false
+        return new Date(emp.joinedAt) > oneMonthAgo
+      })
+    } else if (filterBy === "high-salary") {
+      filtered = filtered.filter(emp => emp.salary >= 500) // 500k cNGN / 1000 = 500 (display value)
+    }
+
+    // Apply sort
+    const sorted = [...filtered]
+    if (sortBy === "name") {
+      sorted.sort((a, b) => a.surname.localeCompare(b.surname))
+    } else if (sortBy === "salary") {
+      sorted.sort((a, b) => b.salary - a.salary)
+    } else if (sortBy === "date") {
+      sorted.sort((a, b) => {
+        if (!a.joinedAt) return 1
+        if (!b.joinedAt) return -1
+        return new Date(b.joinedAt).getTime() - new Date(a.joinedAt).getTime()
+      })
+    }
+
+    return sorted
+  }
+
+  const filteredEmployees = getFilteredEmployees()
+
+  const filterOptions = [
+    { value: "all", label: "All Employees" },
+    { value: "new", label: "New Employees (Last 30 days)" },
+    { value: "high-salary", label: "High Salary (≥500k cNGN)" },
+  ]
+
+  const sortOptions = [
+    { value: "name", label: "Name (A-Z)" },
+    { value: "salary", label: "Salary (High to Low)" },
+    { value: "date", label: "Join Date (Newest)" },
+  ]
+
+  const getFilterLabel = () => filterOptions.find(opt => opt.value === filterBy)?.label || "All Employees"
+  const getSortLabel = () => sortOptions.find(opt => opt.value === sortBy)?.label || "Name"
+
+  const handleEmployeeAdded = () => {
+    refresh()
+    setShowAddEmployeeModal(false)
+  }
+
+  const loading = orgLoading || employeesLoading
+
+  if (loading) {
+    return (
+      <div className="py-4 sm:py-6 lg:py-8 px-4 sm:px-6 lg:px-8 flex items-center justify-center min-h-[400px]">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="py-4 sm:py-6 lg:py-8 px-4 sm:px-6 lg:px-8">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <p className="text-red-600">Failed to load employees: {error}</p>
+          <Button onClick={refresh} className="mt-2" variant="outline">Try Again</Button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="py-4 sm:py-6 lg:py-8 px-4 sm:px-6 lg:px-8 space-y-8">
@@ -87,15 +247,70 @@ export default function EmployeesPage() {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" className="gap-2 bg-transparent">
-              <Filter size={16} />
-              Filters: {filterBy}
-            </Button>
-            <Button variant="outline" size="sm" className="gap-2 bg-transparent">
-              <ArrowUpDown size={16} />
-              Sort: {sortBy}
-            </Button>
+          <div className="flex gap-2 relative">
+            {/* Filter Dropdown */}
+            <div className="relative" ref={filterRef}>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="gap-2 bg-transparent"
+                onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+              >
+                <Filter size={16} />
+                {getFilterLabel()}
+                <ChevronDown size={14} />
+              </Button>
+              {showFilterDropdown && (
+                <div className="absolute top-full left-0 mt-1 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-20 py-1">
+                  {filterOptions.map((option) => (
+                    <button
+                      key={option.value}
+                      onClick={() => {
+                        setFilterBy(option.value as typeof filterBy)
+                        setShowFilterDropdown(false)
+                      }}
+                      className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 ${
+                        filterBy === option.value ? "bg-blue-50 text-blue-600" : "text-gray-700"
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Sort Dropdown */}
+            <div className="relative" ref={sortRef}>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="gap-2 bg-transparent"
+                onClick={() => setShowSortDropdown(!showSortDropdown)}
+              >
+                <ArrowUpDown size={16} />
+                {getSortLabel()}
+                <ChevronDown size={14} />
+              </Button>
+              {showSortDropdown && (
+                <div className="absolute top-full left-0 mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-20 py-1">
+                  {sortOptions.map((option) => (
+                    <button
+                      key={option.value}
+                      onClick={() => {
+                        setSortBy(option.value as typeof sortBy)
+                        setShowSortDropdown(false)
+                      }}
+                      className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 ${
+                        sortBy === option.value ? "bg-blue-50 text-blue-600" : "text-gray-700"
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -114,22 +329,40 @@ export default function EmployeesPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredEmployees.map((employee, index) => (
-                <TableRow key={employee.id}>
-                  <TableCell className="font-medium text-gray-900">{index + 1}</TableCell>
-                  <TableCell className="text-gray-700">{employee.surname}</TableCell>
-                  <TableCell className="text-gray-700">{employee.firstName}</TableCell>
-                  <TableCell className="text-gray-700">{employee.username}</TableCell>
-                  <TableCell className="text-gray-700 font-mono text-sm">{employee.walletAddress}</TableCell>
-                  <TableCell className="text-gray-700">{employee.role}</TableCell>
-                  <TableCell className="text-gray-900 font-medium">{employee.salary.toLocaleString()}</TableCell>
-                  <TableCell>
-                    <button className="p-1 hover:bg-gray-100 rounded transition-colors">
-                      <MoreVertical size={16} className="text-gray-600" />
-                    </button>
+              {filteredEmployees.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="py-8 text-center text-gray-500">
+                    No employees found. Add your first employee to get started.
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : (
+                filteredEmployees.map((employee, index) => (
+                  <TableRow key={employee.id}>
+                    <TableCell className="font-medium text-gray-900">{index + 1}</TableCell>
+                    <TableCell className="text-gray-700">{employee.surname}</TableCell>
+                    <TableCell className="text-gray-700">{employee.firstName}</TableCell>
+                    <TableCell className="text-gray-700">{employee.username}</TableCell>
+                    <TableCell className="text-gray-700">
+                      <WalletAddress address={employee.walletAddress} />
+                    </TableCell>
+                    <TableCell className="text-gray-700">
+                      {employee.isSigner ? (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
+                          Signer
+                        </span>
+                      ) : (
+                        <span className="text-gray-600">{employee.role}</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-gray-900 font-medium">{employee.salary.toLocaleString()}</TableCell>
+                    <TableCell>
+                      <button className="p-1 hover:bg-gray-100 rounded transition-colors">
+                        <MoreVertical size={16} className="text-gray-600" />
+                      </button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </div>
@@ -137,6 +370,7 @@ export default function EmployeesPage() {
 
       {showAddEmployeeModal && (
         <AddEmployeeModal 
+          organizationId={organization?._id}
           onClose={() => setShowAddEmployeeModal(false)} 
           onEmployeeAdded={handleEmployeeAdded}
         />
