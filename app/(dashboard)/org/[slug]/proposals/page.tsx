@@ -32,12 +32,12 @@ export default function ProposalsPage() {
   ]
 
   return (
-    <div className="p-8  space-y-8">
+    <div className="py-4 sm:py-6 lg:py-8 px-4 sm:px-6 lg:px-8 space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <p className="text-sm text-gray-500 mb-2">Dashboard › Proposals</p>
-          <h1 className="text-3xl font-bold">Proposals</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold">Proposals</h1>
         </div>
         <Button onClick={() => setShowCreateModal(true)} className="bg-blue-600 hover:bg-blue-700 text-white gap-2">
           + Create a Proposal
@@ -45,31 +45,33 @@ export default function ProposalsPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((stat) => (
           <ProposalStatCard key={stat.label} {...stat} />
         ))}
       </div>
 
       {/* Proposal History */}
-      <Card className="p-6">
+      <Card className="p-4 sm:p-6">
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-lg font-semibold">Proposal History</h3>
         </div>
 
-        <div className="flex items-center gap-4 mb-6">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 mb-6">
           <div className="flex-1 relative">
             <Search size={18} className="absolute left-3 top-3 text-gray-400" />
             <Input placeholder="Search for proposals" className="pl-10" />
           </div>
-          <Button variant="outline" size="sm" className="gap-2 bg-transparent">
-            <Filter size={16} />
-            Filters: Recent Transaction
-          </Button>
-          <Button variant="outline" size="sm" className="gap-2 bg-transparent">
-            <ArrowUpDown size={16} />
-            Sort: Date
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" className="gap-2 bg-transparent">
+              <Filter size={16} />
+              Filters: Recent Transaction
+            </Button>
+            <Button variant="outline" size="sm" className="gap-2 bg-transparent">
+              <ArrowUpDown size={16} />
+              Sort: Date
+            </Button>
+          </div>
         </div>
 
         <ProposalTable proposals={proposals} />

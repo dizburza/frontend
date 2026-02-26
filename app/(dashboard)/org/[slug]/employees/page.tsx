@@ -37,12 +37,12 @@ export default function EmployeesPage() {
   )
 
   return (
-    <div className="p-8 space-y-8">
+    <div className="py-4 sm:py-6 lg:py-8 px-4 sm:px-6 lg:px-8 space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <p className="text-sm text-gray-500 mb-2">Dashboard › Employees</p>
-          <h1 className="text-3xl font-bold text-gray-900">Employees</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Employees</h1>
         </div>
         <div className="flex items-center gap-3">
           <Button
@@ -59,7 +59,7 @@ export default function EmployeesPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((stat) => (
           <Card key={stat.label} className="p-6">
             <p className="text-sm text-gray-600 mb-2">{stat.label}</p>
@@ -72,12 +72,12 @@ export default function EmployeesPage() {
       </div>
 
       {/* Employees List */}
-      <Card className="p-6">
+      <Card className="p-4 sm:p-6">
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-lg font-semibold text-gray-900">Employee&apos;s List</h3>
         </div>
 
-        <div className="flex items-center gap-4 mb-6">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 mb-6">
           <div className="flex-1 relative">
             <Search size={18} className="absolute left-3 top-3 text-gray-400" />
             <Input
@@ -87,14 +87,16 @@ export default function EmployeesPage() {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <Button variant="outline" size="sm" className="gap-2 bg-transparent">
-            <Filter size={16} />
-            Filters: {filterBy}
-          </Button>
-          <Button variant="outline" size="sm" className="gap-2 bg-transparent">
-            <ArrowUpDown size={16} />
-            Sort: {sortBy}
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" className="gap-2 bg-transparent">
+              <Filter size={16} />
+              Filters: {filterBy}
+            </Button>
+            <Button variant="outline" size="sm" className="gap-2 bg-transparent">
+              <ArrowUpDown size={16} />
+              Sort: {sortBy}
+            </Button>
+          </div>
         </div>
 
         <div className="overflow-x-auto">

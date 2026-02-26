@@ -35,10 +35,10 @@ export default function OrganizationDashboardPage() {
   };
 
   return (
-    <div className=" py-8">
+    <div className="py-4 sm:py-6 lg:py-8 px-4 sm:px-6 lg:px-8">
       {/* Welcome Banner */}
       <Card className="rounded-xl bg-white px-4 pt-4 mb-4">
-        <div className=" bg-[#373CD0] rounded-md relative h-32 text-white overflow-hidden">
+        <div className="bg-[#373CD0] rounded-md relative h-32 text-white overflow-hidden">
           <div className="absolute inset-0 opacity-50">
             <div className="absolute top-4 left-1/2 w-16 h-16 bg-white rounded-full blur-2xl" />
             <div className="absolute top-20 right-1/2 w-20 h-20 bg-white rounded-full blur-2xl" />
@@ -115,20 +115,20 @@ export default function OrganizationDashboardPage() {
         </div>
 
         {/* Organization Info Card */}
-        <div className="pt-4 px-8">
-          <div className="flex items-start justify-between">
-            <div className="flex items-start gap-x-4">
-              <div className=" relative bottom-8 z-10">
+        <div className="pt-4 px-4 sm:px-8">
+          <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
+            <div className="flex flex-col sm:flex-row items-start gap-x-4 gap-y-2">
+              <div className="relative bottom-8 z-10">
                 <Image
                   src="/org-logo.svg"
                   alt="Org logo"
-                  width="100"
-                  height={"100"}
+                  width={100}
+                  height={100}
                 />
               </div>
               <div>
-                <div className="flex gap-2">
-                  <h2 className="text-2xl font-bold text-gray-900">
+                <div className="flex flex-wrap gap-2">
+                  <h2 className="text-xl sm:text-2xl font-bold text-gray-900">
                     {org.name}
                   </h2>
                   <div className="flex items-center gap-2 mt-1">
@@ -142,7 +142,7 @@ export default function OrganizationDashboardPage() {
             </div>
             <div className="flex gap-2">
               <Button
-                className="bg-blue-600 hover:bg-blue-700  border-b-2 border-[#8286E9]"
+                className="bg-blue-600 hover:bg-blue-700 border-b-2 border-[#8286E9]"
                 onClick={() => setIsAddSignersOpen(true)}
               >
                 + Add Signers
@@ -154,11 +154,11 @@ export default function OrganizationDashboardPage() {
       </Card>
 
       {/* Main Content Grid */}
-      <div className="grid grid-cols-12 gap-4 h-full mb-8">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 h-full mb-8">
         {/* Left Sidebar - Wallet */}
-        <div className="col-span-3 h-full">
+        <div className="lg:col-span-3 h-full">
           <Card className="h-full">
-            <CardContent className="pt-6">
+            <CardContent className="pt-6 px-4 sm:px-6">
               <div className="flex items-center justify-between mb-6">
                 <p className="text-sm text-gray-600">
                   Wallet : {wallet.address}
@@ -190,13 +190,13 @@ export default function OrganizationDashboardPage() {
         </div>
 
         {/* Center Content - Payroll Summary */}
-        <div className="col-span-5 h-full">
+        <div className="lg:col-span-5 h-full">
           <Card className="h-full">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg font-semibold">
+            <CardContent className="pt-6 px-4 sm:px-6">
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-lg font-semibold text-gray-900">
                   Payroll Summary
-                </CardTitle>
+                </p>
                 <button
                   type="button"
                   className="text-blue-600 text-sm font-medium hover:underline"
@@ -204,9 +204,7 @@ export default function OrganizationDashboardPage() {
                   View all
                 </button>
               </div>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-8 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-8 gap-2">
                 <div className="p-4 col-span-2 bg-gray-50 rounded-lg">
                   <p className="text-xs text-[#26297A] mb-2">
                     Active Employees
@@ -235,7 +233,7 @@ export default function OrganizationDashboardPage() {
         </div>
 
         {/* Right Content - Authorized Signers */}
-        <div className="col-span-4">
+        <div className="lg:col-span-4">
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -250,7 +248,7 @@ export default function OrganizationDashboardPage() {
                 </button>
               </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-4 sm:px-6">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
@@ -296,7 +294,7 @@ export default function OrganizationDashboardPage() {
       </div>
 
       {/* Analysis and Proposal History */}
-      <div className="grid grid-cols-2 gap-6 mb-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-8">
         <Card className="h-96">
           <AnalysisChart />
         </Card>
@@ -310,7 +308,7 @@ export default function OrganizationDashboardPage() {
               </button>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-4 sm:px-6">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -353,14 +351,14 @@ export default function OrganizationDashboardPage() {
       {/* Transaction History */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <CardTitle>Transaction History</CardTitle>
             <Link href={viewAllTransactionsHref} className="text-blue-600 text-sm font-medium">
               View all
             </Link>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 sm:px-6">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
