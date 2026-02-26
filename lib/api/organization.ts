@@ -69,6 +69,7 @@ async function apiFetch(endpoint: string, options: RequestInit = {}) {
 export interface ApiEmployee {
   _id: string;
   username: string;
+  displayUsername?: string;
   surname: string;
   firstname: string;
   fullName: string;
@@ -344,6 +345,7 @@ export function mapApiEmployeeToEmployee(apiEmployee: ApiEmployee): {
   surname: string;
   firstName: string;
   username: string;
+  displayUsername?: string;
   walletAddress: string;
   role: string;
   isSigner: boolean;
@@ -367,6 +369,7 @@ export function mapApiEmployeeToEmployee(apiEmployee: ApiEmployee): {
     surname: apiEmployee.surname,
     firstName: apiEmployee.firstname,
     username: apiEmployee.username,
+    displayUsername: apiEmployee.displayUsername,
     walletAddress: apiEmployee.walletAddress,
     role: apiEmployee.jobDetails?.jobRole || apiEmployee.role || "Employee",
     isSigner: apiEmployee.isSigner || false,

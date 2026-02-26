@@ -59,6 +59,7 @@ export default function EmployeesPage() {
   const [editingEmployee, setEditingEmployee] = useState<null | {
     id: string
     username: string
+    displayUsername?: string
     jobRole: string
     salary: string
     department?: string
@@ -314,7 +315,7 @@ export default function EmployeesPage() {
             <div className="p-6 space-y-4">
               <div>
                 <label htmlFor="edit-employee-username" className="block text-sm font-medium text-gray-700 mb-1">Username</label>
-                <Input id="edit-employee-username" value={editingEmployee.username} disabled className="w-full" />
+                <Input id="edit-employee-username" value={editingEmployee.displayUsername || editingEmployee.username} disabled className="w-full" />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -601,7 +602,7 @@ export default function EmployeesPage() {
                     <TableCell className="font-medium text-gray-900">{index + 1}</TableCell>
                     <TableCell className="text-gray-700">{employee.surname}</TableCell>
                     <TableCell className="text-gray-700">{employee.firstName}</TableCell>
-                    <TableCell className="text-gray-700">{employee.username}</TableCell>
+                    <TableCell className="text-gray-700">{employee.displayUsername || employee.username}</TableCell>
                     <TableCell className="text-gray-700">
                       <WalletAddress address={employee.walletAddress} />
                     </TableCell>
@@ -628,6 +629,7 @@ export default function EmployeesPage() {
                             setEditingEmployee({
                               id: employee.id,
                               username: employee.username,
+                              displayUsername: employee.displayUsername,
                               jobRole: employee.role,
                               salary: String(employee.salary || ""),
                               department: employee.department,
