@@ -114,7 +114,7 @@ export function SendToCNGNFlow({ isOpen, onClose, initialRecipient }: Readonly<S
 
     try {
       showLoading("Resolving username...")
-      const backend = process.env.BACKEND_URL
+      const backend = process.env.NEXT_PUBLIC_BACKEND_URL
       if (!backend) {
         toast.error("Backend URL not configured")
         return null

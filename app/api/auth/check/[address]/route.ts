@@ -14,7 +14,7 @@ export async function GET(
 ) {
   const { address } = await context.params;
 
-  const baseUrl = process.env.BACKEND_URL || "http://localhost:5050";
+  const baseUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5050";
 
   const upstreamUrl = new URL(`/api/auth/check/${address}`, baseUrl);
 

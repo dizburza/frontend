@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuthCompleted } from "@/hooks/useAutoAuthenticate";
 
-const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:5050";
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5050";
 
 // Types
 export interface Organization {
@@ -77,6 +77,12 @@ export interface ApiEmployee {
   avatar?: string;
   role: string;
   isSigner?: boolean;
+  lastAudit?: {
+    action?: "ADD" | "UPDATE" | "REMOVE";
+    createdAt?: string;
+    performedByUsername?: string;
+    performedByWalletAddress?: string;
+  } | null;
   jobDetails?: {
     jobRole?: string;
     salary?: string;
@@ -157,6 +163,35 @@ export async function fetchOrganizationEmployees(organizationId: string): Promis
 
 export async function fetchOrganizationBatches(organizationId: string): Promise<BatchesResponse> {
   return apiFetch(`/api/payroll/organizations/${organizationId}/batches`);
+}
+
+export async function updateOrganizationEmployee(
+  organizationId: string,
+  username: string,
+  updates: {
+    jobRole?: string;
+    salary?: string;
+    department?: string;
+    employeeId?: string;
+  }
+) {
+  return apiFetch(`/api/organizations/${organizationId}/employees/${encodeURIComponent(username)}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(updates),
+    }
+  );
+}
+
+export async function removeOrganizationEmployee(
+  organizationId: string,
+  username: string
+) {
+  return apiFetch(`/api/organizations/${organizationId}/employees/${encodeURIComponent(username)}`,
+    {
+      method: "DELETE",
+    }
+  );
 }
 
 // React Hooks
@@ -316,6 +351,12 @@ export function mapApiEmployeeToEmployee(apiEmployee: ApiEmployee): {
   department?: string;
   employeeId?: string;
   joinedAt?: string;
+  lastAudit?: {
+    action?: "ADD" | "UPDATE" | "REMOVE";
+    createdAt?: string;
+    performedByUsername?: string;
+    performedByWalletAddress?: string;
+  } | null;
 } {
   // Salary is stored with 6 extra decimals for blockchain (divide by 10^6)
   const rawSalary = Number.parseFloat(apiEmployee.jobDetails?.salary || "0");
@@ -333,6 +374,7 @@ export function mapApiEmployeeToEmployee(apiEmployee: ApiEmployee): {
     department: apiEmployee.jobDetails?.department,
     employeeId: apiEmployee.jobDetails?.employeeId,
     joinedAt: apiEmployee.jobDetails?.joinedAt,
+    lastAudit: apiEmployee.lastAudit || null,
   };
 }
 

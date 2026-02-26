@@ -47,7 +47,7 @@ export default function useAddressUsernames(addresses: string[]) {
     };
 
     const run = async () => {
-      const backend = process.env.BACKEND_URL;
+      const backend = process.env.NEXT_PUBLIC_BACKEND_URL;
       if (!backend) return;
 
       const missing = normalized.filter((a) => !cacheRef.current.has(a));

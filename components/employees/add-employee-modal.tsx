@@ -11,7 +11,7 @@ import { addEmployeeToSession } from "@/lib/localStorage"
 // Local apiFetch helper
 async function apiFetch(endpoint: string, options: RequestInit = {}) {
   const token = localStorage.getItem("token")
-  const backendBaseUrl = (process.env.BACKEND_URL || "http://localhost:5050").replace(/\/$/, "").replace(/\/api$/, "")
+  const backendBaseUrl = (process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5050").replace(/\/$/, "").replace(/\/api$/, "")
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...(options.headers as Record<string, string>),
@@ -35,7 +35,7 @@ async function apiFetch(endpoint: string, options: RequestInit = {}) {
 
 async function backendFetchBlob(endpoint: string, options: RequestInit = {}) {
   const token = localStorage.getItem("token")
-  const backendBaseUrl = (process.env.BACKEND_URL || "http://localhost:5050").replace(/\/$/, "").replace(/\/api$/, "")
+  const backendBaseUrl = (process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5050").replace(/\/$/, "").replace(/\/api$/, "")
   const headers: Record<string, string> = {
     ...(options.headers as Record<string, string>),
   }
@@ -88,9 +88,15 @@ interface FormData {
 function SingleEmployeeForm({
   formData,
   onChange,
+  onResolveUsername,
+  isResolvingUsername,
+  isAutofilled,
 }: Readonly<{
   formData: FormData
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void
+  onResolveUsername: () => void
+  isResolvingUsername: boolean
+  isAutofilled: boolean
 }>) {
   return (
     <div className="space-y-4">
@@ -98,15 +104,30 @@ function SingleEmployeeForm({
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-1">Username *</label>
-          <Input
-            id="username"
-            name="username"
-            placeholder="johndoe"
-            value={formData.username}
-            onChange={onChange}
-            className="w-full"
-          />
+          <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-1">Username</label>
+          <div className="flex gap-2">
+            <Input
+              id="username"
+              name="username"
+              placeholder="johndoe"
+              value={formData.username}
+              onChange={onChange}
+              className="w-full"
+            />
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onResolveUsername}
+              disabled={!formData.username || isResolvingUsername}
+              className="shrink-0"
+            >
+              {isResolvingUsername ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                "Search"
+              )}
+            </Button>
+          </div>
         </div>
         <div>
           <label htmlFor="employeeId" className="block text-sm font-medium text-gray-700 mb-1">Employee ID</label>
@@ -130,6 +151,7 @@ function SingleEmployeeForm({
             placeholder="Doe"
             value={formData.surname}
             onChange={onChange}
+            disabled={isAutofilled}
             className="w-full"
           />
         </div>
@@ -141,6 +163,7 @@ function SingleEmployeeForm({
             placeholder="John"
             value={formData.firstname}
             onChange={onChange}
+            disabled={isAutofilled}
             className="w-full"
           />
         </div>
@@ -154,6 +177,7 @@ function SingleEmployeeForm({
           placeholder="0x..."
           value={formData.walletAddress}
           onChange={onChange}
+          disabled={isAutofilled}
           className="w-full font-mono"
         />
       </div>
@@ -194,7 +218,6 @@ function SingleEmployeeForm({
           onChange={onChange}
           className="w-full"
         />
-        <p className="text-xs text-gray-500 mt-1">This will be multiplied by 10^6 for blockchain storage</p>
       </div>
     </div>
   )
@@ -213,6 +236,7 @@ function UploadResultsTable({ details }: Readonly<{ details: BulkUploadResult["d
             <th className="pb-2">Username</th>
             <th className="pb-2">Status</th>
             <th className="pb-2">Verified</th>
+            <th className="pb-2">Message</th>
           </tr>
         </thead>
         <tbody>
@@ -240,12 +264,15 @@ function UploadResultsTable({ details }: Readonly<{ details: BulkUploadResult["d
                   <span className="text-orange-500 text-xs" title="User not yet registered on platform">⚠ Unverified</span>
                 )}
               </td>
+              <td className="py-2 text-xs text-gray-600">
+                {detail.message || "-"}
+              </td>
             </tr>
             )
           })}
           {details.length > 10 && (
             <tr>
-              <td colSpan={4} className="py-2 text-gray-500 text-center">
+              <td colSpan={5} className="py-2 text-gray-500 text-center">
                 ... and {details.length - 10} more
               </td>
             </tr>
@@ -458,6 +485,8 @@ export function AddEmployeeModal({ onClose, onEmployeeAdded, organizationId }: R
   const [isUploading, setIsUploading] = useState(false)
   const [uploadResult, setUploadResult] = useState<BulkUploadResult | null>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
+  const [isResolvingUsername, setIsResolvingUsername] = useState(false)
+  const [isAutofilled, setIsAutofilled] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   
   const [formData, setFormData] = useState<FormData>({
@@ -473,14 +502,45 @@ export function AddEmployeeModal({ onClose, onEmployeeAdded, organizationId }: R
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
+    if (name === "username") {
+      setIsAutofilled(false)
+    }
     setFormData((prev) => ({
       ...prev,
       [name]: value,
     }))
   }
 
+  const resolveUsername = async () => {
+    const username = formData.username.trim()
+    if (!username) return
+
+    setIsResolvingUsername(true)
+    try {
+      const response = await apiFetch(`/api/users/search/${encodeURIComponent(username)}`)
+      const user = response?.data?.user || response?.user
+      if (!user) {
+        throw new Error("User not found")
+      }
+
+      setFormData((prev) => ({
+        ...prev,
+        surname: user.surname || "",
+        firstname: user.firstname || "",
+        walletAddress: user.walletAddress || "",
+      }))
+      setIsAutofilled(true)
+    } catch (err) {
+      console.error("Failed to resolve username:", err)
+      alert(err instanceof Error ? err.message : "Failed to resolve username")
+      setIsAutofilled(false)
+    } finally {
+      setIsResolvingUsername(false)
+    }
+  }
+
   const handleSubmit = async () => {
-    if (!formData.username || !formData.role || !formData.salary) {
+    if (!formData.role || !formData.salary) {
       return
     }
     
@@ -490,8 +550,11 @@ export function AddEmployeeModal({ onClose, onEmployeeAdded, organizationId }: R
           method: "POST",
           body: JSON.stringify({
             username: formData.username,
+            walletAddress: formData.walletAddress,
             surname: formData.surname,
             firstname: formData.firstname,
+            jobRole: formData.role,
+            salary: formData.salary,
             department: formData.department || "General",
             employeeId: formData.employeeId,
           }),
@@ -519,7 +582,7 @@ export function AddEmployeeModal({ onClose, onEmployeeAdded, organizationId }: R
     try {
       if (!organizationId) {
         const template = `surname,firstname,walletAddress,jobRole,salary,department,employeeId
-Doe,John,0x1234567890abcdef1234567890abcdef12345678,Software Engineer,500000000000,Engineering,EMP001`
+Doe,John,0x1234567890abcdef1234567890abcdef12345678,Software Engineer,500000,Engineering,EMP001`
         const blob = new Blob([template], { type: "text/csv" })
         const url = globalThis.URL.createObjectURL(blob)
         const a = document.createElement("a")
@@ -591,7 +654,9 @@ Doe,John,0x1234567890abcdef1234567890abcdef12345678,Software Engineer,5000000000
     return <AddEmployeeSuccessModal onClose={handleClose} />
   }
 
-  const isSubmitDisabled = !formData.username || !formData.role || !formData.salary || !formData.surname || !formData.firstname
+  const hasUsername = Boolean(formData.username.trim())
+  const hasManualIdentity = Boolean(formData.walletAddress.trim()) && Boolean(formData.surname.trim()) && Boolean(formData.firstname.trim())
+  const isSubmitDisabled = !formData.role || !formData.salary || (!hasUsername && !hasManualIdentity)
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -604,7 +669,13 @@ Doe,John,0x1234567890abcdef1234567890abcdef12345678,Software Engineer,5000000000
 
         <div className="p-6">
           {mode === "single" ? (
-            <SingleEmployeeForm formData={formData} onChange={handleInputChange} />
+            <SingleEmployeeForm
+              formData={formData}
+              onChange={handleInputChange}
+              onResolveUsername={resolveUsername}
+              isResolvingUsername={isResolvingUsername}
+              isAutofilled={isAutofilled}
+            />
           ) : (
             <BulkUploadSection
               isUploading={isUploading}

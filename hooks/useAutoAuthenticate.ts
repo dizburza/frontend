@@ -22,7 +22,7 @@ interface LoginResponse {
   error?: string;
 }
 
-const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:5050";
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5050";
 
 // Global event name for auth completion
 const AUTH_COMPLETED_EVENT = "auth:completed";

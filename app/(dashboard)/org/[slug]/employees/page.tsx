@@ -4,13 +4,15 @@ import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Search, Filter, ArrowUpDown, MoreVertical, Loader2, ChevronDown, Copy, Check } from "lucide-react"
+import { Search, Filter, ArrowUpDown, Loader2, ChevronDown, Copy, Check, X, Pencil, Trash2 } from "lucide-react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { AddEmployeeModal } from "@/components/employees/add-employee-modal"
 import { 
   useOrganizationBySlug, 
   useOrganizationEmployees,
-  mapApiEmployeeToEmployee 
+  mapApiEmployeeToEmployee,
+  updateOrganizationEmployee,
+  removeOrganizationEmployee 
 } from "@/lib/api/organization"
 import useOrgSlug from "@/hooks/useOrgSlug"
 
@@ -52,6 +54,17 @@ export default function EmployeesPage() {
   const [filterBy, setFilterBy] = useState<"all" | "new" | "high-salary">("all")
   const [sortBy, setSortBy] = useState<"name" | "salary" | "date">("name")
   const [showAddEmployeeModal, setShowAddEmployeeModal] = useState(false)
+  const [editingEmployee, setEditingEmployee] = useState<null | {
+    id: string
+    username: string
+    jobRole: string
+    salary: string
+    department?: string
+    employeeId?: string
+    isSigner: boolean
+  }>(null)
+  const [isSavingEdit, setIsSavingEdit] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
   const [showFilterDropdown, setShowFilterDropdown] = useState(false)
   const [showSortDropdown, setShowSortDropdown] = useState(false)
 
@@ -155,6 +168,32 @@ export default function EmployeesPage() {
 
   const filteredEmployees = getFilteredEmployees()
 
+  const renderLastUpdatedBy = (employee: { lastAudit?: { performedByUsername?: string; performedByWalletAddress?: string; createdAt?: string } | null }) => {
+    if (employee.lastAudit?.performedByUsername) {
+      return (
+        <div className="text-sm">
+          <div className="font-medium text-gray-900">@{employee.lastAudit.performedByUsername}</div>
+          {employee.lastAudit.createdAt ? (
+            <div className="text-xs text-gray-500">{new Date(employee.lastAudit.createdAt).toLocaleString()}</div>
+          ) : null}
+        </div>
+      )
+    }
+
+    if (employee.lastAudit?.performedByWalletAddress) {
+      return (
+        <div className="text-sm">
+          <div className="font-medium text-gray-900 font-mono">{employee.lastAudit.performedByWalletAddress.slice(0, 6)}...{employee.lastAudit.performedByWalletAddress.slice(-4)}</div>
+          {employee.lastAudit.createdAt ? (
+            <div className="text-xs text-gray-500">{new Date(employee.lastAudit.createdAt).toLocaleString()}</div>
+          ) : null}
+        </div>
+      )
+    }
+
+    return <span className="text-gray-400">-</span>
+  }
+
   const filterOptions = [
     { value: "all", label: "All Employees" },
     { value: "new", label: "New Employees (Last 30 days)" },
@@ -173,6 +212,46 @@ export default function EmployeesPage() {
   const handleEmployeeAdded = () => {
     refresh()
     setShowAddEmployeeModal(false)
+  }
+
+  const handleSaveEdit = async () => {
+    if (!editingEmployee || !organization?._id) return
+    if (editingEmployee.isSigner) return
+
+    setIsSavingEdit(true)
+    try {
+      await updateOrganizationEmployee(organization._id, editingEmployee.username, {
+        jobRole: editingEmployee.jobRole,
+        salary: editingEmployee.salary,
+        department: editingEmployee.department,
+        employeeId: editingEmployee.employeeId,
+      })
+      setEditingEmployee(null)
+      refresh()
+    } catch (err) {
+      console.error("Failed to update employee:", err)
+      alert(err instanceof Error ? err.message : "Failed to update employee")
+    } finally {
+      setIsSavingEdit(false)
+    }
+  }
+
+  const handleDeleteEmployee = async (username: string) => {
+    if (!organization?._id) return
+
+    const confirmed = confirm(`Remove @${username} from this organization?`)
+    if (!confirmed) return
+
+    setIsDeleting(true)
+    try {
+      await removeOrganizationEmployee(organization._id, username)
+      refresh()
+    } catch (err) {
+      console.error("Failed to remove employee:", err)
+      alert(err instanceof Error ? err.message : "Failed to remove employee")
+    } finally {
+      setIsDeleting(false)
+    }
   }
 
   const loading = orgLoading || employeesLoading
@@ -198,6 +277,119 @@ export default function EmployeesPage() {
 
   return (
     <div className="py-4 sm:py-6 lg:py-8 px-4 sm:px-6 lg:px-8 space-y-8">
+      {editingEmployee && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg w-full max-w-lg overflow-hidden">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <h2 className="text-xl font-semibold text-gray-900">Edit Employee</h2>
+              <button onClick={() => setEditingEmployee(null)} className="text-gray-400 hover:text-gray-600">
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <label htmlFor="edit-employee-username" className="block text-sm font-medium text-gray-700 mb-1">Username</label>
+                <Input id="edit-employee-username" value={editingEmployee.username} disabled className="w-full" />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="edit-employee-jobRole" className="block text-sm font-medium text-gray-700 mb-1">Job Role</label>
+                  <Input
+                    id="edit-employee-jobRole"
+                    value={editingEmployee.jobRole}
+                    onChange={(e) =>
+                      setEditingEmployee((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              jobRole: e.target.value,
+                            }
+                          : prev
+                      )
+                    }
+                    className="w-full"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="edit-employee-department" className="block text-sm font-medium text-gray-700 mb-1">Department</label>
+                  <Input
+                    id="edit-employee-department"
+                    value={editingEmployee.department || ""}
+                    onChange={(e) =>
+                      setEditingEmployee((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              department: e.target.value,
+                            }
+                          : prev
+                      )
+                    }
+                    className="w-full"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="edit-employee-salary" className="block text-sm font-medium text-gray-700 mb-1">Salary (cNGN)</label>
+                  <Input
+                    id="edit-employee-salary"
+                    type="number"
+                    value={editingEmployee.salary}
+                    onChange={(e) =>
+                      setEditingEmployee((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              salary: e.target.value,
+                            }
+                          : prev
+                      )
+                    }
+                    className="w-full"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="edit-employee-employeeId" className="block text-sm font-medium text-gray-700 mb-1">Employee ID</label>
+                  <Input
+                    id="edit-employee-employeeId"
+                    value={editingEmployee.employeeId || ""}
+                    onChange={(e) =>
+                      setEditingEmployee((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              employeeId: e.target.value,
+                            }
+                          : prev
+                      )
+                    }
+                    className="w-full"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-gray-200">
+              <Button
+                onClick={handleSaveEdit}
+                disabled={isSavingEdit || editingEmployee.isSigner}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                {isSavingEdit ? (
+                  <span className="inline-flex items-center"><Loader2 size={16} className="animate-spin mr-2" />Saving...</span>
+                ) : (
+                  "Save Changes"
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -325,13 +517,14 @@ export default function EmployeesPage() {
                 <TableHead>WALLET ADDRESS</TableHead>
                 <TableHead>ROLE</TableHead>
                 <TableHead>SALARY (cNGN)</TableHead>
+                <TableHead>LAST UPDATED BY</TableHead>
                 <TableHead className="w-12">ACTION</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredEmployees.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="py-8 text-center text-gray-500">
+                  <TableCell colSpan={9} className="py-8 text-center text-gray-500">
                     No employees found. Add your first employee to get started.
                   </TableCell>
                 </TableRow>
@@ -355,10 +548,40 @@ export default function EmployeesPage() {
                       )}
                     </TableCell>
                     <TableCell className="text-gray-900 font-medium">{employee.salary.toLocaleString()}</TableCell>
+                    <TableCell className="text-gray-700">
+                      {renderLastUpdatedBy(employee)}
+                    </TableCell>
                     <TableCell>
-                      <button className="p-1 hover:bg-gray-100 rounded transition-colors">
-                        <MoreVertical size={16} className="text-gray-600" />
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          className="p-1 hover:bg-gray-100 rounded transition-colors disabled:opacity-50"
+                          title={employee.isSigner ? "Signers cannot be edited" : "Edit"}
+                          onClick={() => {
+                            setEditingEmployee({
+                              id: employee.id,
+                              username: employee.username,
+                              jobRole: employee.role,
+                              salary: String(employee.salary || ""),
+                              department: employee.department,
+                              employeeId: employee.employeeId,
+                              isSigner: employee.isSigner,
+                            })
+                          }}
+                          disabled={employee.isSigner}
+                        >
+                          <Pencil size={16} className="text-gray-600" />
+                        </button>
+                        <button
+                          type="button"
+                          className="p-1 hover:bg-gray-100 rounded transition-colors disabled:opacity-50"
+                          title={employee.isSigner ? "Signers cannot be removed" : "Remove"}
+                          onClick={() => handleDeleteEmployee(employee.username)}
+                          disabled={employee.isSigner || isDeleting}
+                        >
+                          <Trash2 size={16} className={employee.isSigner ? "text-gray-400" : "text-red-600"} />
+                        </button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
