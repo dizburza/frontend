@@ -149,6 +149,46 @@ export interface BatchesResponse {
   };
 }
 
+export interface ApiTransactionUser {
+  _id: string;
+  username?: string;
+  fullName?: string;
+}
+
+export interface ApiTransaction {
+  _id: string;
+  txHash: string;
+  type: string;
+  fromAddress: string;
+  toAddress: string;
+  amount: string;
+  currency?: string;
+  description?: string;
+  memo?: string;
+  category?: string;
+  batchId?: string;
+  batchName?: string;
+  organizationId?: string;
+  blockNumber?: number;
+  status: "pending" | "confirmed" | "failed";
+  timestamp: string;
+  direction?: "sent" | "received";
+  displayAmount?: string;
+  fromUserId?: ApiTransactionUser;
+  toUserId?: ApiTransactionUser;
+}
+
+export interface TransactionHistoryResponse {
+  transactions: ApiTransaction[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasMore: boolean;
+  };
+}
+
 // API Functions
 export async function fetchOrganizationBySlug(slug: string): Promise<Organization> {
   const response = await apiFetch(`/api/organizations/slug/${slug}`);
@@ -164,6 +204,34 @@ export async function fetchOrganizationEmployees(organizationId: string): Promis
 
 export async function fetchOrganizationBatches(organizationId: string): Promise<BatchesResponse> {
   return apiFetch(`/api/payroll/organizations/${organizationId}/batches`);
+}
+
+export async function fetchTransactionHistory(
+  address: string,
+  params?: {
+    page?: number;
+    limit?: number;
+    type?: string;
+    category?: string;
+    startDate?: string;
+    endDate?: string;
+    status?: string;
+  }
+): Promise<TransactionHistoryResponse> {
+  const query = new URLSearchParams();
+  if (params?.page) query.set("page", String(params.page));
+  if (params?.limit) query.set("limit", String(params.limit));
+  if (params?.type) query.set("type", params.type);
+  if (params?.category) query.set("category", params.category);
+  if (params?.startDate) query.set("startDate", params.startDate);
+  if (params?.endDate) query.set("endDate", params.endDate);
+  if (params?.status) query.set("status", params.status);
+
+  const qs = query.toString();
+  const baseUrl = `/api/transactions/${address}`;
+  const url = qs ? baseUrl + "?" + qs : baseUrl;
+  const response = await apiFetch(url);
+  return response.data || response;
 }
 
 export async function updateOrganizationEmployee(
@@ -245,6 +313,91 @@ export function useOrganizationEmployees(organizationId: string | null) {
     };
   }, [organizationId, refreshKey]);
   
+  return { data, loading, error, refresh };
+}
+
+export function useTransactionHistory(
+  address: string | null,
+  params?: {
+    page?: number;
+    limit?: number;
+    type?: string;
+    category?: string;
+    startDate?: string;
+    endDate?: string;
+    status?: string;
+  }
+) {
+  const [data, setData] = useState<TransactionHistoryResponse | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const page = params?.page;
+  const limit = params?.limit;
+  const type = params?.type;
+  const category = params?.category;
+  const startDate = params?.startDate;
+  const endDate = params?.endDate;
+  const status = params?.status;
+
+  const refresh = () => setRefreshKey((k) => k + 1);
+
+  useAuthCompleted(() => {
+    if (address) {
+      refresh();
+    }
+  });
+
+  useEffect(() => {
+    const addr = address;
+    if (!addr) {
+      setLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadHistory() {
+      try {
+        setLoading(true);
+        setError(null);
+        if (!addr) {
+          return;
+        }
+
+        const result = await fetchTransactionHistory(addr, {
+          page,
+          limit,
+          type,
+          category,
+          startDate,
+          endDate,
+          status,
+        });
+        if (!cancelled) {
+          setData(result);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(
+            err instanceof Error ? err.message : "Failed to load transactions"
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadHistory();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [address, refreshKey, page, limit, type, category, startDate, endDate, status]);
+
   return { data, loading, error, refresh };
 }
 
