@@ -163,6 +163,8 @@ export interface ApiTransaction {
   toAddress: string;
   amount: string;
   currency?: string;
+  fee?: string;
+  gasUsed?: string;
   description?: string;
   memo?: string;
   category?: string;

@@ -13,6 +13,7 @@ export function OrganizationPromotionCard() {
   const [displayName, setDisplayName] = useState<string | null>(null)
   const [organizationSlug, setOrganizationSlug] = useState<string | null>(null)
   const [roleLabel, setRoleLabel] = useState<string | null>(null)
+  const [jobRole, setJobRole] = useState<string | null>(null)
 
   const { data: organization } = useOrganizationBySlug(organizationSlug)
 
@@ -28,6 +29,7 @@ export function OrganizationPromotionCard() {
       setDisplayName(null)
       setOrganizationSlug(null)
       setRoleLabel(null)
+      setJobRole(null)
       return
     }
 
@@ -36,13 +38,18 @@ export function OrganizationPromotionCard() {
       const raw = localStorage.getItem(cacheKey)
       if (!raw) {
         setDisplayName(null)
+        setOrganizationSlug(null)
+        setRoleLabel(null)
+        setJobRole(null)
         return
       }
-      const cached = JSON.parse(raw) as { fullName?: string; username?: string; organizationSlug?: string; role?: string }
+      const cached = JSON.parse(raw) as { fullName?: string; username?: string; organizationSlug?: string; role?: string; jobRole?: string }
       const name = (cached.fullName || cached.username || "").trim()
       setDisplayName(name || null)
       const slug = (cached.organizationSlug || "").trim()
       setOrganizationSlug(slug || null)
+      const jr = (cached.jobRole || "").trim()
+      setJobRole(jr || null)
       const r = String(cached.role || "").trim().toLowerCase()
       if (r === "signer") setRoleLabel("Signer")
       else if (r === "admin") setRoleLabel("Admin")
@@ -53,8 +60,13 @@ export function OrganizationPromotionCard() {
       setDisplayName(null)
       setOrganizationSlug(null)
       setRoleLabel(null)
+      setJobRole(null)
     }
   }, [account?.address])
+
+  const shouldShowOrganizationCard = Boolean(
+    organizationSlug && organization && roleLabel === "Employee"
+  )
 
   return (
       <Card className="relative space-y-2 h-auto sm:h-44 w-full bg-white rounded-2xl px-4 overflow-hidden shadow-md shadow-[#454ADE24]">
@@ -119,12 +131,26 @@ export function OrganizationPromotionCard() {
               Your wallet is active and ready to go.
             </p>
           </div>
-          {organizationSlug && organization ? (
+          {shouldShowOrganizationCard ? (
             <Card className="rounded-lg relative sm:bottom-2 flex justify-between bg-gradient-to-br w-full sm:w-[45%] lg:w-[40%] from-[#454ADE] to-[#5B63F0] self-center h-auto sm:h-[90%] z-10">
               <div className="space-y-1 p-3 sm:p-4 h-full flex flex-col">
                 <h2 className="text-base font-bold text-white">Organization</h2>
                 <p className="text-xs text-white/90 text-balance">{organization.name}</p>
-                <p className="text-xs text-white/90 text-balance">Role: {roleLabel || "--"}</p>
+
+                <div className="mt-1 space-y-0.5">
+                  {organization.metadata?.industry ? (
+                    <p className="text-[11px] text-white/80">Industry: {organization.metadata.industry}</p>
+                  ) : null}
+                  {jobRole ? (
+                    <p className="text-[11px] text-white/80">Job role: {jobRole}</p>
+                  ) : null}
+                  {!jobRole && organization.metadata?.size ? (
+                    <p className="text-[11px] text-white/80">Company size: {organization.metadata.size}</p>
+                  ) : null}
+                  {!jobRole && roleLabel ? (
+                    <p className="text-[11px] text-white/70">Account type: {roleLabel}</p>
+                  ) : null}
+                </div>
               </div>
 
               <div className="flex items-end justify-between">

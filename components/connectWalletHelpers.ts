@@ -23,6 +23,9 @@ type AuthCheckData = {
     avatar?: string;
     role?: "user" | "employee" | "signer" | "admin";
     organizationSlug?: string;
+    jobDetails?: {
+      jobRole?: string;
+    };
   };
 };
 
@@ -33,6 +36,7 @@ type CachedAuthCheck = {
   avatar?: string;
   role?: "user" | "employee" | "signer" | "admin";
   organizationSlug?: string;
+  jobRole?: string;
   savedAt: number;
 };
 
@@ -107,6 +111,7 @@ const fetchAuthCheck = async (params: { address: string; router: AppRouter }) =>
       avatar: data?.user?.avatar,
       role: data?.user?.role || "user",
       organizationSlug: data?.user?.organizationSlug,
+      jobRole: data?.user?.jobDetails?.jobRole,
     };
   } catch {
     router.push("/setup-profile");
@@ -214,6 +219,7 @@ export const useRedirectOnFirstConnect = (params: {
           avatar: fetched.avatar,
           role: fetched.role || "user",
           organizationSlug: fetched.organizationSlug,
+          jobRole: fetched.jobRole,
           savedAt: Date.now(),
         };
         localStorage.setItem(cacheKey, JSON.stringify(toCache));
