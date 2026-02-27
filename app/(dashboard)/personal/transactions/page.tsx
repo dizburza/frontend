@@ -5,13 +5,36 @@ import { StatCard } from "@/components/stat-card"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { ChevronDown, Search, Copy, MoreVertical } from "lucide-react"
-import useCngnTransferActivity from "@/hooks/ERC20/useCngnTransferActivity"
+import { useActiveAccount } from "thirdweb/react"
+import { useTransactionHistory } from "@/lib/api/organization"
 
 export default function PersonalTransactionsPage() {
   const [searchTerm, setSearchTerm] = useState("")
 
-  const { rows, incomingTotal, outgoingTotal, isLoading, toShortAddress } = useCngnTransferActivity()
-  const transactions = rows
+  const account = useActiveAccount()
+  const address = account?.address ?? null
+  const { data, loading: isLoading } = useTransactionHistory(address, { limit: 50 })
+
+  const transactions = data?.transactions ?? []
+
+  const toShortAddress = (value: string) => {
+    if (!value) return "--"
+    return `${value.slice(0, 6)}...${value.slice(-4)}`
+  }
+
+  const outgoingTotal = transactions
+    .filter((t) => t.direction === "sent")
+    .reduce((acc, t) => {
+      const amt = Number.parseFloat(String(t.displayAmount || "0").replace("-", ""))
+      return acc + (Number.isFinite(amt) ? amt : 0)
+    }, 0)
+
+  const incomingTotal = transactions
+    .filter((t) => t.direction === "received")
+    .reduce((acc, t) => {
+      const amt = Number.parseFloat(String(t.displayAmount || "0").replace("+", ""))
+      return acc + (Number.isFinite(amt) ? amt : 0)
+    }, 0)
 
   const copyToClipboard = async (value: string) => {
     try {
@@ -47,17 +70,21 @@ export default function PersonalTransactionsPage() {
     }
 
     return transactions.map((tx, idx) => (
-      <tr key={tx.id} className="border-b border-gray-100 hover:bg-gray-50">
+      <tr key={tx._id} className="border-b border-gray-100 hover:bg-gray-50">
         <td className="py-4 px-4 text-sm text-gray-900">{idx + 1}</td>
         <td className="py-4 px-4 text-sm text-gray-900">
-          {tx.direction === "incoming" ? "Inflow from" : "Outflow to"} {toShortAddress(tx.counterparty)}
+          {tx.direction === "received" ? "Inflow from" : "Outflow to"}{" "}
+          {toShortAddress(tx.direction === "received" ? tx.fromAddress : tx.toAddress)}
         </td>
         <td className="py-4 px-4 text-sm font-semibold text-gray-900">
-          {tx.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          {Number.parseFloat(String(tx.displayAmount || "0").replace(/[+-]/g, "")).toLocaleString(undefined, {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          })}
         </td>
-        <td className="py-4 px-4 text-sm text-gray-600">{tx.direction === "incoming" ? "Inflow" : "Outflow"}</td>
+        <td className="py-4 px-4 text-sm text-gray-600">{tx.direction === "received" ? "Inflow" : "Outflow"}</td>
         <td className="py-4 px-4 text-sm text-gray-600">
-          {tx.timestamp ? new Date(tx.timestamp * 1000).toLocaleString() : "--"}
+          {tx.timestamp ? new Date(tx.timestamp).toLocaleString() : "--"}
         </td>
         <td className="py-4 px-4 text-sm">
           <span className={`px-3 py-1 rounded text-xs font-medium ${getStatusColor("Completed")}`}>Completed</span>
@@ -65,16 +92,16 @@ export default function PersonalTransactionsPage() {
         <td className="py-4 px-4 text-sm text-gray-600">
           <div className="flex items-center gap-2">
             <a
-              href={`https://sepolia.basescan.org/tx/${tx.transactionHash}`}
+              href={`https://sepolia.basescan.org/tx/${tx.txHash}`}
               target="_blank"
               rel="noreferrer"
               className="text-blue-600 hover:underline"
             >
-              {toShortAddress(tx.transactionHash)}
+              {toShortAddress(tx.txHash)}
             </a>
             <button
               type="button"
-              onClick={() => void copyToClipboard(tx.transactionHash)}
+              onClick={() => void copyToClipboard(tx.txHash)}
               className="text-gray-400 hover:text-gray-600"
               aria-label="Copy transaction hash"
             >

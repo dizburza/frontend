@@ -6,10 +6,15 @@ import Image from "next/image"
 import Link from "next/link"
 import { useActiveAccount } from "thirdweb/react"
 import { useEffect, useMemo, useState } from "react"
+import { useOrganizationBySlug } from "@/lib/api/organization"
 
 export function OrganizationPromotionCard() {
   const account = useActiveAccount()
   const [displayName, setDisplayName] = useState<string | null>(null)
+  const [organizationSlug, setOrganizationSlug] = useState<string | null>(null)
+  const [roleLabel, setRoleLabel] = useState<string | null>(null)
+
+  const { data: organization } = useOrganizationBySlug(organizationSlug)
 
   const shortAddress = useMemo(() => {
     const address = account?.address
@@ -21,6 +26,8 @@ export function OrganizationPromotionCard() {
     const address = account?.address
     if (!address) {
       setDisplayName(null)
+      setOrganizationSlug(null)
+      setRoleLabel(null)
       return
     }
 
@@ -31,11 +38,21 @@ export function OrganizationPromotionCard() {
         setDisplayName(null)
         return
       }
-      const cached = JSON.parse(raw) as { fullName?: string; username?: string }
+      const cached = JSON.parse(raw) as { fullName?: string; username?: string; organizationSlug?: string; role?: string }
       const name = (cached.fullName || cached.username || "").trim()
       setDisplayName(name || null)
+      const slug = (cached.organizationSlug || "").trim()
+      setOrganizationSlug(slug || null)
+      const r = String(cached.role || "").trim().toLowerCase()
+      if (r === "signer") setRoleLabel("Signer")
+      else if (r === "admin") setRoleLabel("Admin")
+      else if (r === "employee") setRoleLabel("Employee")
+      else if (r === "user") setRoleLabel("User")
+      else setRoleLabel(null)
     } catch {
       setDisplayName(null)
+      setOrganizationSlug(null)
+      setRoleLabel(null)
     }
   }, [account?.address])
 
@@ -102,17 +119,31 @@ export function OrganizationPromotionCard() {
               Your wallet is active and ready to go.
             </p>
           </div>
-          <Card className="rounded-lg relative sm:bottom-2 flex justify-between bg-gradient-to-br w-full sm:w-[45%] lg:w-[40%] from-[#454ADE] to-[#5B63F0] self-center h-auto sm:h-[90%] z-10">
-        <div className="space-y-1 p-3 sm:p-4 h-full flex flex-col">
-          <h2 className="text-base font-bold text-white">Create an Organization Account</h2>
-          <p className="text-xs text-white/90 text-balance">Manage batch payments, and approve transactions with your team.</p>
-          <div className="flex flex-col sm:flex-row self-start sm:self-end gap-2 mt-auto"><Link href={"/organization-setup/organization-details"} ><Button className="bg-white text-[#454ADE] hover:bg-white/90 font-semibold text-xs sm:text-sm">+ Create Organization Now</Button></Link></div>
-        </div>
+          {organizationSlug && organization ? (
+            <Card className="rounded-lg relative sm:bottom-2 flex justify-between bg-gradient-to-br w-full sm:w-[45%] lg:w-[40%] from-[#454ADE] to-[#5B63F0] self-center h-auto sm:h-[90%] z-10">
+              <div className="space-y-1 p-3 sm:p-4 h-full flex flex-col">
+                <h2 className="text-base font-bold text-white">Organization</h2>
+                <p className="text-xs text-white/90 text-balance">{organization.name}</p>
+                <p className="text-xs text-white/90 text-balance">Role: {roleLabel || "--"}</p>
+              </div>
 
-        <div className="flex items-end justify-between">
-          <Image src="/org-bag.svg" alt="Organization briefcase" width={200} height={130} className="object-contain" />
-        </div>
-          </Card>
+              <div className="flex items-end justify-between">
+                <Image src="/org-bag.svg" alt="Organization briefcase" width={200} height={130} className="object-contain" />
+              </div>
+            </Card>
+          ) : (
+            <Card className="rounded-lg relative sm:bottom-2 flex justify-between bg-gradient-to-br w-full sm:w-[45%] lg:w-[40%] from-[#454ADE] to-[#5B63F0] self-center h-auto sm:h-[90%] z-10">
+              <div className="space-y-1 p-3 sm:p-4 h-full flex flex-col">
+                <h2 className="text-base font-bold text-white">Create an Organization Account</h2>
+                <p className="text-xs text-white/90 text-balance">Manage batch payments, and approve transactions with your team.</p>
+                <div className="flex flex-col sm:flex-row self-start sm:self-end gap-2 mt-auto"><Link href={"/organization-setup/organization-details"} ><Button className="bg-white text-[#454ADE] hover:bg-white/90 font-semibold text-xs sm:text-sm">+ Create Organization Now</Button></Link></div>
+              </div>
+
+              <div className="flex items-end justify-between">
+                <Image src="/org-bag.svg" alt="Organization briefcase" width={200} height={130} className="object-contain" />
+              </div>
+            </Card>
+          )}
         </main>
       </Card>
   )

@@ -21,7 +21,7 @@ type AuthCheckData = {
     firstname?: string;
     fullName?: string;
     avatar?: string;
-    role?: "employee" | "signer" | "admin";
+    role?: "user" | "employee" | "signer" | "admin";
     organizationSlug?: string;
   };
 };
@@ -31,13 +31,13 @@ type CachedAuthCheck = {
   username?: string;
   fullName?: string;
   avatar?: string;
-  role?: "employee" | "signer" | "admin";
+  role?: "user" | "employee" | "signer" | "admin";
   organizationSlug?: string;
   savedAt: number;
 };
 
 const getRedirectPathForRole = (
-  role: CachedAuthCheck["role"] = "employee",
+  role: CachedAuthCheck["role"] = "user",
   organizationSlug?: string
 ) => {
   if (role === "admin" || role === "signer") {
@@ -45,7 +45,7 @@ const getRedirectPathForRole = (
     if (!slug) return null;
     return { path: `/org/${slug}`, accountType: "organization" as const };
   }
-  if (role === "employee") {
+  if (role === "employee" || role === "user") {
     return { path: "/personal/wallet", accountType: "personal" as const };
   }
   return null;
@@ -105,7 +105,7 @@ const fetchAuthCheck = async (params: { address: string; router: AppRouter }) =>
       username: data?.user?.username,
       fullName: data?.user?.fullName,
       avatar: data?.user?.avatar,
-      role: data?.user?.role || "employee",
+      role: data?.user?.role || "user",
       organizationSlug: data?.user?.organizationSlug,
     };
   } catch {
@@ -212,7 +212,7 @@ export const useRedirectOnFirstConnect = (params: {
           username: fetched.username,
           fullName: fetched.fullName,
           avatar: fetched.avatar,
-          role: fetched.role || "employee",
+          role: fetched.role || "user",
           organizationSlug: fetched.organizationSlug,
           savedAt: Date.now(),
         };

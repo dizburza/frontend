@@ -11,7 +11,7 @@ type CachedAuthCheck = {
   username?: string;
   fullName?: string;
   avatar?: string;
-  role?: "employee" | "signer" | "admin";
+  role?: "user" | "employee" | "signer" | "admin";
   organizationSlug?: string;
   savedAt: number;
 };
@@ -35,7 +35,7 @@ export default function OrgGuard(
     const cacheKey = `authCheck:${address}`;
 
     const handleAuthCheck = (cached: CachedAuthCheck) => {
-      if (cached.role === "employee") {
+      if (cached.role === "employee" || cached.role === "user") {
         router.replace("/personal/wallet");
         return;
       }
@@ -109,7 +109,7 @@ export default function OrgGuard(
         const user = payload.data?.user;
         const toCache: CachedAuthCheck = {
           isRegistered,
-          role: user?.role || "employee",
+          role: user?.role || "user",
           organizationSlug: user?.organizationSlug,
           username: user?.username,
           fullName: user?.fullName,

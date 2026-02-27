@@ -59,12 +59,14 @@ export function QRCodeModal({ onClose }: Readonly<QRCodeModalProps>) {
     if (!base) return ""
 
     const url = new URL("/receive", base)
-    if (address) url.searchParams.set("address", address)
-    if (username) url.searchParams.set("username", username)
+    const addressParam = selected === "address" ? address : ""
+    const usernameParam = selected === "username" ? username : ""
+    if (addressParam) url.searchParams.set("address", addressParam)
+    if (usernameParam) url.searchParams.set("username", usernameParam)
 
     const dappTarget = `${url.host}${url.pathname}${url.search}`
     return `https://metamask.app.link/dapp/${dappTarget}`
-  }, [address, appOrigin, origin, username])
+  }, [address, appOrigin, origin, selected, username])
 
   const qrValue = deepLink
 

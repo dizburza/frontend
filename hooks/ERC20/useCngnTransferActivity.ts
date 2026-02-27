@@ -239,9 +239,7 @@ export default function useCngnTransferActivity(params?: {
   const decimals = params?.decimals ?? 6;
   const enrichLimit = params?.enrichLimit ?? 3;
   const staleTimeMs = params?.staleTimeMs ?? 60_000;
-  // ~50k blocks covers roughly a week on Base Sepolia (~2s block time).
-  // Increase if you need more history, but be aware of RPC call volume.
-  const blockRange = params?.blockRange ?? BigInt(50000);
+  const blockRange = params?.blockRange ?? BigInt(200000);
 
   const contract = useMemo(() => {
     if (!tokenAddress) return null;

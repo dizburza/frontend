@@ -8,8 +8,9 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import useOrgSlug from "@/hooks/useOrgSlug"
-import useCngnTransferActivity from "@/hooks/ERC20/useCngnTransferActivity"
 import useAddressUsernames from "@/hooks/useAddressUsernames"
+import { useActiveAccount } from "thirdweb/react"
+import { useTransactionHistory } from "@/lib/api/organization"
 
 export function TransactionHistory({
   viewAllHref = "/",
@@ -17,20 +18,21 @@ export function TransactionHistory({
 }: Readonly<{ viewAllHref?: string; limit?: number }>) {
   const pathname = usePathname()
 
-  const { rows, isLoading, error, toShortAddress } = useCngnTransferActivity()
-  const recent = rows.slice(0, limit)
+  const account = useActiveAccount()
+  const address = account?.address ?? null
+  const { data, loading: isLoading, error } = useTransactionHistory(address, { limit })
 
-  const { getUsername } = useAddressUsernames(recent.map((r) => r.counterparty))
+  const transactions = data?.transactions ?? []
+  const recent = transactions.slice(0, limit)
 
-  const gasFeeDisplay = (gasFeeEth?: number) => {
-    if (typeof gasFeeEth !== "number" || !Number.isFinite(gasFeeEth)) return "--"
-    if (gasFeeEth === 0) return "0 ETH"
-    if (gasFeeEth < 0.000001) return "<0.000001 ETH"
-    return `${gasFeeEth.toLocaleString(undefined, {
-      minimumFractionDigits: 6,
-      maximumFractionDigits: 6,
-    })} ETH`
+  const toShortAddress = (value: string) => {
+    if (!value) return "--"
+    return `${value.slice(0, 6)}...${value.slice(-4)}`
   }
+
+  const { getUsername } = useAddressUsernames(
+    recent.map((r) => (r.direction === "received" ? r.fromAddress : r.toAddress))
+  )
 
   const orgSlug = useOrgSlug()
 
@@ -55,10 +57,11 @@ export function TransactionHistory({
     }
 
     if (error) {
+      const errorMessage = typeof error === "string" ? error : ""
       return (
         <tr>
           <td colSpan={8} className="py-8 text-center text-gray-500">
-            Could not load transactions{error.message ? `: ${error.message}` : "."}
+            Could not load transactions{errorMessage ? `: ${errorMessage}` : "."}
           </td>
         </tr>
       )
@@ -74,34 +77,38 @@ export function TransactionHistory({
       )
     }
 
-    return recent.map((tx, idx) => (
-      <tr key={tx.id} className="border-b border-gray-100 hover:bg-gray-50">
+    return recent.map((tx, idx) => {
+      const counterparty = tx.direction === "received" ? tx.fromAddress : tx.toAddress
+      const amountAbs = Number.parseFloat(String(tx.displayAmount || "0").replace(/[+-]/g, ""))
+
+      return (
+        <tr key={tx._id} className="border-b border-gray-100 hover:bg-gray-50">
         <td className="py-4 px-4">{idx + 1}</td>
-        <td className="py-4 px-4">{tx.direction === "incoming" ? "Inflow" : "Outflow"}</td>
+        <td className="py-4 px-4">{tx.direction === "received" ? "Inflow" : "Outflow"}</td>
         <td className="py-4 px-4">
           <div className="flex items-center gap-2">
             <Avatar className="h-8 w-8">
               <AvatarImage src={"/placeholder.svg"} />
-              <AvatarFallback>{tx.counterparty[2] || "?"}</AvatarFallback>
+              <AvatarFallback>{counterparty[2] || "?"}</AvatarFallback>
             </Avatar>
             <span>
               {(() => {
-                const username = getUsername(tx.counterparty)
-                return username ? `@${username}` : toShortAddress(tx.counterparty)
+                const username = getUsername(counterparty)
+                return username ? `@${username}` : toShortAddress(counterparty)
               })()}
             </span>
           </div>
         </td>
         <td className="py-4 px-4">
-          {tx.amount.toLocaleString(undefined, {
+          {amountAbs.toLocaleString(undefined, {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
           })} cNGN
         </td>
-        <td className="py-4 px-4">{gasFeeDisplay(tx.gasFeeEth)}</td>
+        <td className="py-4 px-4">--</td>
         <td className="py-4 px-4">
           <div>
-            <p>{tx.timestamp ? new Date(tx.timestamp * 1000).toLocaleDateString() : "--"}</p>
+            <p>{tx.timestamp ? new Date(tx.timestamp).toLocaleDateString() : "--"}</p>
             <p className="text-gray-500 text-xs"> </p>
           </div>
         </td>
@@ -110,16 +117,17 @@ export function TransactionHistory({
         </td>
         <td className="py-4 px-4">
           <a
-            href={`https://sepolia.basescan.org/tx/${tx.transactionHash}`}
+            href={`https://sepolia.basescan.org/tx/${tx.txHash}`}
             target="_blank"
             rel="noreferrer"
             className="text-blue-600 cursor-pointer hover:underline"
           >
-            {toShortAddress(tx.transactionHash)}
+            {toShortAddress(tx.txHash)}
           </a>
         </td>
-      </tr>
-    ))
+        </tr>
+      )
+    })
   })()
 
   return (
