@@ -14,7 +14,7 @@ export const thirdwebClient = createThirdwebClient({
 export const wallets = [
   inAppWallet({
     auth: {
-      options: ["google", "facebook", "telegram", "email", "x", "passkey"],
+      options: ["google", "email", "passkey"],
     },
   }),
   createWallet("io.metamask"),
