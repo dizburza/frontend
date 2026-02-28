@@ -23,6 +23,19 @@ export default function TransactionsPage() {
 
   const transactions = history?.transactions || []
 
+  const toShortAddress = (value: string) => {
+    if (!value) return "--"
+    return `${value.slice(0, 6)}...${value.slice(-4)}`
+  }
+
+  const copyToClipboard = async (value: string) => {
+    try {
+      await navigator.clipboard.writeText(value)
+    } catch {
+      // ignore
+    }
+  }
+
   useEffect(() => {
     if (!transactionsLoading && history) {
       setLastUpdatedAt(new Date())
@@ -56,20 +69,21 @@ export default function TransactionsPage() {
     return "bg-red-100 text-red-700"
   }
 
+  const getStatusLabel = (status: string) => {
+    if (status === "confirmed") return "Completed"
+    if (status === "pending") return "Pending"
+    return "Failed"
+  }
+
   const getTypeColor = (type: string) => {
     return type === "Inflow" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
   }
 
-  const filteredTransactions = transactions.filter(tx => {
-    const label = (tx.batchName || tx.description || "").toLowerCase()
-    const initiatedBy = (
-      tx.fromUserId?.fullName ||
-      tx.fromUserId?.username ||
-      tx.fromAddress ||
-      ""
-    ).toLowerCase()
+  const filteredTransactions = transactions.filter((tx) => {
+    const description = (tx.description || tx.batchName || "").toLowerCase()
+    const addresses = `${tx.fromAddress} ${tx.toAddress} ${tx.txHash}`.toLowerCase()
     const q = searchTerm.toLowerCase()
-    return label.includes(q) || initiatedBy.includes(q)
+    return description.includes(q) || addresses.includes(q)
   })
 
   if (error) {
@@ -125,14 +139,14 @@ export default function TransactionsPage() {
 
       {/* Recent Transactions Table */}
       <Card className="p-4 sm:p-6">
-        <h2 className="text-lg font-semibold mb-4">Recent Transaction</h2>
+        <h2 className="text-lg font-semibold mb-4">Recent Transactions</h2>
 
         {/* Search and Filters */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between mb-6 gap-4">
           <div className="flex items-center gap-2 flex-1 max-w-md">
             <Search className="w-5 h-5 text-gray-400 flex-shrink-0" />
             <Input
-              placeholder="Search by Batch Name or Creator"
+              placeholder="Search transactions"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="border-0 bg-transparent focus:ring-0"
@@ -140,14 +154,6 @@ export default function TransactionsPage() {
           </div>
 
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 text-sm">
-              <span className="text-gray-600">Filters:</span>
-              <button className="flex items-center gap-1 text-gray-700 hover:text-gray-900">
-                Recent Transaction
-                <ChevronDown className="w-4 h-4" />
-              </button>
-            </div>
-
             <div className="flex items-center gap-2 text-sm">
               <span className="text-gray-600">Sort:</span>
               <button className="flex items-center gap-1 text-gray-700 hover:text-gray-900">
@@ -164,9 +170,8 @@ export default function TransactionsPage() {
             <thead>
               <tr className="border-b border-gray-200">
                 <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">#</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">BATCH NAME</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">INITIATED BY</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">TOTAL AMOUNT (cNGN)</th>
+                <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">DESCRIPTION</th>
+                <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">AMOUNT (cNGN)</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">TYPE</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">DATE</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">STATUS</th>
@@ -177,18 +182,17 @@ export default function TransactionsPage() {
             <tbody>
               {filteredTransactions.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-8 text-center text-gray-500">
+                  <td colSpan={8} className="py-8 text-center text-gray-500">
                     No transactions found.
                   </td>
                 </tr>
               ) : (
                 filteredTransactions.map((tx, index) => {
-                  const batchName = tx.batchName || tx.description || "Transaction"
-                  const initiatedBy = tx.fromUserId?.fullName || tx.fromUserId?.username || tx.fromAddress
-
                   const amountNumber = Number.parseFloat(tx.displayAmount || "0")
                   const isInflow = amountNumber > 0
                   const txType = isInflow ? "Inflow" : "Outflow"
+
+                  const description = tx.description || tx.batchName || "Transaction"
 
                   const createdAt = new Date(tx.timestamp)
                   const txDate = createdAt.toLocaleDateString("en-US", {
@@ -208,8 +212,12 @@ export default function TransactionsPage() {
                   return (
                     <tr key={tx._id} className="border-b border-gray-100 hover:bg-gray-50">
                       <td className="py-4 px-4 text-sm text-gray-900">{index + 1}</td>
-                      <td className="py-4 px-4 text-sm text-gray-900">{batchName}</td>
-                      <td className="py-4 px-4 text-sm text-gray-600">{initiatedBy}</td>
+                      <td className="py-4 px-4 text-sm text-gray-900">
+                        {description}
+                        <div className="text-xs text-gray-500 mt-0.5">
+                          {txType === "Inflow" ? "Inflow from" : "Outflow to"} {toShortAddress(txType === "Inflow" ? tx.fromAddress : tx.toAddress)}
+                        </div>
+                      </td>
                       <td className="py-4 px-4 text-sm font-semibold text-gray-900">
                         {Math.abs(amountNumber).toLocaleString(undefined, { maximumFractionDigits: 6 })}
                       </td>
@@ -225,12 +233,19 @@ export default function TransactionsPage() {
                       </td>
                       <td className="py-4 px-4 text-sm">
                         <span className={`px-3 py-1 rounded text-xs font-medium ${getStatusColor(tx.status)}`}>
-                          {tx.status}
+                          {getStatusLabel(tx.status)}
                         </span>
                       </td>
                       <td className="py-4 px-4 text-sm text-gray-600 flex items-center gap-2">
                         {txHashShort}
-                        <Copy className="w-4 h-4 text-gray-400 cursor-pointer hover:text-gray-600" />
+                        <button
+                          type="button"
+                          onClick={() => void copyToClipboard(tx.txHash)}
+                          className="text-gray-400 hover:text-gray-600"
+                          aria-label="Copy transaction hash"
+                        >
+                          <Copy className="w-4 h-4" />
+                        </button>
                       </td>
                       <td className="py-4 px-4 text-sm">
                         <button className="text-gray-400 hover:text-gray-600">

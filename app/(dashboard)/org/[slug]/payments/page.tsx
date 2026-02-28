@@ -75,6 +75,11 @@ export default function PaymentsPage() {
     return "bg-gray-100 text-gray-700";
   };
 
+  const toShortAddress = (value: string) => {
+    if (!value) return "--"
+    return `${value.slice(0, 6)}...${value.slice(-4)}`
+  }
+
   return (
     <div className="py-4 sm:py-6 lg:py-8 px-4 sm:px-6 lg:px-8 space-y-6">
       {/* Breadcrumb */}
@@ -146,17 +151,19 @@ export default function PaymentsPage() {
               <tr className="border-b border-gray-200">
                 <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">#</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">BATCH NAME</th>
+                <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">INITIATED BY</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">TOTAL AMOUNT (cNGN)</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">DATE</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">EMPLOYEES</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">STATUS</th>
+                <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">TRANSACTION HASH</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">ACTION</th>
               </tr>
             </thead>
             <tbody>
               {filteredBatches.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-8 text-center text-gray-500">
+                  <td colSpan={9} className="py-8 text-center text-gray-500">
                     No payment batches yet. Create your first batch to get started.
                   </td>
                 </tr>
@@ -165,6 +172,7 @@ export default function PaymentsPage() {
                   <tr key={batch.id} className="border-b border-gray-100 hover:bg-gray-50">
                     <td className="py-4 px-4 text-sm text-gray-900">{index + 1}</td>
                     <td className="py-4 px-4 text-sm text-gray-900">{batch.batchName}</td>
+                    <td className="py-4 px-4 text-sm text-gray-600">{(batch.creatorJobRole || "").trim() || toShortAddress(batch.creatorAddress)}</td>
                     <td className="py-4 px-4 text-sm font-semibold text-gray-900">
                       {formatAmount(batch.totalAmount)}
                     </td>
@@ -175,6 +183,7 @@ export default function PaymentsPage() {
                         {batch.status}
                       </span>
                     </td>
+                    <td className="py-4 px-4 text-sm text-gray-600">{batch.txHash ? toShortAddress(batch.txHash) : "--"}</td>
                     <td className="py-4 px-4 text-sm">
                       <button className="text-gray-400 hover:text-gray-600">
                         <MoreVertical className="w-5 h-5" />

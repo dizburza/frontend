@@ -5,8 +5,12 @@ import { IncomeExpenseCards } from "@/components/dashboard/income-expense-cards"
 import { AnalysisChart } from "@/components/dashboard/analysis-chart";
 import { TransactionHistory } from "@/components/dashboard/transaction-history";
 import { OrganizationPromotionCard } from "@/components/dashboard/organization-card";
+import useOrgSlug from "@/hooks/useOrgSlug";
 
 export default function WalletPage() {
+  const orgSlug = useOrgSlug();
+  const viewAllHref = orgSlug ? `/org/${orgSlug}/transactions` : "/";
+
   return (
     <div className="space-y-6 sm:space-y-8 py-4 sm:py-6 lg:py-8 px-4 sm:px-6 lg:px-8 w-full grid">
       <div>
@@ -23,7 +27,7 @@ export default function WalletPage() {
           <AnalysisChart />
         </div>
       </div>
-      <TransactionHistory viewAllHref="/" />
+      <TransactionHistory viewAllHref={viewAllHref} limit={3} />
     </div>
   );
 }

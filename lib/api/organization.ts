@@ -100,6 +100,7 @@ export interface ApiPaymentBatch {
   organizationId: string;
   organizationAddress: string;
   creatorAddress: string;
+  creatorJobRole?: string;
   recipients: {
     userId?: string;
     walletAddress: string;
@@ -540,15 +541,20 @@ export function mapApiEmployeeToEmployee(apiEmployee: ApiEmployee): {
 export function mapApiBatchToPaymentBatch(apiBatch: ApiPaymentBatch): {
   id: string;
   batchName: string;
+  creatorAddress: string;
+  creatorJobRole?: string;
   totalAmount: number;
   date: string;
   employees: number;
   status: string;
+  txHash?: string;
   recipients: { surname: string; firstName: string; salary: string }[];
 } {
   return {
     id: apiBatch._id,
     batchName: apiBatch.batchName,
+    creatorAddress: apiBatch.creatorAddress,
+    creatorJobRole: apiBatch.creatorJobRole,
     totalAmount: Number.parseFloat(apiBatch.totalAmount),
     date: new Date(apiBatch.createdAt).toLocaleDateString("en-US", {
       month: "short",
@@ -557,6 +563,7 @@ export function mapApiBatchToPaymentBatch(apiBatch: ApiPaymentBatch): {
     }),
     employees: apiBatch.recipients.length,
     status: apiBatch.status.charAt(0).toUpperCase() + apiBatch.status.slice(1),
+    txHash: apiBatch.txHash,
     recipients: apiBatch.recipients.map(r => {
       const nameParts = r.employeeName.split(" ");
       return {
