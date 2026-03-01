@@ -64,6 +64,33 @@ export default function OrganizationDashboardPage() {
     return "bg-red-100 text-red-800";
   };
 
+  const formatCngnAmount = (amount: string, displayAmount?: string) => {
+    const normalized = String(displayAmount || "")
+      .replaceAll("+", "")
+      .replaceAll("-", "")
+      .trim();
+
+    if (normalized) {
+      const parsed = Number.parseFloat(normalized);
+      if (Number.isFinite(parsed)) {
+        return parsed.toLocaleString(undefined, {
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 2,
+        });
+      }
+    }
+
+    const base = Number.parseFloat(String(amount || "0"));
+    const decimals = 6;
+    const converted = base / 10 ** decimals;
+    if (!Number.isFinite(converted)) return "--";
+
+    return converted.toLocaleString(undefined, {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    });
+  };
+
   const signers = useMemo(() => {
     return (organization?.signers || []).map((s) => ({
       address: s.address,
@@ -434,7 +461,7 @@ export default function OrganizationDashboardPage() {
                   <th className="text-left py-2 px-2 text-gray-600 font-medium">Description</th>
                   <th className="text-left py-2 px-2 text-gray-600 font-medium">From</th>
                   <th className="text-left py-2 px-2 text-gray-600 font-medium">To</th>
-                  <th className="text-left py-2 px-2 text-gray-600 font-medium">Amount</th>
+                  <th className="text-left py-2 px-2 text-gray-600 font-medium">Amount (cNGN)</th>
                   <th className="text-left py-2 px-2 text-gray-600 font-medium">Status</th>
                 </tr>
               </thead>
@@ -460,7 +487,7 @@ export default function OrganizationDashboardPage() {
                       <td className="py-3 px-2">{tx.description || tx.batchName || "Transaction"}</td>
                       <td className="py-3 px-2 text-gray-600 font-mono text-xs">{toShortAddress(tx.fromAddress)}</td>
                       <td className="py-3 px-2 text-gray-600 font-mono text-xs">{toShortAddress(tx.toAddress)}</td>
-                      <td className="py-3 px-2">{Number(tx.amount).toLocaleString()} cNGN</td>
+                      <td className="py-3 px-2">{formatCngnAmount(tx.amount, tx.displayAmount)}</td>
                       <td className="py-3 px-2">
                         <span
                           className={`px-2 py-1 text-xs rounded ${getTxStatusClass(tx.status)}`}
