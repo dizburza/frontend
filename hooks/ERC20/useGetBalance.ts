@@ -1,18 +1,9 @@
-import { useWalletBalance, useActiveAccount } from "thirdweb/react";
-import { thirdwebClient } from "@/app/client";
-import { baseSepolia } from "thirdweb/chains";
+import { useActiveAccount } from "thirdweb/react";
+import useGetCngnBalanceByAddress from "@/hooks/ERC20/useGetCngnBalanceByAddress";
 
 const useGetTokenBalance = () => {
   const account = useActiveAccount();
-
-  const { data } = useWalletBalance({
-    address: account?.address,
-    chain: baseSepolia,
-    client: thirdwebClient,
-    tokenAddress: process.env.NEXT_PUBLIC_CNGN_ADDRESS,
-  });
-
-  return data?.displayValue ? Number.parseFloat(data.displayValue) : null;
+  return useGetCngnBalanceByAddress(account?.address);
 };
 
 export default useGetTokenBalance;

@@ -19,6 +19,7 @@ import {
   useTransactionHistory,
 } from "@/lib/api/organization";
 import { useActiveAccount } from "thirdweb/react";
+import useGetOrgTreasuryBalance from "@/hooks/ERC20/useGetOrgTreasuryBalance";
 
 export default function OrganizationDashboardPage() {
   const [isAddSignersOpen, setIsAddSignersOpen] = useState(false);
@@ -40,6 +41,8 @@ export default function OrganizationDashboardPage() {
   const transactionsAddress = account?.address ?? organization?.contractAddress ?? null;
   const { data: transactionsData } = useTransactionHistory(transactionsAddress, { limit: 5, page: 1 });
 
+  const treasuryBalance = useGetOrgTreasuryBalance();
+
   const proposals = mockProposals.list;
 
   const toShortAddress = (value: string) => {
@@ -53,6 +56,12 @@ export default function OrganizationDashboardPage() {
     } catch {
       // ignore
     }
+  };
+
+  const getTxStatusClass = (status: "pending" | "confirmed" | "failed") => {
+    if (status === "confirmed") return "bg-green-100 text-green-800";
+    if (status === "pending") return "bg-yellow-100 text-yellow-800";
+    return "bg-red-100 text-red-800";
   };
 
   const signers = useMemo(() => {
@@ -231,14 +240,16 @@ export default function OrganizationDashboardPage() {
                 </div>
                 <div className="flex gap-2">
                   <p className="text-3xl font-bold text-gray-900 mb-1">
-                    --
+                    {treasuryBalance === null ? "--" : treasuryBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </p>
                   <div className="flex items-center">
                     <Image src={"/cngn.svg"} alt="cNGN" width={24} height={24} />
                     <span className="text-[#26297A] text-center">cNGN</span>
                   </div>
                 </div>
-                <p className="text-sm text-gray-500">Balance data will appear here.</p>
+                <p className="text-sm text-gray-500">
+                  {treasuryBalance === null ? "Balance data will appear here." : "Live on-chain treasury balance."}
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -452,13 +463,7 @@ export default function OrganizationDashboardPage() {
                       <td className="py-3 px-2">{Number(tx.amount).toLocaleString()} cNGN</td>
                       <td className="py-3 px-2">
                         <span
-                          className={`px-2 py-1 text-xs rounded ${
-                            tx.status === "confirmed"
-                              ? "bg-green-100 text-green-800"
-                              : tx.status === "pending"
-                                ? "bg-yellow-100 text-yellow-800"
-                                : "bg-red-100 text-red-800"
-                          }`}
+                          className={`px-2 py-1 text-xs rounded ${getTxStatusClass(tx.status)}`}
                         >
                           {tx.status}
                         </span>

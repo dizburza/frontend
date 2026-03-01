@@ -64,9 +64,8 @@ export function OrganizationPromotionCard() {
     }
   }, [account?.address])
 
-  const shouldShowOrganizationCard = Boolean(
-    organizationSlug && organization && roleLabel === "Employee"
-  )
+  const shouldShowOrganizationCard = Boolean(organizationSlug && organization && roleLabel === "Employee")
+  const org = shouldShowOrganizationCard ? organization : null
 
   return (
       <Card className="relative space-y-2 h-auto sm:h-44 w-full bg-white rounded-2xl px-4 overflow-hidden shadow-md shadow-[#454ADE24]">
@@ -131,21 +130,21 @@ export function OrganizationPromotionCard() {
               Your wallet is active and ready to go.
             </p>
           </div>
-          {shouldShowOrganizationCard ? (
+          {org ? (
             <Card className="rounded-lg relative sm:bottom-2 flex justify-between bg-gradient-to-br w-full sm:w-[45%] lg:w-[40%] from-[#454ADE] to-[#5B63F0] self-center h-auto sm:h-[90%] z-10">
               <div className="space-y-1 p-3 sm:p-4 h-full flex flex-col">
                 <h2 className="text-base font-bold text-white">Organization</h2>
-                <p className="text-xs text-white/90 text-balance">{organization.name}</p>
+                <p className="text-xs text-white/90 text-balance">{org.name}</p>
 
                 <div className="mt-1 space-y-0.5">
-                  {organization.metadata?.industry ? (
-                    <p className="text-[11px] text-white/80">Industry: {organization.metadata.industry}</p>
+                  {org.metadata?.industry ? (
+                    <p className="text-[11px] text-white/80">Industry: {org.metadata.industry}</p>
                   ) : null}
                   {jobRole ? (
                     <p className="text-[11px] text-white/80">Job role: {jobRole}</p>
                   ) : null}
-                  {!jobRole && organization.metadata?.size ? (
-                    <p className="text-[11px] text-white/80">Company size: {organization.metadata.size}</p>
+                  {!jobRole && org.metadata?.size ? (
+                    <p className="text-[11px] text-white/80">Company size: {org.metadata.size}</p>
                   ) : null}
                   {!jobRole && roleLabel ? (
                     <p className="text-[11px] text-white/70">Account type: {roleLabel}</p>
