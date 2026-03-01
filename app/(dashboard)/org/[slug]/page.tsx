@@ -4,35 +4,84 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { AnalysisChart } from "@/components/dashboard/analysis-chart";
 import AddSignersModal from "@/components/organization/add-signers-modal";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
-  mockOrganizations,
-  mockWallet,
   mockProposals,
-  mockTransactions,
 } from "@/lib/static/mock-data";
-import { getOrganizationSigners } from "@/lib/localStorage";
 import Image from "next/image";
 import { Copy, Info } from "lucide-react";
 import Link from "next/link";
 import useOrgSlug from "@/hooks/useOrgSlug";
+import {
+  useOrganizationBatches,
+  useOrganizationBySlug,
+  useOrganizationEmployees,
+  useTransactionHistory,
+} from "@/lib/api/organization";
+import { useActiveAccount } from "thirdweb/react";
 
 export default function OrganizationDashboardPage() {
   const [isAddSignersOpen, setIsAddSignersOpen] = useState(false);
-  const [signers, setSigners] = useState(getOrganizationSigners());
 
   const orgSlug = useOrgSlug();
   const viewAllTransactionsHref = orgSlug ? `/org/${orgSlug}/transactions` : "/";
+  const viewAllEmployeesHref = orgSlug ? `/org/${orgSlug}/employees` : "/";
+  const viewAllPaymentsHref = orgSlug ? `/org/${orgSlug}/payments` : "/";
+  const viewAllProposalsHref = orgSlug ? `/org/${orgSlug}/proposals` : "/";
 
-  const org = mockOrganizations.current;
-  const wallet = mockWallet.organization;
+  const { data: organization, loading: orgLoading, error: orgError, refresh: refreshOrg } =
+    useOrganizationBySlug(orgSlug);
+
+  const organizationId = organization?._id ?? null;
+  const { data: employeesData } = useOrganizationEmployees(organizationId);
+  const { data: batchesData } = useOrganizationBatches(organizationId);
+
+  const account = useActiveAccount();
+  const transactionsAddress = account?.address ?? organization?.contractAddress ?? null;
+  const { data: transactionsData } = useTransactionHistory(transactionsAddress, { limit: 5, page: 1 });
+
   const proposals = mockProposals.list;
-  const transactions = mockTransactions.list;
+
+  const toShortAddress = (value: string) => {
+    if (!value) return "--";
+    return `${value.slice(0, 6)}...${value.slice(-4)}`;
+  };
+
+  const copyToClipboard = async (value: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+    } catch {
+      // ignore
+    }
+  };
+
+  const signers = useMemo(() => {
+    return (organization?.signers || []).map((s) => ({
+      address: s.address,
+      role: s.role,
+      isActive: s.isActive,
+    }));
+  }, [organization?.signers]);
+
+  const totalEmployees = employeesData?.totalEmployees ?? organization?.employees?.length ?? 0;
+  const quorum = organization?.quorum ?? 0;
+
+  const batchStats = batchesData?.stats || { pending: 0, approved: 0, executed: 0, cancelled: 0 };
 
   // Refresh signers when they're added
   const handleSignersAdded = () => {
-    setSigners(getOrganizationSigners());
+    refreshOrg();
   };
+
+  if (orgError) {
+    return (
+      <div className="py-4 sm:py-6 lg:py-8 px-4 sm:px-6 lg:px-8">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <p className="text-red-600">Failed to load organization: {orgError}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="py-4 sm:py-6 lg:py-8 px-4 sm:px-6 lg:px-8">
@@ -129,15 +178,15 @@ export default function OrganizationDashboardPage() {
               <div>
                 <div className="flex flex-wrap gap-2">
                   <h2 className="text-xl sm:text-2xl font-bold text-gray-900">
-                    {org.name}
+                    {orgLoading ? "Loading..." : (organization?.name || "--")}
                   </h2>
                   <div className="flex items-center gap-2 mt-1">
                     <span className="px-2 py-1 bg-[#F2F1EC] rounded-xl text-amber-800 text-xs font-medium">
-                      {org.category}
+                      {organization?.metadata?.industry || "--"}
                     </span>
                   </div>
                 </div>
-                <p className="text-gray-600 text-sm mt-2">📍 {org.location}</p>
+                <p className="text-gray-600 text-sm mt-2">Quorum: {quorum}</p>
               </div>
             </div>
             <div className="flex gap-2">
@@ -161,9 +210,17 @@ export default function OrganizationDashboardPage() {
             <CardContent className="pt-6 px-4 sm:px-6">
               <div className="flex items-center justify-between mb-6">
                 <p className="text-sm text-gray-600">
-                  Wallet : {wallet.address}
+                  Treasury: {organization?.contractAddress ? toShortAddress(organization.contractAddress) : "--"}
                 </p>
-                <button className="text-gray-400 hover:text-gray-600">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (organization?.contractAddress) {
+                      copyToClipboard(organization.contractAddress);
+                    }
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                >
                   <Copy className="w-4 h-4" />
                 </button>
               </div>
@@ -174,16 +231,14 @@ export default function OrganizationDashboardPage() {
                 </div>
                 <div className="flex gap-2">
                   <p className="text-3xl font-bold text-gray-900 mb-1">
-                    {wallet.balance.toLocaleString()}.00
+                    --
                   </p>
                   <div className="flex items-center">
                     <Image src={"/cngn.svg"} alt="cNGN" width={24} height={24} />
                     <span className="text-[#26297A] text-center">cNGN</span>
                   </div>
                 </div>
-                <p className="text-sm text-green-600">
-                  ▲ {wallet.changePercent}% than last month
-                </p>
+                <p className="text-sm text-gray-500">Balance data will appear here.</p>
               </div>
             </CardContent>
           </Card>
@@ -197,12 +252,9 @@ export default function OrganizationDashboardPage() {
                 <p className="text-lg font-semibold text-gray-900">
                   Payroll Summary
                 </p>
-                <button
-                  type="button"
-                  className="text-blue-600 text-sm font-medium hover:underline"
-                >
+                <Link href={viewAllPaymentsHref} className="text-blue-600 text-sm font-medium hover:underline">
                   View all
-                </button>
+                </Link>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-8 gap-2">
                 <div className="p-4 col-span-2 bg-gray-50 rounded-lg">
@@ -210,21 +262,21 @@ export default function OrganizationDashboardPage() {
                     Active Employees
                   </p>
                   <p className="text-xl font-bold text-[#26297A]">
-                    {org.totalEmployees}
+                    {totalEmployees}
                   </p>
                 </div>
                 <div className="p-4 bg-gray-50 col-span-3 rounded-lg">
                   <p className="text-xs text-[#26297A] mb-2">Pending</p>
                   <div className="flex gap-2">
                     <Image src={"/cngn.svg"} alt="cNGN" width={24} height={24} />
-                    <p className="text-lg font-bold text-[#26297A]">275,000.00</p>
+                    <p className="text-lg font-bold text-[#26297A]">{batchStats.pending.toLocaleString()}.00</p>
                   </div>
                 </div>
                 <div className="p-4 bg-gray-50 rounded-lg col-span-3">
                   <p className="text-xs text-[#26297A] mb-2">Paid</p>
                   <div className="flex gap-2">
                     <Image src={"/cngn.svg"} alt="cNGN" width={24} height={24} />
-                    <p className="text-lg font-bold text-[#26297A]">275,000.00</p>
+                    <p className="text-lg font-bold text-[#26297A]">{batchStats.executed.toLocaleString()}.00</p>
                   </div>
                 </div>
               </div>
@@ -240,12 +292,9 @@ export default function OrganizationDashboardPage() {
                 <CardTitle className="text-lg font-semibold">
                   Authorized Signers
                 </CardTitle>
-                <button
-                  type="button"
-                  className="text-blue-600 text-sm font-medium hover:underline"
-                >
+                <Link href={viewAllEmployeesHref} className="text-blue-600 text-sm font-medium hover:underline">
                   View all
-                </button>
+                </Link>
               </div>
             </CardHeader>
             <CardContent className="px-4 sm:px-6">
@@ -268,19 +317,25 @@ export default function OrganizationDashboardPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {signers.map((signer: typeof org.signers[0], index: number) => (
+                    {signers.map((signer, index: number) => (
                       <tr
-                        key={signer.id}
+                        key={signer.address}
                         className={index < signers.length - 1 ? "border-b border-gray-100" : ""}
                       >
                         <td className="py-3 px-2 text-gray-900">{index + 1}</td>
                         <td className="py-3 px-2 text-gray-900">
-                          {signer.username}
+                          {toShortAddress(signer.address)}
                         </td>
                         <td className="py-3 px-2 text-gray-900">{signer.role}</td>
                         <td className="py-3 px-2">
-                          <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded font-medium">
-                            {signer.status}
+                          <span
+                            className={`px-2 py-1 text-xs rounded font-medium ${
+                              signer.isActive
+                                ? "bg-green-100 text-green-800"
+                                : "bg-gray-100 text-gray-700"
+                            }`}
+                          >
+                            {signer.isActive ? "active" : "inactive"}
                           </span>
                         </td>
                       </tr>
@@ -303,9 +358,9 @@ export default function OrganizationDashboardPage() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle>Proposal History</CardTitle>
-              <button type="button" className="text-blue-600 text-sm font-medium">
+              <Link href={viewAllProposalsHref} className="text-blue-600 text-sm font-medium hover:underline">
                 View all
-              </button>
+              </Link>
             </div>
           </CardHeader>
           <CardContent className="px-4 sm:px-6">
@@ -365,52 +420,52 @@ export default function OrganizationDashboardPage() {
                 <tr className="border-b border-gray-200">
                   <th className="text-left py-2 px-2 text-gray-600 font-medium">#</th>
                   <th className="text-left py-2 px-2 text-gray-600 font-medium">TNX HASH</th>
-                  <th className="text-left py-2 px-2 text-gray-600 font-medium">Batch Name</th>
-                  <th className="text-left py-2 px-2 text-gray-600 font-medium">Initiated By</th>
+                  <th className="text-left py-2 px-2 text-gray-600 font-medium">Description</th>
+                  <th className="text-left py-2 px-2 text-gray-600 font-medium">From</th>
+                  <th className="text-left py-2 px-2 text-gray-600 font-medium">To</th>
                   <th className="text-left py-2 px-2 text-gray-600 font-medium">Amount</th>
-                  <th className="text-left py-2 px-2 text-gray-600 font-medium">Type</th>
                   <th className="text-left py-2 px-2 text-gray-600 font-medium">Status</th>
                 </tr>
               </thead>
               <tbody>
-                {transactions.slice(0, 5).map((tx, index) => (
-                  <tr
-                    key={tx.id}
-                    className={
-                      index < Math.min(transactions.length, 5) - 1
-                        ? "border-b border-gray-100"
-                        : ""
-                    }
-                  >
-                    <td className="py-3 px-2">{index + 1}</td>
-                    <td className="py-3 px-2 text-gray-600 font-mono text-xs">{tx.transactionHash}</td>
-                    <td className="py-3 px-2">{tx.batchName}</td>
-                    <td className="py-3 px-2">{tx.initiatedBy}</td>
-                    <td className="py-3 px-2">{tx.totalAmount.toLocaleString()} cNGN</td>
-                    <td className="py-3 px-2">
-                      <span
-                        className={`px-2 py-1 text-xs rounded ${
-                          tx.type === "Inflow"
-                            ? "bg-green-100 text-green-800"
-                            : "bg-red-100 text-red-800"
-                        }`}
-                      >
-                        {tx.type}
-                      </span>
-                    </td>
-                    <td className="py-3 px-2">
-                      <span
-                        className={`px-2 py-1 text-xs rounded ${
-                          tx.status === "Completed"
-                            ? "bg-green-100 text-green-800"
-                            : "bg-red-100 text-red-800"
-                        }`}
-                      >
-                        {tx.status}
-                      </span>
+                {(transactionsData?.transactions || []).length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="py-6 text-center text-gray-500">
+                      No transactions to display.
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  (transactionsData?.transactions || []).map((tx, index) => (
+                    <tr
+                      key={tx._id}
+                      className={
+                        index < Math.min((transactionsData?.transactions || []).length, 5) - 1
+                          ? "border-b border-gray-100"
+                          : ""
+                      }
+                    >
+                      <td className="py-3 px-2">{index + 1}</td>
+                      <td className="py-3 px-2 text-gray-600 font-mono text-xs">{toShortAddress(tx.txHash)}</td>
+                      <td className="py-3 px-2">{tx.description || tx.batchName || "Transaction"}</td>
+                      <td className="py-3 px-2 text-gray-600 font-mono text-xs">{toShortAddress(tx.fromAddress)}</td>
+                      <td className="py-3 px-2 text-gray-600 font-mono text-xs">{toShortAddress(tx.toAddress)}</td>
+                      <td className="py-3 px-2">{Number(tx.amount).toLocaleString()} cNGN</td>
+                      <td className="py-3 px-2">
+                        <span
+                          className={`px-2 py-1 text-xs rounded ${
+                            tx.status === "confirmed"
+                              ? "bg-green-100 text-green-800"
+                              : tx.status === "pending"
+                                ? "bg-yellow-100 text-yellow-800"
+                                : "bg-red-100 text-red-800"
+                          }`}
+                        >
+                          {tx.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
