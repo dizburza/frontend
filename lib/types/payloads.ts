@@ -41,6 +41,7 @@ export type Signer = {
   id: string
   name: string
   username: string
+  walletAddress: string
   role: string
   avatar: string
 }

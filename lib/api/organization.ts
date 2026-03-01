@@ -192,6 +192,34 @@ export interface TransactionHistoryResponse {
   };
 }
 
+export interface CreateOrganizationRequest {
+  name: string;
+  contractAddress: string;
+  organizationHash?: string;
+  creatorAddress: string;
+  businessEmail: string;
+  businessInfo?: {
+    registrationNumber?: string;
+    registrationType?: string;
+  };
+  signers: {
+    address: string;
+    name: string;
+    role: string;
+  }[];
+  quorum: number;
+  metadata?: {
+    industry?: string;
+    size?: string;
+    description?: string;
+  };
+  settings?: {
+    payrollCurrency?: string;
+    defaultPaymentDay?: number;
+    timeZone?: string;
+  };
+}
+
 // API Functions
 export async function fetchOrganizationBySlug(slug: string): Promise<Organization> {
   const response = await apiFetch(`/api/organizations/slug/${slug}`);
@@ -234,6 +262,14 @@ export async function fetchTransactionHistory(
   const baseUrl = `/api/transactions/${address}`;
   const url = qs ? baseUrl + "?" + qs : baseUrl;
   const response = await apiFetch(url);
+  return response.data || response;
+}
+
+export async function createOrganizationRecord(payload: CreateOrganizationRequest): Promise<Organization> {
+  const response = await apiFetch(`/api/organizations`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
   return response.data || response;
 }
 
