@@ -80,7 +80,7 @@ export function TransactionHistory({
 
     return recent.map((tx, idx) => {
       const counterparty = tx.direction === "received" ? tx.fromAddress : tx.toAddress
-      const amountAbs = Number.parseFloat(String(tx.displayAmount || "0").replace(/[+-]/g, ""))
+      const amountAbs = Number.parseFloat(String(tx.displayAmount || "0").replaceAll(/[+-]/g, ""))
       const gasFeeDisplay = (() => {
         const fee = tx.fee
         if (!fee) return "--"
