@@ -21,6 +21,13 @@ type UserLookupResult = {
   currentOrganization?: string | null
 }
 
+const formatAddress = (address: string) => {
+  const a = (address || "").trim()
+  if (!a) return ""
+  if (a.length <= 12) return a
+  return `${a.slice(0, 6)}…${a.slice(-4)}`
+}
+
 const isAddressQuery = (value: string) => {
   const v = value.trim()
   return /^0x[a-fA-F0-9]{40}$/.test(v)
@@ -490,7 +497,7 @@ export default function AddSignersPage() {
                                   {result.fullName || (result.username ? `@${result.username}` : "Unknown")}
                                 </p>
                                 <p className="text-xs text-gray-500">
-                                  {result.username ? `@${result.username}` : ""} {result.walletAddress}
+                                  {result.username ? `@${result.username}` : ""} {formatAddress(result.walletAddress)}
                                 </p>
                               </div>
                             </div>
@@ -513,7 +520,7 @@ export default function AddSignersPage() {
                       <span className="font-medium">Username:</span> {selectedCandidate.username ? `@${selectedCandidate.username}` : "--"}
                     </p>
                     <p className="text-xs text-gray-600 break-all">
-                      <span className="font-medium">Address:</span> {selectedCandidate.walletAddress}
+                      <span className="font-medium">Address:</span> {formatAddress(selectedCandidate.walletAddress)}
                     </p>
                     {selectedCandidate.currentOrganization ? (
                       <p className="text-xs text-gray-600">
@@ -556,7 +563,7 @@ export default function AddSignersPage() {
                           <div>
                             <p className="text-sm font-medium text-gray-900">{signer.name}</p>
                             <p className="text-xs text-gray-500">{signer.username}</p>
-                            <p className="text-[10px] text-gray-500 break-all">{signer.walletAddress}</p>
+                            <p className="text-[10px] text-gray-500 break-all">{formatAddress(signer.walletAddress)}</p>
                           </div>
                         </div>
                         <button
