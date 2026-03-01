@@ -54,6 +54,8 @@ export default function EmployeesPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [filterBy, setFilterBy] = useState<"all" | "new" | "high-salary">("all")
   const [sortBy, setSortBy] = useState<"name" | "salary" | "date">("name")
+  const [page, setPage] = useState(1)
+  const [limit, setLimit] = useState(10)
   const [showAddEmployeeModal, setShowAddEmployeeModal] = useState(false)
   const [pendingDeleteUsername, setPendingDeleteUsername] = useState<string | null>(null)
   const [editingEmployee, setEditingEmployee] = useState<null | {
@@ -180,6 +182,36 @@ export default function EmployeesPage() {
   }
 
   const filteredEmployees = getFilteredEmployees()
+
+  useEffect(() => {
+    setPage(1)
+  }, [organization?._id, searchTerm, filterBy, sortBy, limit])
+
+  const totalPages = Math.max(1, Math.ceil(filteredEmployees.length / limit))
+  const safePage = Math.min(Math.max(1, page), totalPages)
+  const startIndex = (safePage - 1) * limit
+  const paginatedEmployees = filteredEmployees.slice(startIndex, startIndex + limit)
+
+  const getPageItems = (currentPage: number, total: number) => {
+    const safeTotalPages = Math.max(1, total)
+    const safeCurrent = Math.min(Math.max(1, currentPage), safeTotalPages)
+    if (safeTotalPages <= 7) {
+      return Array.from({ length: safeTotalPages }, (_, i) => i + 1)
+    }
+
+    const items: Array<number | "..."> = [1]
+    const start = Math.max(2, safeCurrent - 1)
+    const end = Math.min(safeTotalPages - 1, safeCurrent + 1)
+
+    if (start > 2) items.push("...")
+    for (let p = start; p <= end; p++) items.push(p)
+    if (end < safeTotalPages - 1) items.push("...")
+    items.push(safeTotalPages)
+
+    return items
+  }
+
+  const pageItems = getPageItems(safePage, totalPages)
 
   const renderLastUpdatedBy = (employee: { lastAudit?: { performedByUsername?: string; performedByWalletAddress?: string; createdAt?: string } | null }) => {
     if (employee.lastAudit?.performedByUsername) {
@@ -597,9 +629,9 @@ export default function EmployeesPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredEmployees.map((employee, index) => (
+                paginatedEmployees.map((employee, index) => (
                   <TableRow key={employee.id}>
-                    <TableCell className="font-medium text-gray-900">{index + 1}</TableCell>
+                    <TableCell className="font-medium text-gray-900">{startIndex + index + 1}</TableCell>
                     <TableCell className="text-gray-700">{employee.surname}</TableCell>
                     <TableCell className="text-gray-700">{employee.firstName}</TableCell>
                     <TableCell className="text-gray-700">{employee.displayUsername || employee.username}</TableCell>
@@ -657,6 +689,83 @@ export default function EmployeesPage() {
               )}
             </TableBody>
           </Table>
+        </div>
+
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-6">
+          <div className="flex items-center gap-3 text-sm text-gray-600">
+            <span>
+              Page {safePage} of {totalPages}
+            </span>
+            <div className="flex items-center gap-2">
+              <span>Rows:</span>
+              <select
+                value={limit}
+                onChange={(e) => setLimit(Number(e.target.value))}
+                disabled={loading}
+                className="h-9 rounded border border-gray-200 bg-white px-2 text-sm text-gray-700 disabled:opacity-50"
+              >
+                <option value={10}>10</option>
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center gap-3">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={safePage <= 1 || loading}
+                className="px-3 py-2 rounded border border-gray-200 text-sm text-gray-700 disabled:opacity-50"
+              >
+                Prev
+              </button>
+
+              <div className="flex items-center gap-1">
+                {(() => {
+                  let ellipsisCount = 0
+                  return pageItems.map((item) => {
+                    if (item === "...") {
+                      ellipsisCount += 1
+                      const side = ellipsisCount === 1 ? "left" : "right"
+                      return (
+                        <span key={`ellipsis-${side}`} className="px-2 text-gray-500">
+                          ...
+                        </span>
+                      )
+                    }
+
+                    const isActive = item === safePage
+                    return (
+                      <button
+                        key={item}
+                        type="button"
+                        onClick={() => setPage(item)}
+                        disabled={loading}
+                        className={`h-9 min-w-9 rounded border text-sm disabled:opacity-50 ${
+                          isActive
+                            ? "border-gray-900 bg-gray-900 text-white"
+                            : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                        }`}
+                      >
+                        {item}
+                      </button>
+                    )
+                  })
+                })()}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setPage((p) => p + 1)}
+                disabled={safePage >= totalPages || loading}
+                className="px-3 py-2 rounded border border-gray-200 text-sm text-gray-700 disabled:opacity-50"
+              >
+                Next
+              </button>
+            </div>
+          </div>
         </div>
       </Card>
 

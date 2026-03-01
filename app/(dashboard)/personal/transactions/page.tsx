@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { StatCard } from "@/components/stat-card"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -10,12 +10,40 @@ import { useTransactionHistory } from "@/lib/api/organization"
 
 export default function PersonalTransactionsPage() {
   const [searchTerm, setSearchTerm] = useState("")
+  const [page, setPage] = useState(1)
+  const [limit, setLimit] = useState(10)
 
   const account = useActiveAccount()
   const address = account?.address ?? null
-  const { data, loading: isLoading } = useTransactionHistory(address, { limit: 50 })
+  const { data, loading: isLoading } = useTransactionHistory(address, { page, limit })
 
   const transactions = data?.transactions ?? []
+  const totalPages = data?.pagination?.totalPages ?? 1
+  const hasMore = data?.pagination?.hasMore ?? false
+
+  // Reset pagination on wallet switch
+  useEffect(() => {
+    setPage(1)
+  }, [account?.address, limit])
+
+  const pageItems = (() => {
+    const safeTotalPages = Math.max(1, totalPages)
+    const safePage = Math.min(Math.max(1, page), safeTotalPages)
+    if (safeTotalPages <= 7) {
+      return Array.from({ length: safeTotalPages }, (_, i) => i + 1)
+    }
+
+    const items: Array<number | "..."> = [1]
+    const start = Math.max(2, safePage - 1)
+    const end = Math.min(safeTotalPages - 1, safePage + 1)
+
+    if (start > 2) items.push("...")
+    for (let p = start; p <= end; p++) items.push(p)
+    if (end < safeTotalPages - 1) items.push("...")
+    items.push(safeTotalPages)
+
+    return items
+  })()
 
   const toShortAddress = (value: string) => {
     if (!value) return "--"
@@ -25,14 +53,14 @@ export default function PersonalTransactionsPage() {
   const outgoingTotal = transactions
     .filter((t) => t.direction === "sent")
     .reduce((acc, t) => {
-      const amt = Number.parseFloat(String(t.displayAmount || "0").replace("-", ""))
+      const amt = Number.parseFloat(String(t.displayAmount || "0").replaceAll("-", ""))
       return acc + (Number.isFinite(amt) ? amt : 0)
     }, 0)
 
   const incomingTotal = transactions
     .filter((t) => t.direction === "received")
     .reduce((acc, t) => {
-      const amt = Number.parseFloat(String(t.displayAmount || "0").replace("+", ""))
+      const amt = Number.parseFloat(String(t.displayAmount || "0").replaceAll("+", ""))
       return acc + (Number.isFinite(amt) ? amt : 0)
     }, 0)
 
@@ -77,7 +105,11 @@ export default function PersonalTransactionsPage() {
           {toShortAddress(tx.direction === "received" ? tx.fromAddress : tx.toAddress)}
         </td>
         <td className="py-4 px-4 text-sm font-semibold text-gray-900">
-          {Number.parseFloat(String(tx.displayAmount || "0").replace(/[+-]/g, "")).toLocaleString(undefined, {
+          {Number.parseFloat(
+            String(tx.displayAmount || "0")
+              .replaceAll("+", "")
+              .replaceAll("-", "")
+          ).toLocaleString(undefined, {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
           })}
@@ -196,6 +228,83 @@ export default function PersonalTransactionsPage() {
               {tableBody}
             </tbody>
           </table>
+        </div>
+
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-6">
+          <div className="flex items-center gap-3 text-sm text-gray-600">
+            <span>
+              Page {page} of {totalPages}
+            </span>
+            <div className="flex items-center gap-2">
+              <span>Rows:</span>
+              <select
+                value={limit}
+                onChange={(e) => setLimit(Number(e.target.value))}
+                disabled={isLoading}
+                className="h-9 rounded border border-gray-200 bg-white px-2 text-sm text-gray-700 disabled:opacity-50"
+              >
+                <option value={10}>10</option>
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center gap-3">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1 || isLoading}
+                className="px-3 py-2 rounded border border-gray-200 text-sm text-gray-700 disabled:opacity-50"
+              >
+                Prev
+              </button>
+
+            <div className="flex items-center gap-1">
+              {(() => {
+                let ellipsisCount = 0
+                return pageItems.map((item) => {
+                  if (item === "...") {
+                    ellipsisCount += 1
+                    const side = ellipsisCount === 1 ? "left" : "right"
+                    return (
+                      <span key={`ellipsis-${side}`} className="px-2 text-gray-500">
+                        ...
+                      </span>
+                    )
+                  }
+
+                  const isActive = item === page
+                  return (
+                    <button
+                      key={item}
+                      type="button"
+                      onClick={() => setPage(item)}
+                      disabled={isLoading}
+                      className={`h-9 min-w-9 rounded border text-sm disabled:opacity-50 ${
+                        isActive
+                          ? "border-gray-900 bg-gray-900 text-white"
+                          : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                      }`}
+                    >
+                      {item}
+                    </button>
+                  )
+                })
+              })()}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setPage((p) => p + 1)}
+              disabled={!hasMore || isLoading}
+              className="px-3 py-2 rounded border border-gray-200 text-sm text-gray-700 disabled:opacity-50"
+            >
+              Next
+            </button>
+          </div>
+          </div>
         </div>
       </Card>
     </div>

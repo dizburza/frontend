@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { StatCard } from "@/components/stat-card"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -10,6 +10,7 @@ import { BatchPaymentCreationModal } from "@/components/payments/batch-payment-c
 import { 
   useOrganizationBySlug, 
   useOrganizationBatches,
+  useTransactionHistory,
   mapApiBatchToPaymentBatch 
 } from "@/lib/api/organization"
 import useOrgSlug from "@/hooks/useOrgSlug"
@@ -17,24 +18,60 @@ import useOrgSlug from "@/hooks/useOrgSlug"
 export default function PaymentsPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [showBatchModal, setShowBatchModal] = useState(false)
+  const [page, setPage] = useState(1)
+  const [limit, setLimit] = useState(10)
+
+  const getPageItems = (currentPage: number, total: number) => {
+    const safeTotalPages = Math.max(1, total)
+    const safeCurrent = Math.min(Math.max(1, currentPage), safeTotalPages)
+    if (safeTotalPages <= 7) {
+      return Array.from({ length: safeTotalPages }, (_, i) => i + 1)
+    }
+
+    const items: Array<number | "..."> = [1]
+    const start = Math.max(2, safeCurrent - 1)
+    const end = Math.min(safeTotalPages - 1, safeCurrent + 1)
+
+    if (start > 2) items.push("...")
+    for (let p = start; p <= end; p++) items.push(p)
+    if (end < safeTotalPages - 1) items.push("...")
+    items.push(safeTotalPages)
+
+    return items
+  }
 
   const orgSlug = useOrgSlug()
   const { data: organization } = useOrganizationBySlug(orgSlug)
   const { data: batchesData, loading: batchesLoading, error, refresh } = useOrganizationBatches(organization?._id || null)
+  const { data: transactionsData } = useTransactionHistory(
+    organization?.contractAddress || null,
+    { limit: 200 }
+  )
 
   const paymentBatches = batchesData?.batches?.map(mapApiBatchToPaymentBatch) || []
   const stats = batchesData?.stats || { pending: 0, approved: 0, executed: 0, cancelled: 0 }
   const totalBatches = batchesData?.totalBatches || 0
 
+  const transactions = transactionsData?.transactions ?? []
+
+  const outflow = transactions
+    .filter((t) => t.direction === "sent")
+    .reduce((acc, t) => {
+      const amt = Number.parseFloat(String(t.displayAmount || "0").replaceAll("-", ""))
+      return acc + (Number.isFinite(amt) ? amt : 0)
+    }, 0)
+
+  const inflow = transactions
+    .filter((t) => t.direction === "received")
+    .reduce((acc, t) => {
+      const amt = Number.parseFloat(String(t.displayAmount || "0").replaceAll("+", ""))
+      return acc + (Number.isFinite(amt) ? amt : 0)
+    }, 0)
+
   const handlePaymentCreated = () => {
     refresh()
     setShowBatchModal(false)
   }
-
-  // Calculate employees paid from executed batches
-  const employeesPaid = batchesData?.batches
-    ?.filter(b => b.status === "executed")
-    ?.reduce((sum, b) => sum + b.recipients.length, 0) || 0
 
   // Format amount for display
   const formatAmount = (amount: number) => {
@@ -52,6 +89,20 @@ export default function PaymentsPage() {
     totalBatchesUpdatedText = new Date(latestBatchUpdatedAt).toLocaleString()
   }
 
+  const filteredBatches = paymentBatches.filter(batch =>
+    batch.batchName.toLowerCase().includes(searchTerm.toLowerCase())
+  )
+
+  useEffect(() => {
+    setPage(1)
+  }, [organization?._id, searchTerm, limit])
+
+  const totalPages = Math.max(1, Math.ceil(filteredBatches.length / limit))
+  const safePage = Math.min(Math.max(1, page), totalPages)
+  const startIndex = (safePage - 1) * limit
+  const paginatedBatches = filteredBatches.slice(startIndex, startIndex + limit)
+  const pageItems = getPageItems(safePage, totalPages)
+
   if (error) {
     return (
       <div className="py-4 sm:py-6 lg:py-8 px-4 sm:px-6 lg:px-8">
@@ -62,10 +113,6 @@ export default function PaymentsPage() {
       </div>
     )
   }
-
-  const filteredBatches = paymentBatches.filter(batch =>
-    batch.batchName.toLowerCase().includes(searchTerm.toLowerCase())
-  )
 
   const getStatusStyle = (status: string) => {
     const normalizedStatus = status.toLowerCase();
@@ -105,8 +152,14 @@ export default function PaymentsPage() {
           lastUpdated={totalBatchesUpdatedText}
         />
         <StatCard label="Pending Approval" value={stats.pending.toString()} />
-        <StatCard label="Executed This Month" value={stats.executed.toString()} />
-        <StatCard label="Employees Paid" value={employeesPaid.toString()} />
+        <StatCard
+          label="Outflow (cNGN)"
+          value={outflow.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        />
+        <StatCard
+          label="Inflow (cNGN)"
+          value={inflow.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        />
       </div>
 
       {/* Payment Batches Table */}
@@ -168,9 +221,9 @@ export default function PaymentsPage() {
                   </td>
                 </tr>
               ) : (
-                filteredBatches.map((batch, index) => (
+                paginatedBatches.map((batch, index) => (
                   <tr key={batch.id} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="py-4 px-4 text-sm text-gray-900">{index + 1}</td>
+                    <td className="py-4 px-4 text-sm text-gray-900">{startIndex + index + 1}</td>
                     <td className="py-4 px-4 text-sm text-gray-900">{batch.batchName}</td>
                     <td className="py-4 px-4 text-sm text-gray-600">{(batch.creatorJobRole || "").trim() || toShortAddress(batch.creatorAddress)}</td>
                     <td className="py-4 px-4 text-sm font-semibold text-gray-900">
@@ -194,6 +247,83 @@ export default function PaymentsPage() {
               )}
             </tbody>
           </table>
+        </div>
+
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-6">
+          <div className="flex items-center gap-3 text-sm text-gray-600">
+            <span>
+              Page {safePage} of {totalPages}
+            </span>
+            <div className="flex items-center gap-2">
+              <span>Rows:</span>
+              <select
+                value={limit}
+                onChange={(e) => setLimit(Number(e.target.value))}
+                disabled={batchesLoading}
+                className="h-9 rounded border border-gray-200 bg-white px-2 text-sm text-gray-700 disabled:opacity-50"
+              >
+                <option value={10}>10</option>
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center gap-3">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={safePage <= 1 || batchesLoading}
+                className="px-3 py-2 rounded border border-gray-200 text-sm text-gray-700 disabled:opacity-50"
+              >
+                Prev
+              </button>
+
+              <div className="flex items-center gap-1">
+                {(() => {
+                  let ellipsisCount = 0
+                  return pageItems.map((item) => {
+                    if (item === "...") {
+                      ellipsisCount += 1
+                      const side = ellipsisCount === 1 ? "left" : "right"
+                      return (
+                        <span key={`ellipsis-${side}`} className="px-2 text-gray-500">
+                          ...
+                        </span>
+                      )
+                    }
+
+                    const isActive = item === safePage
+                    return (
+                      <button
+                        key={item}
+                        type="button"
+                        onClick={() => setPage(item)}
+                        disabled={batchesLoading}
+                        className={`h-9 min-w-9 rounded border text-sm disabled:opacity-50 ${
+                          isActive
+                            ? "border-gray-900 bg-gray-900 text-white"
+                            : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                        }`}
+                      >
+                        {item}
+                      </button>
+                    )
+                  })
+                })()}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setPage((p) => p + 1)}
+                disabled={safePage >= totalPages || batchesLoading}
+                className="px-3 py-2 rounded border border-gray-200 text-sm text-gray-700 disabled:opacity-50"
+              >
+                Next
+              </button>
+            </div>
+          </div>
         </div>
       </Card>
 

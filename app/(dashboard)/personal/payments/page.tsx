@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { StatCard } from "@/components/stat-card"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -16,6 +16,27 @@ export default function PersonalPaymentsPage() {
   const [showScan, setShowScan] = useState(false)
   const [showSend, setShowSend] = useState(false)
   const [scanRecipient, setScanRecipient] = useState<string | undefined>(undefined)
+  const [page, setPage] = useState(1)
+  const [limit, setLimit] = useState(10)
+
+  const getPageItems = (currentPage: number, total: number) => {
+    const safeTotalPages = Math.max(1, total)
+    const safeCurrent = Math.min(Math.max(1, currentPage), safeTotalPages)
+    if (safeTotalPages <= 7) {
+      return Array.from({ length: safeTotalPages }, (_, i) => i + 1)
+    }
+
+    const items: Array<number | "..."> = [1]
+    const start = Math.max(2, safeCurrent - 1)
+    const end = Math.min(safeTotalPages - 1, safeCurrent + 1)
+
+    if (start > 2) items.push("...")
+    for (let p = start; p <= end; p++) items.push(p)
+    if (end < safeTotalPages - 1) items.push("...")
+    items.push(safeTotalPages)
+
+    return items
+  }
 
   const { rows, outgoingTotal, isLoading, error, toShortAddress, lastUpdatedAt } = useCngnTransferActivity()
 
@@ -34,6 +55,16 @@ export default function PersonalPaymentsPage() {
       return counterparty.includes(q) || txHash.includes(q)
     })
   })()
+
+  useEffect(() => {
+    setPage(1)
+  }, [searchTerm, limit])
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / limit))
+  const safePage = Math.min(Math.max(1, page), totalPages)
+  const startIndex = (safePage - 1) * limit
+  const paginated = filtered.slice(startIndex, startIndex + limit)
+  const pageItems = getPageItems(safePage, totalPages)
 
   const { getUsername } = useAddressUsernames(filtered.map((p) => p.counterparty))
 
@@ -146,9 +177,9 @@ export default function PersonalPaymentsPage() {
                   )
                 }
 
-                return filtered.map((payment, idx) => (
+                return paginated.map((payment, idx) => (
                   <tr key={payment.id} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="py-4 px-4 text-sm text-gray-900">{idx + 1}</td>
+                    <td className="py-4 px-4 text-sm text-gray-900">{startIndex + idx + 1}</td>
                     <td className="py-4 px-4 text-sm text-gray-900">
                       {(() => {
                         const username = getUsername(payment.counterparty)
@@ -182,6 +213,83 @@ export default function PersonalPaymentsPage() {
               })()}
             </tbody>
           </table>
+        </div>
+
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-6">
+          <div className="flex items-center gap-3 text-sm text-gray-600">
+            <span>
+              Page {safePage} of {totalPages}
+            </span>
+            <div className="flex items-center gap-2">
+              <span>Rows:</span>
+              <select
+                value={limit}
+                onChange={(e) => setLimit(Number(e.target.value))}
+                disabled={isLoading}
+                className="h-9 rounded border border-gray-200 bg-white px-2 text-sm text-gray-700 disabled:opacity-50"
+              >
+                <option value={10}>10</option>
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center gap-3">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={safePage <= 1 || isLoading}
+                className="px-3 py-2 rounded border border-gray-200 text-sm text-gray-700 disabled:opacity-50"
+              >
+                Prev
+              </button>
+
+              <div className="flex items-center gap-1">
+                {(() => {
+                  let ellipsisCount = 0
+                  return pageItems.map((item) => {
+                    if (item === "...") {
+                      ellipsisCount += 1
+                      const side = ellipsisCount === 1 ? "left" : "right"
+                      return (
+                        <span key={`ellipsis-${side}`} className="px-2 text-gray-500">
+                          ...
+                        </span>
+                      )
+                    }
+
+                    const isActive = item === safePage
+                    return (
+                      <button
+                        key={item}
+                        type="button"
+                        onClick={() => setPage(item)}
+                        disabled={isLoading}
+                        className={`h-9 min-w-9 rounded border text-sm disabled:opacity-50 ${
+                          isActive
+                            ? "border-gray-900 bg-gray-900 text-white"
+                            : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                        }`}
+                      >
+                        {item}
+                      </button>
+                    )
+                  })
+                })()}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setPage((p) => p + 1)}
+                disabled={safePage >= totalPages || isLoading}
+                className="px-3 py-2 rounded border border-gray-200 text-sm text-gray-700 disabled:opacity-50"
+              >
+                Next
+              </button>
+            </div>
+          </div>
         </div>
       </Card>
 

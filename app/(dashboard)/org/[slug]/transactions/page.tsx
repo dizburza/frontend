@@ -11,6 +11,27 @@ import { useOrganizationBySlug, useTransactionHistory } from "@/lib/api/organiza
 export default function TransactionsPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null)
+  const [page, setPage] = useState(1)
+  const [limit, setLimit] = useState(10)
+
+  const getPageItems = (currentPage: number, total: number) => {
+    const safeTotalPages = Math.max(1, total)
+    const safePage = Math.min(Math.max(1, currentPage), safeTotalPages)
+    if (safeTotalPages <= 7) {
+      return Array.from({ length: safeTotalPages }, (_, i) => i + 1)
+    }
+
+    const items: Array<number | "..."> = [1]
+    const start = Math.max(2, safePage - 1)
+    const end = Math.min(safeTotalPages - 1, safePage + 1)
+
+    if (start > 2) items.push("...")
+    for (let p = start; p <= end; p++) items.push(p)
+    if (end < safeTotalPages - 1) items.push("...")
+    items.push(safeTotalPages)
+
+    return items
+  }
 
   const orgSlug = useOrgSlug()
   const { data: organization } = useOrganizationBySlug(orgSlug)
@@ -19,9 +40,19 @@ export default function TransactionsPage() {
     loading: transactionsLoading,
     error,
     refresh,
-  } = useTransactionHistory(organization?.contractAddress || null, { limit: 100 })
+  } = useTransactionHistory(organization?.contractAddress || null, { page, limit })
 
   const transactions = history?.transactions || []
+
+  const totalTransactions = history?.pagination?.total ?? transactions.length
+  const totalPages = history?.pagination?.totalPages ?? 1
+  const hasMore = history?.pagination?.hasMore ?? false
+
+  useEffect(() => {
+    setPage(1)
+  }, [organization?.contractAddress, limit])
+
+  const pageItems = getPageItems(page, totalPages)
 
   const toShortAddress = (value: string) => {
     if (!value) return "--"
@@ -49,19 +80,19 @@ export default function TransactionsPage() {
     lastUpdatedText = lastUpdatedAt.toLocaleString()
   }
 
-  const pendingTransactions = transactions.filter(tx => tx.status === "pending").length
-  const confirmedTransactions = transactions.filter(tx => tx.status === "confirmed")
-  const totalTransactions = history?.pagination?.total ?? transactions.length
+  const outgoingTotal = transactions
+    .filter((t) => t.direction === "sent")
+    .reduce((acc, t) => {
+      const amt = Number.parseFloat(String(t.displayAmount || "0").replaceAll("-", ""))
+      return acc + (Number.isFinite(amt) ? amt : 0)
+    }, 0)
 
-  const outflow = confirmedTransactions.reduce((sum, tx) => {
-    const value = Number.parseFloat(tx.displayAmount || "0")
-    return value < 0 ? sum + Math.abs(value) : sum
-  }, 0)
-
-  const inflow = confirmedTransactions.reduce((sum, tx) => {
-    const value = Number.parseFloat(tx.displayAmount || "0")
-    return value > 0 ? sum + value : sum
-  }, 0)
+  const incomingTotal = transactions
+    .filter((t) => t.direction === "received")
+    .reduce((acc, t) => {
+      const amt = Number.parseFloat(String(t.displayAmount || "0").replaceAll("+", ""))
+      return acc + (Number.isFinite(amt) ? amt : 0)
+    }, 0)
 
   const getStatusColor = (status: string) => {
     if (status === "confirmed") return "bg-green-100 text-green-700"
@@ -69,11 +100,7 @@ export default function TransactionsPage() {
     return "bg-red-100 text-red-700"
   }
 
-  const getStatusLabel = (status: string) => {
-    if (status === "confirmed") return "Completed"
-    if (status === "pending") return "Pending"
-    return "Failed"
-  }
+  const statusLabel = "Completed"
 
   const getTypeColor = (type: string) => {
     return type === "Inflow" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
@@ -123,18 +150,14 @@ export default function TransactionsPage() {
           lastUpdated={lastUpdatedText}
         />
         <StatCard
-          label="Outflow (cNGN)"
-          value={outflow.toFixed(2)}
-        />
-        <StatCard 
-          label="Inflow (cNGN)" 
-          value={inflow.toFixed(2)} 
+          label="Total Outflow (cNGN)"
+          value={outgoingTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         />
         <StatCard
-          label="Pending Transactions"
-          value={pendingTransactions.toString()}
-          lastUpdated={transactionsLoading ? "updating ..." : undefined}
+          label="Total Inflow (cNGN)"
+          value={incomingTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         />
+        <StatCard label="Completed" value={String(transactions.length)} />
       </div>
 
       {/* Recent Transactions Table */}
@@ -188,64 +211,58 @@ export default function TransactionsPage() {
                 </tr>
               ) : (
                 filteredTransactions.map((tx, index) => {
-                  const amountNumber = Number.parseFloat(tx.displayAmount || "0")
-                  const isInflow = amountNumber > 0
-                  const txType = isInflow ? "Inflow" : "Outflow"
-
                   const description = tx.description || tx.batchName || "Transaction"
 
-                  const createdAt = new Date(tx.timestamp)
-                  const txDate = createdAt.toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric",
-                  })
-                  const txTime = createdAt.toLocaleTimeString("en-US", {
-                    hour: "numeric",
-                    minute: "2-digit",
-                  })
-
-                  const txHashShort = tx.txHash
-                    ? `${tx.txHash.slice(0, 6)}...${tx.txHash.slice(-4)}`
-                    : "--"
+                  const directionLabel = tx.direction === "received" ? "Inflow" : "Outflow"
 
                   return (
                     <tr key={tx._id} className="border-b border-gray-100 hover:bg-gray-50">
                       <td className="py-4 px-4 text-sm text-gray-900">{index + 1}</td>
                       <td className="py-4 px-4 text-sm text-gray-900">
                         {description}
-                        <div className="text-xs text-gray-500 mt-0.5">
-                          {txType === "Inflow" ? "Inflow from" : "Outflow to"} {toShortAddress(txType === "Inflow" ? tx.fromAddress : tx.toAddress)}
-                        </div>
                       </td>
                       <td className="py-4 px-4 text-sm font-semibold text-gray-900">
-                        {Math.abs(amountNumber).toLocaleString(undefined, { maximumFractionDigits: 6 })}
+                        {Number.parseFloat(
+                          String(tx.displayAmount || "0")
+                            .replaceAll("+", "")
+                            .replaceAll("-", "")
+                        ).toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
                       </td>
                       <td className="py-4 px-4 text-sm">
-                        <span className={`px-3 py-1 rounded text-xs font-medium ${getTypeColor(txType)}`}>
-                          {txType}
+                        <span className={`px-3 py-1 rounded text-xs font-medium ${getTypeColor(directionLabel)}`}>
+                          {directionLabel}
                         </span>
                       </td>
                       <td className="py-4 px-4 text-sm text-gray-600">
-                        {txDate}
-                        <br />
-                        <span className="text-xs text-gray-500">{txTime}</span>
+                        {tx.timestamp ? new Date(tx.timestamp).toLocaleString() : "--"}
                       </td>
                       <td className="py-4 px-4 text-sm">
-                        <span className={`px-3 py-1 rounded text-xs font-medium ${getStatusColor(tx.status)}`}>
-                          {getStatusLabel(tx.status)}
+                        <span className={`px-3 py-1 rounded text-xs font-medium ${getStatusColor("confirmed")}`}>
+                          {statusLabel}
                         </span>
                       </td>
-                      <td className="py-4 px-4 text-sm text-gray-600 flex items-center gap-2">
-                        {txHashShort}
-                        <button
-                          type="button"
-                          onClick={() => void copyToClipboard(tx.txHash)}
-                          className="text-gray-400 hover:text-gray-600"
-                          aria-label="Copy transaction hash"
-                        >
-                          <Copy className="w-4 h-4" />
-                        </button>
+                      <td className="py-4 px-4 text-sm text-gray-600">
+                        <div className="flex items-center gap-2">
+                          <a
+                            href={`https://sepolia.basescan.org/tx/${tx.txHash}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-blue-600 hover:underline"
+                          >
+                            {toShortAddress(tx.txHash)}
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() => void copyToClipboard(tx.txHash)}
+                            className="text-gray-400 hover:text-gray-600"
+                            aria-label="Copy transaction hash"
+                          >
+                            <Copy className="w-4 h-4" />
+                          </button>
+                        </div>
                       </td>
                       <td className="py-4 px-4 text-sm">
                         <button className="text-gray-400 hover:text-gray-600">
@@ -258,6 +275,83 @@ export default function TransactionsPage() {
               )}
             </tbody>
           </table>
+        </div>
+
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-6">
+          <div className="flex items-center gap-3 text-sm text-gray-600">
+            <span>
+              Page {page} of {totalPages}
+            </span>
+            <div className="flex items-center gap-2">
+              <span>Rows:</span>
+              <select
+                value={limit}
+                onChange={(e) => setLimit(Number(e.target.value))}
+                disabled={transactionsLoading}
+                className="h-9 rounded border border-gray-200 bg-white px-2 text-sm text-gray-700 disabled:opacity-50"
+              >
+                <option value={10}>10</option>
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center gap-3">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1 || transactionsLoading}
+                className="px-3 py-2 rounded border border-gray-200 text-sm text-gray-700 disabled:opacity-50"
+              >
+                Prev
+              </button>
+
+            <div className="flex items-center gap-1">
+              {(() => {
+                let ellipsisCount = 0
+                return pageItems.map((item) => {
+                  if (item === "...") {
+                    ellipsisCount += 1
+                    const side = ellipsisCount === 1 ? "left" : "right"
+                    return (
+                      <span key={`ellipsis-${side}`} className="px-2 text-gray-500">
+                        ...
+                      </span>
+                    )
+                  }
+
+                  const isActive = item === page
+                  return (
+                    <button
+                      key={item}
+                      type="button"
+                      onClick={() => setPage(item)}
+                      disabled={transactionsLoading}
+                      className={`h-9 min-w-9 rounded border text-sm disabled:opacity-50 ${
+                        isActive
+                          ? "border-gray-900 bg-gray-900 text-white"
+                          : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                      }`}
+                    >
+                      {item}
+                    </button>
+                  )
+                })
+              })()}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setPage((p) => p + 1)}
+              disabled={!hasMore || transactionsLoading}
+              className="px-3 py-2 rounded border border-gray-200 text-sm text-gray-700 disabled:opacity-50"
+            >
+              Next
+            </button>
+          </div>
+          </div>
         </div>
       </Card>
     </div>
