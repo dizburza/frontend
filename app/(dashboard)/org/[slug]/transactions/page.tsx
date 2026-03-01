@@ -14,6 +14,7 @@ export default function TransactionsPage() {
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null)
   const [page, setPage] = useState(1)
   const [limit, setLimit] = useState(10)
+  const [scope, setScope] = useState<"wallet" | "treasury">("wallet")
 
   const getPageItems = (currentPage: number, total: number) => {
     const safeTotalPages = Math.max(1, total)
@@ -38,8 +39,21 @@ export default function TransactionsPage() {
   const { data: organization } = useOrganizationBySlug(orgSlug)
 
   const account = useActiveAccount()
-  const queryAddress = account?.address ?? organization?.contractAddress ?? null
-  const scopeLabel = account?.address ? "My Wallet" : "Org Treasury"
+
+  useEffect(() => {
+    setScope(account?.address ? "wallet" : "treasury")
+  }, [account?.address])
+
+  useEffect(() => {
+    setSearchTerm("")
+  }, [scope])
+
+  const queryAddress =
+    scope === "wallet"
+      ? account?.address ?? null
+      : organization?.contractAddress ?? null
+
+  const scopeLabel = scope === "wallet" ? "My Wallet" : "Org Treasury"
   const {
     data: history,
     loading: transactionsLoading,
@@ -142,6 +156,33 @@ export default function TransactionsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="space-y-1">
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">My Transactions</h1>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex items-center rounded-md border border-gray-200 bg-gray-50 p-1">
+              <button
+                type="button"
+                disabled={!account?.address}
+                onClick={() => setScope("wallet")}
+                className={`px-2 py-1 text-xs font-medium rounded ${
+                  scope === "wallet"
+                    ? "bg-white text-gray-900 shadow-sm"
+                    : "text-gray-600 hover:text-gray-900"
+                } ${account?.address ? "" : "opacity-50 cursor-not-allowed"}`}
+              >
+                My Wallet
+              </button>
+              <button
+                type="button"
+                onClick={() => setScope("treasury")}
+                className={`px-2 py-1 text-xs font-medium rounded ${
+                  scope === "treasury"
+                    ? "bg-white text-gray-900 shadow-sm"
+                    : "text-gray-600 hover:text-gray-900"
+                }`}
+              >
+                Org Treasury
+              </button>
+            </div>
+          </div>
           <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
             <span className="px-2 py-0.5 rounded border border-gray-200 bg-gray-50 text-gray-700">{scopeLabel}</span>
             <span>Address:</span>
