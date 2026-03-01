@@ -97,9 +97,22 @@ export default function OrganizationDetailsPage() {
                   className="w-full text-sm px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Select industry</option>
-                  <option value="tech">Technology</option>
-                  <option value="finance">Finance</option>
-                  <option value="retail">Retail</option>
+                  <option value="Information Technology">Information Technology</option>
+                  <option value="Finance">Finance</option>
+                  <option value="Healthcare">Healthcare</option>
+                  <option value="Agriculture">Agriculture</option>
+                  <option value="Education">Education</option>
+                  <option value="Media">Media</option>
+                  <option value="Industrial Services">Industrial Services</option>
+                  <option value="Transportation">Transportation</option>
+                  <option value="Tourism">Tourism</option>
+                  <option value="Legal Services">Legal Services</option>
+                  <option value="Life Sciences">Life Sciences</option>
+                  <option value="Manufacturing">Manufacturing</option>
+                  <option value="Entertainment">Entertainment</option>
+                  <option value="Hospitality">Hospitality</option>
+                  <option value="Social Impact">Social Impact</option>
+                  <option value="Logistics">Logistics</option>
                 </select>
               </div>
 
@@ -119,9 +132,14 @@ export default function OrganizationDetailsPage() {
                   className="w-full text-sm px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Select business type</option>
-                  <option value="llc">LLC</option>
-                  <option value="corp">Corporation</option>
-                  <option value="sole">Sole Proprietor</option>
+                  <option value="Sole Proprietorship">Sole Proprietorship</option>
+                  <option value="Partnership">Partnership</option>
+                  <option value="Limited Liability Company (Ltd)">Limited Liability Company (Ltd)</option>
+                  <option value="Public Limited Company (PLC)">Public Limited Company (PLC)</option>
+                  <option value="Nonprofit / NGO">Nonprofit / NGO</option>
+                  <option value="Cooperative">Cooperative</option>
+                  <option value="Government Owned">Government Owned</option>
+                  <option value="Business Name">Business Name</option>
                 </select>
               </div>
 

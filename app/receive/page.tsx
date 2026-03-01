@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { Suspense, useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -79,6 +79,14 @@ const shortAddress = (value: string) => {
 }
 
 export default function ReceivePage() {
+  return (
+    <Suspense>
+      <ReceivePageContent />
+    </Suspense>
+  )
+}
+
+function ReceivePageContent() {
   const params = useSearchParams()
   const address = (params.get("address") || "").trim()
   const username = (params.get("username") || "").trim().replace(/^@/, "")
