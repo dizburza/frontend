@@ -133,12 +133,21 @@ export default function PaymentsPage() {
       <div className="text-sm text-gray-600">
         <span>Dashboard</span>
         <span className="mx-2">›</span>
-        <span>Payments</span>
+        <span>Treasury Payments</span>
       </div>
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Payments</h1>
+        <div className="space-y-1">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Treasury Payments</h1>
+          <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
+            <span className="px-2 py-0.5 rounded border border-gray-200 bg-gray-50 text-gray-700">Org Treasury</span>
+            <span>Address:</span>
+            <span className="font-mono text-gray-800">
+              {organization?.contractAddress ? toShortAddress(organization.contractAddress) : "--"}
+            </span>
+          </div>
+        </div>
         <Button onClick={() => setShowBatchModal(true)} className="bg-blue-600 hover:bg-blue-700 text-white">
           + Create New Batch
         </Button>

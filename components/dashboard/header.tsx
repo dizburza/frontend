@@ -157,8 +157,8 @@ export function DashboardHeader() {
       { label: "Employees", href: `${base}/employees` },
       { label: "Proposals", href: `${base}/proposals` },
       { label: "Wallets", href: `${base}/wallet` },
-      { label: "Payments", href: `${base}/payments` },
-      { label: "Transactions", href: `${base}/transactions` },
+      { label: "Treasury Payments", href: `${base}/payments` },
+      { label: "My Transactions", href: `${base}/transactions` },
     ];
   })();
 

@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { ChevronDown, Search, Copy, MoreVertical } from "lucide-react"
 import useOrgSlug from "@/hooks/useOrgSlug"
 import { useOrganizationBySlug, useTransactionHistory } from "@/lib/api/organization"
+import { useActiveAccount } from "thirdweb/react"
 
 export default function TransactionsPage() {
   const [searchTerm, setSearchTerm] = useState("")
@@ -35,12 +36,16 @@ export default function TransactionsPage() {
 
   const orgSlug = useOrgSlug()
   const { data: organization } = useOrganizationBySlug(orgSlug)
+
+  const account = useActiveAccount()
+  const queryAddress = account?.address ?? organization?.contractAddress ?? null
+  const scopeLabel = account?.address ? "My Wallet" : "Org Treasury"
   const {
     data: history,
     loading: transactionsLoading,
     error,
     refresh,
-  } = useTransactionHistory(organization?.contractAddress || null, { page, limit })
+  } = useTransactionHistory(queryAddress, { page, limit })
 
   const transactions = history?.transactions || []
 
@@ -50,7 +55,7 @@ export default function TransactionsPage() {
 
   useEffect(() => {
     setPage(1)
-  }, [organization?.contractAddress, limit])
+  }, [queryAddress, limit])
 
   const pageItems = getPageItems(page, totalPages)
 
@@ -130,12 +135,29 @@ export default function TransactionsPage() {
       <div className="text-sm text-gray-600">
         <span>Dashboard</span>
         <span className="mx-2">›</span>
-        <span>Transaction History</span>
+        <span>My Transactions</span>
       </div>
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Transaction History</h1>
+        <div className="space-y-1">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">My Transactions</h1>
+          <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
+            <span className="px-2 py-0.5 rounded border border-gray-200 bg-gray-50 text-gray-700">{scopeLabel}</span>
+            <span>Address:</span>
+            <span className="font-mono text-gray-800">{queryAddress ? toShortAddress(queryAddress) : "--"}</span>
+            {queryAddress ? (
+              <button
+                type="button"
+                onClick={() => copyToClipboard(queryAddress)}
+                className="inline-flex items-center gap-1 text-gray-700 hover:text-gray-900"
+              >
+                <Copy className="w-4 h-4" />
+                Copy
+              </button>
+            ) : null}
+          </div>
+        </div>
         <button className="text-blue-600 hover:text-blue-700 font-medium flex items-center gap-2">
           Export
           <ChevronDown className="w-4 h-4" />

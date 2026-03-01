@@ -352,7 +352,7 @@ export default function OrganizationDashboardPage() {
       <Card>
         <CardHeader>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <CardTitle>Transaction History</CardTitle>
+            <CardTitle>My Transactions</CardTitle>
             <Link href={viewAllTransactionsHref} className="text-blue-600 text-sm font-medium">
               View all
             </Link>
