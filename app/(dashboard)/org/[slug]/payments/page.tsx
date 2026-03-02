@@ -13,7 +13,8 @@ import {
   useTransactionHistory,
   mapApiBatchToPaymentBatch,
   recordBatchApproval,
-  recordBatchExecution 
+  recordBatchExecution,
+  recordBatchCancellation 
 } from "@/lib/api/organization"
 import useOrgSlug from "@/hooks/useOrgSlug"
 import { toast } from "sonner"
@@ -35,7 +36,6 @@ export default function PaymentsPage() {
     if (safeTotalPages <= 7) {
       return Array.from({ length: safeTotalPages }, (_, i) => i + 1)
     }
-
     const items: Array<number | "..."> = [1]
     const start = Math.max(2, safeCurrent - 1)
     const end = Math.min(safeTotalPages - 1, safeCurrent + 1)
@@ -256,6 +256,97 @@ export default function PaymentsPage() {
     }
   }
 
+  const handleRevokeApproval = async (batchName: string) => {
+    if (actionLoadingBatch) return
+
+    try {
+      setActionLoadingBatch(batchName)
+
+      if (!account?.address) {
+        toast.error("Connect your wallet to continue")
+        return
+      }
+
+      if (!organization?.contractAddress) {
+        toast.error("Missing organization contract address")
+        return
+      }
+
+      if (!isSignerOrAdmin) {
+        toast.error("Only signers can revoke approvals")
+        return
+      }
+
+      const contract = getContract({
+        client: thirdwebClient,
+        address: organization.contractAddress,
+        chain: baseSepolia,
+      })
+
+      const tx = prepareContractCall({
+        contract,
+        method: "function revokeBatchApproval(string batchName)",
+        params: [batchName],
+      })
+
+      await sendAndConfirmTx(tx)
+
+      refresh()
+      toast.success("Approval revoked")
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Failed to revoke approval"
+      toast.error(msg)
+    } finally {
+      setActionLoadingBatch(null)
+    }
+  }
+
+  const handleCancelBatch = async (batchName: string) => {
+    if (actionLoadingBatch) return
+
+    try {
+      setActionLoadingBatch(batchName)
+
+      if (!account?.address) {
+        toast.error("Connect your wallet to continue")
+        return
+      }
+
+      if (!organization?.contractAddress) {
+        toast.error("Missing organization contract address")
+        return
+      }
+
+      if (!isSignerOrAdmin) {
+        toast.error("Only signers can cancel batches")
+        return
+      }
+
+      const contract = getContract({
+        client: thirdwebClient,
+        address: organization.contractAddress,
+        chain: baseSepolia,
+      })
+
+      const tx = prepareContractCall({
+        contract,
+        method: "function cancelBatch(string batchName)",
+        params: [batchName],
+      })
+
+      await sendAndConfirmTx(tx)
+
+      await recordBatchCancellation(batchName)
+      refresh()
+      toast.success("Batch cancelled")
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Failed to cancel batch"
+      toast.error(msg)
+    } finally {
+      setActionLoadingBatch(null)
+    }
+  }
+
   return (
     <div className="py-4 sm:py-6 lg:py-8 px-4 sm:px-6 lg:px-8 space-y-6">
       {/* Breadcrumb */}
@@ -383,6 +474,18 @@ export default function PaymentsPage() {
                       <div className="flex items-center gap-2">
                         {isSignerOrAdmin && batch.statusRaw !== "executed" && batch.statusRaw !== "cancelled" && batch.statusRaw !== "expired" ? (
                           <>
+                            {batch.approvalSignerAddresses
+                              .map((a) => a.toLowerCase())
+                              .includes((account?.address || "").toLowerCase()) ? (
+                              <Button
+                                variant="outline"
+                                className="h-8 px-3"
+                                disabled={actionLoadingBatch !== null}
+                                onClick={() => void handleRevokeApproval(batch.batchName)}
+                              >
+                                {actionLoadingBatch === batch.batchName ? "Processing..." : "Revoke"}
+                              </Button>
+                            ) : null}
                             <Button
                               variant="outline"
                               className="h-8 px-3"
@@ -405,6 +508,14 @@ export default function PaymentsPage() {
                               onClick={() => void handleExecuteBatch(batch.batchName)}
                             >
                               {actionLoadingBatch === batch.batchName ? "Processing..." : "Execute"}
+                            </Button>
+                            <Button
+                              variant="outline"
+                              className="h-8 px-3"
+                              disabled={actionLoadingBatch !== null}
+                              onClick={() => void handleCancelBatch(batch.batchName)}
+                            >
+                              {actionLoadingBatch === batch.batchName ? "Processing..." : "Cancel"}
                             </Button>
                           </>
                         ) : null}
