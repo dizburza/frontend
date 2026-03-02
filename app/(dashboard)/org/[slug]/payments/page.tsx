@@ -30,6 +30,7 @@ export default function PaymentsPage() {
   const [page, setPage] = useState(1)
   const [limit, setLimit] = useState(10)
   const [actionLoadingBatch, setActionLoadingBatch] = useState<string | null>(null)
+  const [expandedBatchId, setExpandedBatchId] = useState<string | null>(null)
 
   const getPageItems = (currentPage: number, total: number) => {
     const safeTotalPages = Math.max(1, total)
@@ -155,6 +156,10 @@ export default function PaymentsPage() {
   const toShortAddress = (value: string) => {
     if (!value) return "--"
     return `${value.slice(0, 6)}...${value.slice(-4)}`
+  }
+
+  const toggleBatchExpanded = (batchId: string) => {
+    setExpandedBatchId((prev) => (prev === batchId ? null : batchId))
   }
 
   const handleApproveBatch = async (batchName: string) => {
@@ -456,92 +461,132 @@ export default function PaymentsPage() {
                   </td>
                 </tr>
               ) : (
-                paginatedBatches.map((batch, index) => (
-                  <tr key={batch.id} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="py-4 px-4 text-sm text-gray-900">{startIndex + index + 1}</td>
-                    <td className="py-4 px-4 text-sm text-gray-900">{batch.batchName}</td>
-                    <td className="py-4 px-4 text-sm text-gray-600">{(batch.creatorJobRole || "").trim() || toShortAddress(batch.creatorAddress)}</td>
-                    <td className="py-4 px-4 text-sm font-semibold text-gray-900">
-                      {formatAmount(batch.totalAmount)}
-                    </td>
-                    <td className="py-4 px-4 text-sm text-gray-600">{batch.date}</td>
-                    <td className="py-4 px-4 text-sm text-gray-900">{batch.employees}</td>
-                    <td className="py-4 px-4 text-sm">
-                      <span className={`px-3 py-1 rounded text-xs font-medium ${getStatusStyle(batch.status)}`}>
-                        {batch.status}
-                      </span>
-                    </td>
-                    <td className="py-4 px-4 text-sm text-gray-700">
-                      {batch.approvalCount}/{batch.quorumRequired}
-                    </td>
-                    <td className="py-4 px-4 text-sm text-gray-600">
-                      {batch.txHash ? (
-                        <a
-                          href={`https://sepolia.basescan.org/tx/${batch.txHash}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-blue-600 hover:underline"
-                        >
-                          {toShortAddress(batch.txHash)}
-                        </a>
-                      ) : "--"}
-                    </td>
-                    <td className="py-4 px-4 text-sm">
-                      <div className="flex items-center gap-2">
-                        {isSignerOrAdmin && batch.statusRaw !== "executed" && batch.statusRaw !== "cancelled" && batch.statusRaw !== "expired" ? (
-                          <>
-                            {batch.approvalSignerAddresses
-                              .map((a) => a.toLowerCase())
-                              .includes((account?.address || "").toLowerCase()) ? (
+                paginatedBatches.flatMap((batch, index) => {
+                  const isExpanded = expandedBatchId === batch.id
+                  const approvalCountText = `${batch.approvalCount}/${batch.quorumRequired}`
+
+                  const row = (
+                    <tr key={batch.id} className="border-b border-gray-100 hover:bg-gray-50">
+                      <td className="py-4 px-4 text-sm text-gray-900">{startIndex + index + 1}</td>
+                      <td className="py-4 px-4 text-sm text-gray-900">{batch.batchName}</td>
+                      <td className="py-4 px-4 text-sm text-gray-600">{(batch.creatorJobRole || "").trim() || toShortAddress(batch.creatorAddress)}</td>
+                      <td className="py-4 px-4 text-sm font-semibold text-gray-900">
+                        {formatAmount(batch.totalAmount)}
+                      </td>
+                      <td className="py-4 px-4 text-sm text-gray-600">{batch.date}</td>
+                      <td className="py-4 px-4 text-sm text-gray-900">{batch.employees}</td>
+                      <td className="py-4 px-4 text-sm">
+                        <span className={`px-3 py-1 rounded text-xs font-medium ${getStatusStyle(batch.status)}`}>
+                          {batch.status}
+                        </span>
+                      </td>
+                      <td className="py-4 px-4 text-sm text-gray-700">
+                        <div className="flex items-center gap-2">
+                          <span>{approvalCountText}</span>
+                          {batch.approvals.length > 0 ? (
+                            <button
+                              type="button"
+                              onClick={() => toggleBatchExpanded(batch.id)}
+                              className="text-blue-600 hover:underline text-xs"
+                            >
+                              {isExpanded ? "Hide" : "View"}
+                            </button>
+                          ) : null}
+                        </div>
+                      </td>
+                      <td className="py-4 px-4 text-sm text-gray-600">
+                        {batch.txHash ? (
+                          <a
+                            href={`https://sepolia.basescan.org/tx/${batch.txHash}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-blue-600 hover:underline"
+                          >
+                            {toShortAddress(batch.txHash)}
+                          </a>
+                        ) : "--"}
+                      </td>
+                      <td className="py-4 px-4 text-sm">
+                        <div className="flex items-center gap-2">
+                          {isSignerOrAdmin && batch.statusRaw !== "executed" && batch.statusRaw !== "cancelled" && batch.statusRaw !== "expired" ? (
+                            <>
+                              {batch.approvalSignerAddresses
+                                .map((a) => a.toLowerCase())
+                                .includes((account?.address || "").toLowerCase()) ? (
+                                <Button
+                                  variant="outline"
+                                  className="h-8 px-3"
+                                  disabled={actionLoadingBatch !== null}
+                                  onClick={() => void handleRevokeApproval(batch.batchName)}
+                                >
+                                  {actionLoadingBatch === batch.batchName ? "Processing..." : "Revoke"}
+                                </Button>
+                              ) : null}
+                              <Button
+                                variant="outline"
+                                className="h-8 px-3"
+                                disabled={
+                                  actionLoadingBatch !== null ||
+                                  batch.approvalSignerAddresses
+                                    .map((a) => a.toLowerCase())
+                                    .includes((account?.address || "").toLowerCase())
+                                }
+                                onClick={() => void handleApproveBatch(batch.batchName)}
+                              >
+                                {actionLoadingBatch === batch.batchName ? "Processing..." : "Approve"}
+                              </Button>
+                              <Button
+                                className="h-8 px-3 bg-blue-600 hover:bg-blue-700"
+                                disabled={
+                                  actionLoadingBatch !== null ||
+                                  batch.approvalCount < batch.quorumRequired
+                                }
+                                onClick={() => void handleExecuteBatch(batch.batchName)}
+                              >
+                                {actionLoadingBatch === batch.batchName ? "Processing..." : "Execute"}
+                              </Button>
                               <Button
                                 variant="outline"
                                 className="h-8 px-3"
                                 disabled={actionLoadingBatch !== null}
-                                onClick={() => void handleRevokeApproval(batch.batchName)}
+                                onClick={() => void handleCancelBatch(batch.batchName)}
                               >
-                                {actionLoadingBatch === batch.batchName ? "Processing..." : "Revoke"}
+                                {actionLoadingBatch === batch.batchName ? "Processing..." : "Cancel"}
                               </Button>
-                            ) : null}
-                            <Button
-                              variant="outline"
-                              className="h-8 px-3"
-                              disabled={
-                                actionLoadingBatch !== null ||
-                                batch.approvalSignerAddresses
-                                  .map((a) => a.toLowerCase())
-                                  .includes((account?.address || "").toLowerCase())
-                              }
-                              onClick={() => void handleApproveBatch(batch.batchName)}
-                            >
-                              {actionLoadingBatch === batch.batchName ? "Processing..." : "Approve"}
-                            </Button>
-                            <Button
-                              className="h-8 px-3 bg-blue-600 hover:bg-blue-700"
-                              disabled={
-                                actionLoadingBatch !== null ||
-                                batch.approvalCount < batch.quorumRequired
-                              }
-                              onClick={() => void handleExecuteBatch(batch.batchName)}
-                            >
-                              {actionLoadingBatch === batch.batchName ? "Processing..." : "Execute"}
-                            </Button>
-                            <Button
-                              variant="outline"
-                              className="h-8 px-3"
-                              disabled={actionLoadingBatch !== null}
-                              onClick={() => void handleCancelBatch(batch.batchName)}
-                            >
-                              {actionLoadingBatch === batch.batchName ? "Processing..." : "Cancel"}
-                            </Button>
-                          </>
-                        ) : null}
-                        <button className="text-gray-400 hover:text-gray-600">
-                          <MoreVertical className="w-5 h-5" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                            </>
+                          ) : null}
+                          <button className="text-gray-400 hover:text-gray-600">
+                            <MoreVertical className="w-5 h-5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+
+                  const detailRow = isExpanded ? (
+                    <tr key={`${batch.id}-approvals`} className="border-b border-gray-100 bg-gray-50">
+                      <td colSpan={10} className="px-4 pb-4">
+                        <div className="pt-2">
+                          <p className="text-xs font-semibold text-gray-700">Approvals</p>
+                          <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                            {batch.approvals.map((a) => (
+                              <div
+                                key={`${batch.id}-${a.signerAddress}-${a.approvedAt}`}
+                                className="rounded border border-gray-200 bg-white px-3 py-2"
+                              >
+                                <p className="text-xs font-medium text-gray-900">{a.signerName || "Signer"}</p>
+                                <p className="text-[10px] text-gray-600 font-mono">{toShortAddress(a.signerAddress)}</p>
+                                <p className="text-[10px] text-gray-500">{new Date(a.approvedAt).toLocaleString()}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : null
+
+                  return detailRow ? [row, detailRow] : [row]
+                })
               )}
             </tbody>
           </table>
