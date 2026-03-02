@@ -237,6 +237,53 @@ export async function fetchOrganizationBatches(organizationId: string): Promise<
   return apiFetch(`/api/payroll/organizations/${organizationId}/batches`);
 }
 
+export async function recordBatchCreation(payload: {
+  batchName: string;
+  organizationId: string;
+  organizationAddress: string;
+  creatorAddress: string;
+  recipients: {
+    userId?: string;
+    walletAddress: string;
+    amount: string;
+    employeeName: string;
+  }[];
+}): Promise<ApiPaymentBatch> {
+  const response = await apiFetch(`/api/payroll/batches`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  return response.data || response;
+}
+
+export async function recordBatchApproval(
+  batchName: string,
+  payload: {
+    signerAddress: string;
+    signerName: string;
+  }
+): Promise<ApiPaymentBatch> {
+  const response = await apiFetch(`/api/payroll/batches/${encodeURIComponent(batchName)}/approve`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  return response.data || response;
+}
+
+export async function recordBatchExecution(
+  batchName: string,
+  payload: {
+    executorAddress: string;
+    txHash: string;
+  }
+): Promise<ApiPaymentBatch> {
+  const response = await apiFetch(`/api/payroll/batches/${encodeURIComponent(batchName)}/execute`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  return response.data || response;
+}
+
 export async function fetchTransactionHistory(
   address: string,
   params?: {
@@ -583,15 +630,22 @@ export function mapApiBatchToPaymentBatch(apiBatch: ApiPaymentBatch): {
   date: string;
   employees: number;
   status: string;
+  statusRaw: ApiPaymentBatch["status"];
+  approvalCount: number;
+  quorumRequired: number;
+  approvalSignerAddresses: string[];
   txHash?: string;
   recipients: { surname: string; firstName: string; salary: string }[];
 } {
+  const rawTotal = Number.parseFloat(apiBatch.totalAmount || "0");
+  const displayTotal = rawTotal / 1_000_000;
+
   return {
     id: apiBatch._id,
     batchName: apiBatch.batchName,
     creatorAddress: apiBatch.creatorAddress,
     creatorJobRole: apiBatch.creatorJobRole,
-    totalAmount: Number.parseFloat(apiBatch.totalAmount),
+    totalAmount: displayTotal,
     date: new Date(apiBatch.createdAt).toLocaleDateString("en-US", {
       month: "short",
       day: "numeric",
@@ -599,6 +653,10 @@ export function mapApiBatchToPaymentBatch(apiBatch: ApiPaymentBatch): {
     }),
     employees: apiBatch.recipients.length,
     status: apiBatch.status.charAt(0).toUpperCase() + apiBatch.status.slice(1),
+    statusRaw: apiBatch.status,
+    approvalCount: apiBatch.approvalCount,
+    quorumRequired: apiBatch.quorumRequired,
+    approvalSignerAddresses: (apiBatch.approvals || []).map((a) => a.signerAddress),
     txHash: apiBatch.txHash,
     recipients: apiBatch.recipients.map(r => {
       const nameParts = r.employeeName.split(" ");
