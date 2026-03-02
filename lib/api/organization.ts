@@ -284,6 +284,13 @@ export async function recordBatchExecution(
   return response.data || response;
 }
 
+export async function recordBatchCancellation(batchName: string): Promise<ApiPaymentBatch> {
+  const response = await apiFetch(`/api/payroll/batches/${encodeURIComponent(batchName)}/cancel`, {
+    method: "POST",
+  });
+  return response.data || response;
+}
+
 export async function fetchTransactionHistory(
   address: string,
   params?: {
