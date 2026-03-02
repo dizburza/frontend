@@ -654,6 +654,7 @@ export function mapApiBatchToPaymentBatch(apiBatch: ApiPaymentBatch): {
   approvalCount: number;
   quorumRequired: number;
   approvalSignerAddresses: string[];
+  approvals: { signerName: string; signerAddress: string; approvedAt: string }[];
   txHash?: string;
   recipients: { surname: string; firstName: string; salary: string }[];
 } {
@@ -677,6 +678,11 @@ export function mapApiBatchToPaymentBatch(apiBatch: ApiPaymentBatch): {
     approvalCount: apiBatch.approvalCount,
     quorumRequired: apiBatch.quorumRequired,
     approvalSignerAddresses: (apiBatch.approvals || []).map((a) => a.signerAddress),
+    approvals: (apiBatch.approvals || []).map((a) => ({
+      signerName: a.signerName,
+      signerAddress: a.signerAddress,
+      approvedAt: a.approvedAt,
+    })),
     txHash: apiBatch.txHash,
     recipients: apiBatch.recipients.map(r => {
       const nameParts = r.employeeName.split(" ");
