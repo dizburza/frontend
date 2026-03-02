@@ -61,6 +61,14 @@ export default function PaymentsPage() {
   const account = useActiveAccount()
   const { mutateAsync: sendAndConfirmTx } = useSendAndConfirmTransaction()
 
+  const accountAddressLower = (account?.address || "").toLowerCase()
+
+  const isBatchTerminal = (statusRaw?: string) =>
+    statusRaw === "executed" || statusRaw === "cancelled" || statusRaw === "expired"
+
+  const hasSignedApproval = (approvalSignerAddresses: string[]) =>
+    approvalSignerAddresses.some((a) => a.toLowerCase() === accountAddressLower)
+
   const isSignerOrAdmin = useMemo(() => {
     const addr = account?.address
     if (!addr) return false
@@ -464,6 +472,9 @@ export default function PaymentsPage() {
                 paginatedBatches.flatMap((batch, index) => {
                   const isExpanded = expandedBatchId === batch.id
                   const approvalCountText = `${batch.approvalCount}/${batch.quorumRequired}`
+                  const userHasApproved = hasSignedApproval(batch.approvalSignerAddresses)
+                  const showActionButtons = isSignerOrAdmin && !isBatchTerminal(batch.statusRaw)
+                  const isActionLoading = actionLoadingBatch !== null
 
                   const row = (
                     <tr key={batch.id} className="border-b border-gray-100 hover:bg-gray-50">
@@ -483,7 +494,7 @@ export default function PaymentsPage() {
                       <td className="py-4 px-4 text-sm text-gray-700">
                         <div className="flex items-center gap-2">
                           <span>{approvalCountText}</span>
-                          {batch.approvals.length > 0 ? (
+                          {batch.approvals.length > 0 && (
                             <button
                               type="button"
                               onClick={() => toggleBatchExpanded(batch.id)}
@@ -491,7 +502,7 @@ export default function PaymentsPage() {
                             >
                               {isExpanded ? "Hide" : "View"}
                             </button>
-                          ) : null}
+                          )}
                         </div>
                       </td>
                       <td className="py-4 px-4 text-sm text-gray-600">
@@ -508,39 +519,29 @@ export default function PaymentsPage() {
                       </td>
                       <td className="py-4 px-4 text-sm">
                         <div className="flex items-center gap-2">
-                          {isSignerOrAdmin && batch.statusRaw !== "executed" && batch.statusRaw !== "cancelled" && batch.statusRaw !== "expired" ? (
+                          {showActionButtons && (
                             <>
-                              {batch.approvalSignerAddresses
-                                .map((a) => a.toLowerCase())
-                                .includes((account?.address || "").toLowerCase()) ? (
+                              {userHasApproved && (
                                 <Button
                                   variant="outline"
                                   className="h-8 px-3"
-                                  disabled={actionLoadingBatch !== null}
+                                  disabled={isActionLoading}
                                   onClick={() => void handleRevokeApproval(batch.batchName)}
                                 >
                                   {actionLoadingBatch === batch.batchName ? "Processing..." : "Revoke"}
                                 </Button>
-                              ) : null}
+                              )}
                               <Button
                                 variant="outline"
                                 className="h-8 px-3"
-                                disabled={
-                                  actionLoadingBatch !== null ||
-                                  batch.approvalSignerAddresses
-                                    .map((a) => a.toLowerCase())
-                                    .includes((account?.address || "").toLowerCase())
-                                }
+                                disabled={isActionLoading || userHasApproved}
                                 onClick={() => void handleApproveBatch(batch.batchName)}
                               >
                                 {actionLoadingBatch === batch.batchName ? "Processing..." : "Approve"}
                               </Button>
                               <Button
                                 className="h-8 px-3 bg-blue-600 hover:bg-blue-700"
-                                disabled={
-                                  actionLoadingBatch !== null ||
-                                  batch.approvalCount < batch.quorumRequired
-                                }
+                                disabled={isActionLoading || batch.approvalCount < batch.quorumRequired}
                                 onClick={() => void handleExecuteBatch(batch.batchName)}
                               >
                                 {actionLoadingBatch === batch.batchName ? "Processing..." : "Execute"}
@@ -548,13 +549,13 @@ export default function PaymentsPage() {
                               <Button
                                 variant="outline"
                                 className="h-8 px-3"
-                                disabled={actionLoadingBatch !== null}
+                                disabled={isActionLoading}
                                 onClick={() => void handleCancelBatch(batch.batchName)}
                               >
                                 {actionLoadingBatch === batch.batchName ? "Processing..." : "Cancel"}
                               </Button>
                             </>
-                          ) : null}
+                          )}
                           <button className="text-gray-400 hover:text-gray-600">
                             <MoreVertical className="w-5 h-5" />
                           </button>
