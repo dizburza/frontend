@@ -13,6 +13,7 @@ import {
   useTransactionHistory,
   mapApiBatchToPaymentBatch,
   recordBatchApproval,
+  recordBatchApprovalRevocation,
   recordBatchExecution,
   recordBatchCancellation 
 } from "@/lib/api/organization"
@@ -291,6 +292,10 @@ export default function PaymentsPage() {
 
       await sendAndConfirmTx(tx)
 
+      await recordBatchApprovalRevocation(batchName, {
+        signerAddress: account.address,
+      })
+
       refresh()
       toast.success("Approval revoked")
     } catch (e) {
@@ -469,7 +474,18 @@ export default function PaymentsPage() {
                     <td className="py-4 px-4 text-sm text-gray-700">
                       {batch.approvalCount}/{batch.quorumRequired}
                     </td>
-                    <td className="py-4 px-4 text-sm text-gray-600">{batch.txHash ? toShortAddress(batch.txHash) : "--"}</td>
+                    <td className="py-4 px-4 text-sm text-gray-600">
+                      {batch.txHash ? (
+                        <a
+                          href={`https://sepolia.basescan.org/tx/${batch.txHash}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-blue-600 hover:underline"
+                        >
+                          {toShortAddress(batch.txHash)}
+                        </a>
+                      ) : "--"}
+                    </td>
                     <td className="py-4 px-4 text-sm">
                       <div className="flex items-center gap-2">
                         {isSignerOrAdmin && batch.statusRaw !== "executed" && batch.statusRaw !== "cancelled" && batch.statusRaw !== "expired" ? (
