@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { StatCard } from "@/components/stat-card"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -11,15 +11,23 @@ import {
   useOrganizationBySlug, 
   useOrganizationBatches,
   useTransactionHistory,
-  mapApiBatchToPaymentBatch 
+  mapApiBatchToPaymentBatch,
+  recordBatchApproval,
+  recordBatchExecution 
 } from "@/lib/api/organization"
 import useOrgSlug from "@/hooks/useOrgSlug"
+import { toast } from "sonner"
+import { useActiveAccount, useSendAndConfirmTransaction } from "thirdweb/react"
+import { getContract, prepareContractCall } from "thirdweb"
+import { baseSepolia } from "thirdweb/chains"
+import { thirdwebClient } from "@/app/client"
 
 export default function PaymentsPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [showBatchModal, setShowBatchModal] = useState(false)
   const [page, setPage] = useState(1)
   const [limit, setLimit] = useState(10)
+  const [actionLoadingBatch, setActionLoadingBatch] = useState<string | null>(null)
 
   const getPageItems = (currentPage: number, total: number) => {
     const safeTotalPages = Math.max(1, total)
@@ -47,6 +55,27 @@ export default function PaymentsPage() {
     organization?.contractAddress || null,
     { limit: 200 }
   )
+
+  const account = useActiveAccount()
+  const { mutateAsync: sendAndConfirmTx } = useSendAndConfirmTransaction()
+
+  const isSignerOrAdmin = useMemo(() => {
+    const addr = account?.address
+    if (!addr) return false
+    const userIsSigner = (organization?.signers || []).some(
+      (s) => s.address?.toLowerCase() === addr.toLowerCase() && s.isActive
+    )
+    return userIsSigner
+  }, [account?.address, organization?.signers])
+
+  const currentSignerName = useMemo(() => {
+    const addr = account?.address
+    if (!addr) return "Signer"
+    const signer = (organization?.signers || []).find(
+      (s) => s.address?.toLowerCase() === addr.toLowerCase()
+    )
+    return (signer?.name || "Signer").trim() || "Signer"
+  }, [account?.address, organization?.signers])
 
   const paymentBatches = batchesData?.batches?.map(mapApiBatchToPaymentBatch) || []
   const stats = batchesData?.stats || { pending: 0, approved: 0, executed: 0, cancelled: 0 }
@@ -125,6 +154,106 @@ export default function PaymentsPage() {
   const toShortAddress = (value: string) => {
     if (!value) return "--"
     return `${value.slice(0, 6)}...${value.slice(-4)}`
+  }
+
+  const handleApproveBatch = async (batchName: string) => {
+    if (actionLoadingBatch) return
+
+    try {
+      setActionLoadingBatch(batchName)
+
+      if (!account?.address) {
+        toast.error("Connect your wallet to continue")
+        return
+      }
+
+      if (!organization?._id || !organization.contractAddress) {
+        toast.error("Missing organization details")
+        return
+      }
+
+      if (!isSignerOrAdmin) {
+        toast.error("Only signers can approve batches")
+        return
+      }
+
+      const contract = getContract({
+        client: thirdwebClient,
+        address: organization.contractAddress,
+        chain: baseSepolia,
+      })
+
+      const tx = prepareContractCall({
+        contract,
+        method: "function approveBatch(string batchName)",
+        params: [batchName],
+      })
+
+      await sendAndConfirmTx(tx)
+
+      await recordBatchApproval(batchName, {
+        signerAddress: account.address,
+        signerName: currentSignerName,
+      })
+
+      refresh()
+      toast.success("Batch approved")
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Failed to approve batch"
+      toast.error(msg)
+    } finally {
+      setActionLoadingBatch(null)
+    }
+  }
+
+  const handleExecuteBatch = async (batchName: string) => {
+    if (actionLoadingBatch) return
+
+    try {
+      setActionLoadingBatch(batchName)
+
+      if (!account?.address) {
+        toast.error("Connect your wallet to continue")
+        return
+      }
+
+      if (!organization?.contractAddress) {
+        toast.error("Missing organization contract address")
+        return
+      }
+
+      if (!isSignerOrAdmin) {
+        toast.error("Only signers can execute batches")
+        return
+      }
+
+      const contract = getContract({
+        client: thirdwebClient,
+        address: organization.contractAddress,
+        chain: baseSepolia,
+      })
+
+      const tx = prepareContractCall({
+        contract,
+        method: "function executeBatchPayroll(string batchName)",
+        params: [batchName],
+      })
+
+      const receipt = await sendAndConfirmTx(tx)
+
+      await recordBatchExecution(batchName, {
+        executorAddress: account.address,
+        txHash: receipt.transactionHash,
+      })
+
+      refresh()
+      toast.success("Batch executed")
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Failed to execute batch"
+      toast.error(msg)
+    } finally {
+      setActionLoadingBatch(null)
+    }
   }
 
   return (
@@ -218,6 +347,7 @@ export default function PaymentsPage() {
                 <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">DATE</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">EMPLOYEES</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">STATUS</th>
+                <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">APPROVALS</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">TRANSACTION HASH</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">ACTION</th>
               </tr>
@@ -225,7 +355,7 @@ export default function PaymentsPage() {
             <tbody>
               {filteredBatches.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-8 text-center text-gray-500">
+                  <td colSpan={10} className="py-8 text-center text-gray-500">
                     No payment batches yet. Create your first batch to get started.
                   </td>
                 </tr>
@@ -245,11 +375,43 @@ export default function PaymentsPage() {
                         {batch.status}
                       </span>
                     </td>
+                    <td className="py-4 px-4 text-sm text-gray-700">
+                      {batch.approvalCount}/{batch.quorumRequired}
+                    </td>
                     <td className="py-4 px-4 text-sm text-gray-600">{batch.txHash ? toShortAddress(batch.txHash) : "--"}</td>
                     <td className="py-4 px-4 text-sm">
-                      <button className="text-gray-400 hover:text-gray-600">
-                        <MoreVertical className="w-5 h-5" />
-                      </button>
+                      <div className="flex items-center gap-2">
+                        {isSignerOrAdmin && batch.statusRaw !== "executed" && batch.statusRaw !== "cancelled" && batch.statusRaw !== "expired" ? (
+                          <>
+                            <Button
+                              variant="outline"
+                              className="h-8 px-3"
+                              disabled={
+                                actionLoadingBatch !== null ||
+                                batch.approvalSignerAddresses
+                                  .map((a) => a.toLowerCase())
+                                  .includes((account?.address || "").toLowerCase())
+                              }
+                              onClick={() => void handleApproveBatch(batch.batchName)}
+                            >
+                              {actionLoadingBatch === batch.batchName ? "Processing..." : "Approve"}
+                            </Button>
+                            <Button
+                              className="h-8 px-3 bg-blue-600 hover:bg-blue-700"
+                              disabled={
+                                actionLoadingBatch !== null ||
+                                batch.approvalCount < batch.quorumRequired
+                              }
+                              onClick={() => void handleExecuteBatch(batch.batchName)}
+                            >
+                              {actionLoadingBatch === batch.batchName ? "Processing..." : "Execute"}
+                            </Button>
+                          </>
+                        ) : null}
+                        <button className="text-gray-400 hover:text-gray-600">
+                          <MoreVertical className="w-5 h-5" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -339,6 +501,7 @@ export default function PaymentsPage() {
       {showBatchModal && (
         <BatchPaymentCreationModal 
           organizationId={organization?._id}
+          organizationAddress={organization?.contractAddress}
           onClose={() => setShowBatchModal(false)} 
           onPaymentCreated={handlePaymentCreated}
         />

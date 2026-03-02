@@ -7,18 +7,32 @@ import { Input } from "@/components/ui/input"
 import { X, ChevronLeft, Loader2 } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { SuccessModal } from "@/components/success-modal"
-import { mapApiEmployeeToEmployee, useOrganizationEmployees } from "@/lib/api/organization"
+import { mapApiEmployeeToEmployee, recordBatchCreation, useOrganizationEmployees } from "@/lib/api/organization"
+import { toast } from "sonner"
+import { useActiveAccount, useSendAndConfirmTransaction } from "thirdweb/react"
+import { getContract, prepareContractCall } from "thirdweb"
+import { baseSepolia } from "thirdweb/chains"
+import { thirdwebClient } from "@/app/client"
 
 interface BatchPaymentCreationModalProps {
   onClose: () => void
   onPaymentCreated?: () => void
   organizationId?: string
+  organizationAddress?: string
 }
 
-export function BatchPaymentCreationModal({ onClose, onPaymentCreated, organizationId }: Readonly<BatchPaymentCreationModalProps>) {
+export function BatchPaymentCreationModal({
+  onClose,
+  onPaymentCreated,
+  organizationId,
+  organizationAddress,
+}: Readonly<BatchPaymentCreationModalProps>) {
+  const account = useActiveAccount()
+  const { mutateAsync: sendAndConfirmTx } = useSendAndConfirmTransaction()
   const [step, setStep] = useState<"details" | "employees" | "preview" | "success">("details")
   const [selectedEmployees, setSelectedEmployees] = useState<string[]>([])
   const [employeeSearch, setEmployeeSearch] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [formData, setFormData] = useState({
     batchName: "",
     paymentDate: "Oct 21,2025",
@@ -70,28 +84,80 @@ export function BatchPaymentCreationModal({ onClose, onPaymentCreated, organizat
     }
   }
 
-  const handleProceedToPayment = () => {
-    // Store batch payment to localStorage
-    const batchPayment = {
-      id: `batch_${Date.now()}`,
-      batchName: formData.batchName,
-      totalAmount: totalAmount,
-      date: formData.paymentDate,
-      employees: selectedEmployeeData.length,
-      status: "Draft" as const,
-      recipients: selectedEmployeeData,
+  const handleProceedToPayment = async () => {
+    if (isSubmitting) return
+
+    try {
+      setIsSubmitting(true)
+
+      if (!account?.address) {
+        toast.error("Connect your wallet to continue")
+        return
+      }
+
+      if (!organizationId || !organizationAddress) {
+        toast.error("Missing organization details")
+        return
+      }
+
+      const batchName = formData.batchName.trim()
+      if (!batchName) {
+        toast.error("Batch name is required")
+        return
+      }
+
+      if (selectedEmployeeData.length === 0) {
+        toast.error("Select at least one employee")
+        return
+      }
+
+      // Convert human salary to base units (cNGN decimals = 6)
+      const recipients = selectedEmployeeData.map((e) => e.walletAddress)
+      const amounts = selectedEmployeeData.map((e) => {
+        const v = Number(e.salary || 0)
+        const base = Math.round(v * 1_000_000)
+        return BigInt(base)
+      })
+
+      const contract = getContract({
+        client: thirdwebClient,
+        address: organizationAddress,
+        chain: baseSepolia,
+      })
+
+      const tx = prepareContractCall({
+        contract,
+        method:
+          "function createBatchPayroll(string batchName, address[] recipients, uint256[] amounts)",
+        params: [batchName, recipients, amounts],
+      })
+
+      await sendAndConfirmTx(tx)
+
+      await recordBatchCreation({
+        batchName,
+        organizationId,
+        organizationAddress,
+        creatorAddress: account.address,
+        recipients: selectedEmployeeData.map((e, idx) => ({
+          userId: e.id,
+          walletAddress: e.walletAddress,
+          amount: amounts[idx].toString(),
+          employeeName: `${e.firstName} ${e.surname}`.trim(),
+        })),
+      })
+
+      if (onPaymentCreated) {
+        onPaymentCreated()
+      }
+
+      setStep("success")
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Failed to create batch"
+      toast.error(msg)
+    } finally {
+      setIsSubmitting(false)
     }
-
-    const batches = JSON.parse(localStorage.getItem("sessionPaymentBatches") || "[]")
-    batches.push(batchPayment)
-    localStorage.setItem("sessionPaymentBatches", JSON.stringify(batches))
-
-    // Notify parent to refresh
-    if (onPaymentCreated) {
-      onPaymentCreated()
-    }
-
-    setStep("success")
   }
 
   const selectedEmployeeData = employees.filter((e) => selectedEmployees.includes(e.id))
@@ -437,11 +503,11 @@ export function BatchPaymentCreationModal({ onClose, onPaymentCreated, organizat
                 <Button
                   onClick={handleProceedToPayment}
                   disabled={
-                    !formData.batchName || selectedEmployees.length === 0
+                    isSubmitting || !formData.batchName || selectedEmployees.length === 0
                   }
                   className="bg-blue-600 hover:bg-blue-700 text-white disabled:bg-gray-300"
                 >
-                  Proceed to Payment
+                  {isSubmitting ? "Submitting..." : "Proceed to Payment"}
                 </Button>
               </>
             )}
@@ -456,6 +522,7 @@ export function BatchPaymentCreationModal({ onClose, onPaymentCreated, organizat
                   }
                   className="bg-blue-600 hover:bg-blue-700 text-white"
                   disabled={
+                    isSubmitting ||
                     (step === "employees" && selectedEmployees.length === 0) ||
                     (step === "details" && !formData.batchName)
                   }
