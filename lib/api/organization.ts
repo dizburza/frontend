@@ -270,6 +270,19 @@ export async function recordBatchApproval(
   return response.data || response;
 }
 
+export async function recordBatchApprovalRevocation(
+  batchName: string,
+  payload: {
+    signerAddress: string;
+  }
+): Promise<ApiPaymentBatch> {
+  const response = await apiFetch(`/api/payroll/batches/${encodeURIComponent(batchName)}/revoke`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  return response.data || response;
+}
+
 export async function recordBatchExecution(
   batchName: string,
   payload: {
