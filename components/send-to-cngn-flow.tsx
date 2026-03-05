@@ -92,12 +92,23 @@ export function SendToCNGNFlow({ isOpen, onClose, initialRecipient }: Readonly<S
       if (/^0x[a-fA-F0-9]{40}$/.test(value)) {
         setResolvedRecipient(value as `0x${string}`)
         setResolvedUsername(null)
-        setStep("amount")
+        if (account?.address) {
+          setStep("amount")
+        }
       }
     } else {
       setRecipient("")
     }
-  }, [initialRecipient, isOpen])
+  }, [account?.address, initialRecipient, isOpen])
+
+  useEffect(() => {
+    if (!isOpen) return
+    if (step !== "recipient") return
+    if (!account?.address) return
+    if (!resolvedRecipient) return
+
+    setStep("amount")
+  }, [account?.address, isOpen, resolvedRecipient, step])
 
   if (!isOpen) return null
 
