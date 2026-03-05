@@ -62,7 +62,7 @@ export const useChainSwitch = () => {
     }
 
     if (!isOnCorrectChain) {
-      toast.warning("Please switch to Lisk Sepolia network");
+      toast.warning("Please switch to Base Sepolia network");
       return await switchToBaseSepolia();
     }
 

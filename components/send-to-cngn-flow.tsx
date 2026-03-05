@@ -14,6 +14,7 @@ import { baseSepolia } from "thirdweb/chains"
 import { thirdwebClient } from "@/app/client"
 import { parseUnits } from "viem"
 import ConnectWallet from "@/components/ConnectWallet"
+import { useChainSwitch } from "@/hooks/useChainSwitch"
 
 interface SendToCNGNFlowProps {
   isOpen: boolean
@@ -33,6 +34,7 @@ export function SendToCNGNFlow({ isOpen, onClose, initialRecipient }: Readonly<S
   const { showLoading, hideLoading } = useGlobalLoading()
 
   const account = useActiveAccount()
+  const { ensureCorrectChain, isOnCorrectChain } = useChainSwitch()
   const { mutateAsync: sendTx } = useSendTransaction()
 
   const tokenAddress = (process.env.NEXT_PUBLIC_CNGN_ADDRESS || "").trim() as `0x${string}` | ""
@@ -160,6 +162,11 @@ export function SendToCNGNFlow({ isOpen, onClose, initialRecipient }: Readonly<S
         return
       }
 
+      const okChain = await ensureCorrectChain()
+      if (!okChain) {
+        return
+      }
+
       if (!contract) {
         toast.error("Token contract not configured")
         return
@@ -192,7 +199,8 @@ export function SendToCNGNFlow({ isOpen, onClose, initialRecipient }: Readonly<S
       setStep("success")
     } catch (error) {
       console.error(error)
-      toast.error("Could not send. Please try again.")
+      const e = error as { message?: string }
+      toast.error(e?.message || "Could not send. Please try again.")
     } finally {
       hideLoading()
       setIsLoading(false)
@@ -322,7 +330,13 @@ export function SendToCNGNFlow({ isOpen, onClose, initialRecipient }: Readonly<S
               <div className="mt-4 text-sm text-gray-600">
                 Available balance:{" "}
                 <span className="font-semibold">
-                  {balanceData ? `${balanceData.displayValue} cNGN` : "--"}
+                  {!account?.address
+                    ? "--"
+                    : !isOnCorrectChain
+                      ? "Switch to Base Sepolia"
+                      : balanceData
+                        ? `${balanceData.displayValue} cNGN`
+                        : "--"}
                 </span>
               </div>
             </div>
