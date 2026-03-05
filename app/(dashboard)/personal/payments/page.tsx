@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { StatCard } from "@/components/stat-card"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -11,8 +11,12 @@ import { QRScanModal } from "@/components/qr-scan-modal"
 import { SendToCNGNFlow } from "@/components/send-to-cngn-flow"
 import { useActiveAccount } from "thirdweb/react"
 import { useTransactionHistory } from "@/lib/api/organization"
+import { useRouter, useSearchParams } from "next/navigation"
 
 export default function PersonalPaymentsPage() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+
   const [searchTerm, setSearchTerm] = useState("")
   const [showScan, setShowScan] = useState(false)
   const [showSend, setShowSend] = useState(false)
@@ -57,6 +61,17 @@ export default function PersonalPaymentsPage() {
     const amt = Number.parseFloat(String(t.displayAmount || "0").replaceAll("-", ""))
     return acc + (Number.isFinite(amt) ? amt : 0)
   }, 0)
+
+  const sendToParam = useMemo(() => {
+    const raw = (searchParams.get("sendTo") ?? "").trim()
+    return raw || null
+  }, [searchParams])
+
+  useEffect(() => {
+    if (!sendToParam) return
+    setScanRecipient(sendToParam)
+    setShowSend(true)
+  }, [sendToParam])
 
   const filtered = (() => {
     const q = searchTerm.trim().toLowerCase()
@@ -106,14 +121,18 @@ export default function PersonalPaymentsPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         <StatCard
           label="Total Payments"
-          value={String(payments.length)}
+          value={isLoading ? "--" : String(payments.length)}
           lastUpdated={isLoading ? "Updating..." : undefined}
         />
         <StatCard
           label="Total Sent (cNGN)"
-          value={`${outgoingTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+          value={
+            isLoading
+              ? "--"
+              : `${outgoingTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+          }
         />
-        <StatCard label="Completed" value={String(payments.length)} />
+        <StatCard label="Completed" value={isLoading ? "--" : String(payments.length)} />
         <StatCard label="Failed" value="0" />
       </div>
 
@@ -312,8 +331,12 @@ export default function PersonalPaymentsPage() {
         isOpen={showScan}
         onClose={() => setShowScan(false)}
         onDetected={({ recipient }) => {
-          setScanRecipient(recipient)
-          setShowSend(true)
+          const value = recipient?.trim()
+          if (!value) return
+          const next = new URLSearchParams(searchParams.toString())
+          next.set("sendTo", value)
+          router.push(`/personal/payments?${next.toString()}`)
+          setShowScan(false)
         }}
       />
 

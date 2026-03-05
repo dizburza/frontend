@@ -13,6 +13,7 @@ import { prepareContractCall } from "thirdweb/transaction"
 import { baseSepolia } from "thirdweb/chains"
 import { thirdwebClient } from "@/app/client"
 import { parseUnits } from "viem"
+import ConnectWallet from "@/components/ConnectWallet"
 
 interface SendToCNGNFlowProps {
   isOpen: boolean
@@ -210,6 +211,11 @@ export function SendToCNGNFlow({ isOpen, onClose, initialRecipient }: Readonly<S
     if (step !== "amount" || !amount) return
     if (isLoading) return
 
+    if (!account?.address) {
+      toast.error("Connect wallet to continue")
+      return
+    }
+
     await submitTransfer()
   }
 
@@ -258,6 +264,12 @@ export function SendToCNGNFlow({ isOpen, onClose, initialRecipient }: Readonly<S
       onBack={step === "recipient" ? undefined : handleBack}
     >
       <div className="space-y-6">
+        {!account?.address && (
+          <div className="space-y-3 rounded-md border border-gray-200 bg-white p-4">
+            <p className="text-sm text-gray-700">Connect your wallet to send cNGN.</p>
+            <ConnectWallet label="Connect Wallet" />
+          </div>
+        )}
         {step === "recipient" && (
           <>
             <div>
@@ -299,7 +311,7 @@ export function SendToCNGNFlow({ isOpen, onClose, initialRecipient }: Readonly<S
                 Available balance: <span className="font-semibold">{balanceData?.displayValue || "--"} cNGN</span>
               </div>
             </div>
-            <Button onClick={handleNext} disabled={!amount || isLoading} className="w-full">
+            <Button onClick={handleNext} disabled={!amount || isLoading || !account?.address} className="w-full">
               {isLoading ? "Sending..." : "Send"}
             </Button>
           </>
