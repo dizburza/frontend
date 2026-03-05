@@ -22,7 +22,7 @@ export default function PersonalPaymentsPage() {
 
   const account = useActiveAccount()
   const address = account?.address ?? null
-  const { data, loading: isLoading, error } = useTransactionHistory(address, { limit: 200, page: 1 })
+  const { data, loading: isLoading, error } = useTransactionHistory(address, { limit: 100, page: 1 })
 
   const transactions = data?.transactions ?? []
 

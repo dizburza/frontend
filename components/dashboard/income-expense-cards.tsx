@@ -10,7 +10,7 @@ import { useTransactionHistory } from "@/lib/api/organization";
 export function IncomeExpenseCards() {
   const account = useActiveAccount();
   const address = account?.address ?? null;
-  const { data, loading: isLoading } = useTransactionHistory(address, { limit: 200, page: 1 });
+  const { data, loading: isLoading } = useTransactionHistory(address, { limit: 100, page: 1 });
 
   const { incomingTotal, outgoingTotal } = useMemo(() => {
     const txs = data?.transactions ?? [];

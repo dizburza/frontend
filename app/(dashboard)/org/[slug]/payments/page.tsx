@@ -55,7 +55,7 @@ export default function PaymentsPage() {
   const { data: batchesData, loading: batchesLoading, error, refresh } = useOrganizationBatches(organization?._id || null)
   const { data: transactionsData } = useTransactionHistory(
     organization?.contractAddress || null,
-    { limit: 200 }
+    { limit: 100 }
   )
 
   const account = useActiveAccount()
