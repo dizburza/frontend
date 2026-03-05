@@ -33,10 +33,6 @@ export function QRCodeModal({ onClose }: Readonly<QRCodeModalProps>) {
   const [selected, setSelected] = useState<"address" | "username">("address")
   const [copied, setCopied] = useState<"address" | "username" | null>(null)
 
-  const cacheBust = useMemo(() => {
-    return Date.now().toString()
-  }, [])
-
   useEffect(() => {
     if (!copied) return
     const t = setTimeout(() => setCopied(null), 1500)
@@ -67,11 +63,10 @@ export function QRCodeModal({ onClose }: Readonly<QRCodeModalProps>) {
     const usernameParam = selected === "username" ? username : ""
     if (addressParam) url.searchParams.set("address", addressParam)
     if (usernameParam) url.searchParams.set("username", usernameParam)
-    url.searchParams.set("v", cacheBust)
 
     const dappTarget = `${url.host}${url.pathname}${url.search}`
     return `https://metamask.app.link/dapp/${dappTarget}`
-  }, [address, appOrigin, cacheBust, origin, selected, username])
+  }, [address, appOrigin, origin, selected, username])
 
   const qrValue = deepLink
 

@@ -104,6 +104,11 @@ const shortAddress = (value: string) => {
   return `${value.slice(0, 6)}...${value.slice(-4)}`
 }
 
+const shortConnectedAddress = (value: string) => {
+  if (!value) return "--"
+  return `${value.slice(0, 6)}...${value.slice(-4)}`
+}
+
 const copyText = async (value: string) => {
   if (!value) return
   await navigator.clipboard.writeText(value)
@@ -251,6 +256,13 @@ function ReceivePageContent() {
                 </div>
 
                 <div className="rounded-md border bg-white p-3">
+                  <p className="text-xs text-gray-600">Wallet</p>
+                  <p className="mt-1 text-sm text-gray-900">
+                    Not connected. Make sure you select the wallet/account that has your cNGN.
+                  </p>
+                </div>
+
+                <div className="rounded-md border bg-white p-3">
                   <p className="text-xs text-gray-600">Recipient</p>
                   <p className="mt-1 break-all font-mono text-sm text-gray-900">{address || "--"}</p>
                 </div>
@@ -274,6 +286,11 @@ function ReceivePageContent() {
     <div className="min-h-screen bg-gray-50 px-6 py-10">
       <div className="max-w-md mx-auto space-y-4">
         <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
+
+        <Card className="p-4">
+          <p className="text-xs text-gray-600">Connected wallet</p>
+          <p className="mt-1 font-mono text-sm text-gray-900">{shortConnectedAddress(account.address)}</p>
+        </Card>
 
         <Card className="p-6 space-y-4">
           <div>
