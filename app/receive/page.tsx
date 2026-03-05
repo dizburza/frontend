@@ -6,6 +6,8 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
 import { SendToCNGNFlow } from "@/components/send-to-cngn-flow"
+import { useActiveAccount } from "thirdweb/react"
+import ConnectWallet from "@/components/ConnectWallet"
 
 type EthereumProvider = {
   request: (args: { method: string; params?: unknown }) => Promise<unknown>
@@ -150,6 +152,8 @@ function ReceivePageContent() {
   const address = (params.get("address") || "").trim()
   const username = (params.get("username") || "").trim().replace(/^@/, "")
 
+  const account = useActiveAccount()
+
   const [isPrompting, setIsPrompting] = useState(false)
   const [showSend, setShowSend] = useState(false)
 
@@ -225,6 +229,46 @@ function ReceivePageContent() {
     } finally {
       setIsPrompting(false)
     }
+  }
+
+  if (!account?.address) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white px-6 py-10">
+        <div className="mx-auto flex min-h-[calc(100vh-5rem)] max-w-md flex-col items-center justify-center">
+          <div className="w-full space-y-6">
+            <div className="space-y-2 text-center">
+              <h1 className="text-2xl font-bold text-gray-900">Connect your wallet</h1>
+              <p className="text-sm text-gray-600">
+                To send cNGN securely on Base Sepolia, connect your wallet first.
+              </p>
+            </div>
+
+            <Card className="p-6">
+              <div className="space-y-4">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-gray-900">You&apos;re about to send</p>
+                  <p className="text-sm text-gray-700">Token: cNGN</p>
+                  <p className="text-sm text-gray-700">Network: Base Sepolia ({BASE_SEPOLIA_CHAIN_ID_DEC})</p>
+                </div>
+
+                <div className="rounded-md border bg-white p-3">
+                  <p className="text-xs text-gray-600">Recipient</p>
+                  <p className="mt-1 break-all font-mono text-sm text-gray-900">{address || "--"}</p>
+                </div>
+
+                <div className="pt-2">
+                  <ConnectWallet label="Connect Wallet" />
+                </div>
+
+                <p className="text-xs text-gray-500">
+                  After connecting, you&apos;ll be able to add the network/token and send cNGN.
+                </p>
+              </div>
+            </Card>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
