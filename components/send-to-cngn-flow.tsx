@@ -24,6 +24,15 @@ interface SendToCNGNFlowProps {
 
 type Step = "recipient" | "amount" | "success"
 
+function shortAddress(value: string) {
+  if (!value) return "--"
+  return `${value.slice(0, 6)}...${value.slice(-4)}`
+}
+
+function isHexAddress(value: string): value is `0x${string}` {
+  return /^0x[a-fA-F0-9]{40}$/.test(value)
+}
+
 export function SendToCNGNFlow({ isOpen, onClose, initialRecipient }: Readonly<SendToCNGNFlowProps>) {
   const [step, setStep] = useState<Step>("recipient")
   const [recipient, setRecipient] = useState("")
@@ -53,6 +62,22 @@ export function SendToCNGNFlow({ isOpen, onClose, initialRecipient }: Readonly<S
     tokenAddress: tokenAddress || undefined,
   })
 
+  let recipientLabel = "--"
+  if (resolvedUsername) {
+    recipientLabel = `@${resolvedUsername}`
+  } else if (resolvedRecipient) {
+    recipientLabel = shortAddress(resolvedRecipient)
+  }
+
+  let availableBalanceText = "--"
+  if (account?.address) {
+    if (!isOnCorrectChain) {
+      availableBalanceText = "Switch to Base Sepolia"
+    } else if (balanceData) {
+      availableBalanceText = `${balanceData.displayValue} cNGN`
+    }
+  }
+
   useEffect(() => {
     if (!isOpen) return
 
@@ -75,15 +100,6 @@ export function SendToCNGNFlow({ isOpen, onClose, initialRecipient }: Readonly<S
   }, [initialRecipient, isOpen])
 
   if (!isOpen) return null
-
-  const isHexAddress = (value: string): value is `0x${string}` => {
-    return /^0x[a-fA-F0-9]{40}$/.test(value)
-  }
-
-  const shortAddress = (value: string) => {
-    if (!value) return "--"
-    return `${value.slice(0, 6)}...${value.slice(-4)}`
-  }
 
   const parseUsername = (value: string) => {
     const trimmed = value.trim()
@@ -183,13 +199,21 @@ export function SendToCNGNFlow({ isOpen, onClose, initialRecipient }: Readonly<S
         return
       }
 
+      const balanceNumber = balanceData?.displayValue ? Number.parseFloat(balanceData.displayValue) : null
+      if (balanceNumber !== null && Number.isFinite(balanceNumber) && parsedAmount > balanceNumber) {
+        toast.error("Transfer amount exceeds balance")
+        return
+      }
+
       setIsLoading(true)
       showLoading("Confirming transfer...")
+
+      const tokenDecimals = typeof balanceData?.decimals === "number" ? balanceData.decimals : 6
 
       const tx = prepareContractCall({
         contract,
         method: "function transfer(address to, uint256 value)",
-        params: [resolvedRecipient, parseUnits(amount, 6)],
+        params: [resolvedRecipient, parseUnits(amount, tokenDecimals)],
       })
 
       await sendTx(tx)
@@ -313,13 +337,7 @@ export function SendToCNGNFlow({ isOpen, onClose, initialRecipient }: Readonly<S
               <p className="text-sm text-gray-600 mb-4">Specify the amount you want to send to this account.</p>
               <div className="text-sm text-gray-600 mb-4">
                 Sending to:{" "}
-                <span className="font-semibold">
-                  {(() => {
-                    if (resolvedUsername) return `@${resolvedUsername}`
-                    if (resolvedRecipient) return shortAddress(resolvedRecipient)
-                    return "--"
-                  })()}
-                </span>
+                <span className="font-semibold">{recipientLabel}</span>
               </div>
               <Input
                 placeholder="Enter amount"
@@ -329,15 +347,7 @@ export function SendToCNGNFlow({ isOpen, onClose, initialRecipient }: Readonly<S
               />
               <div className="mt-4 text-sm text-gray-600">
                 Available balance:{" "}
-                <span className="font-semibold">
-                  {!account?.address
-                    ? "--"
-                    : !isOnCorrectChain
-                      ? "Switch to Base Sepolia"
-                      : balanceData
-                        ? `${balanceData.displayValue} cNGN`
-                        : "--"}
-                </span>
+                <span className="font-semibold">{availableBalanceText}</span>
               </div>
             </div>
             <Button onClick={handleNext} disabled={!amount || isLoading || !account?.address} className="w-full">
