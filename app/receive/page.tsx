@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
+import { SendToCNGNFlow } from "@/components/send-to-cngn-flow"
 
 type EthereumProvider = {
   request: (args: { method: string; params?: unknown[] }) => Promise<unknown>
@@ -105,10 +106,9 @@ function ReceivePageContent() {
   const username = (params.get("username") || "").trim().replace(/^@/, "")
 
   const [isPrompting, setIsPrompting] = useState(false)
+  const [showSend, setShowSend] = useState(false)
 
   const displayUsername = username ? `@${username}` : ""
-
-  const canCopy = Boolean(address || displayUsername)
 
   const title = useMemo(() => {
     if (displayUsername) return `Send cNGN to ${displayUsername}`
@@ -138,6 +138,12 @@ function ReceivePageContent() {
       cancelled = true
     }
   }, [])
+
+  useEffect(() => {
+    if (address || username) {
+      setShowSend(true)
+    }
+  }, [address, username])
 
   const copy = async (value: string) => {
     if (!value) return
@@ -228,13 +234,20 @@ function ReceivePageContent() {
             </Button>
           </div>
 
-          {canCopy ? null : <p className="text-xs text-gray-500">Missing recipient info in QR link.</p>}
+          <Button
+            className="w-full bg-blue-600 hover:bg-blue-700"
+            onClick={() => setShowSend(true)}
+            disabled={isPrompting || (!address && !displayUsername)}
+          >
+            Send cNGN
+          </Button>
         </Card>
 
-        <p className="text-xs text-gray-500">
-          If prompts don’t appear, open this page inside your wallet browser (MetaMask) and tap “Add network” and “Add
-          token”.
-        </p>
+        <SendToCNGNFlow
+          isOpen={showSend}
+          onClose={() => setShowSend(false)}
+          initialRecipient={address || (displayUsername || undefined)}
+        />
       </div>
     </div>
   )
