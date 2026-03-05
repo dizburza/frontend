@@ -333,9 +333,13 @@ export default function PersonalPaymentsPage() {
         onDetected={({ recipient }) => {
           const value = recipient?.trim()
           if (!value) return
-          const next = new URLSearchParams(searchParams.toString())
-          next.set("sendTo", value)
-          router.push(`/personal/payments?${next.toString()}`)
+          const next = new URLSearchParams()
+          if (value.startsWith("@")) {
+            next.set("username", value)
+          } else {
+            next.set("address", value)
+          }
+          router.push(`/receive?${next.toString()}`)
           setShowScan(false)
         }}
       />

@@ -183,9 +183,7 @@ function ReceivePageContent() {
   }, [])
 
   useEffect(() => {
-    if (address || username) {
-      setShowSend(true)
-    }
+    setShowSend(false)
   }, [address, username])
 
   const copy = async (value: string) => {

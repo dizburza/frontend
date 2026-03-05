@@ -12,8 +12,10 @@ import Image from "next/image";
 import { useActiveAccount } from "thirdweb/react";
 import useGetTokenBalance from "@/hooks/ERC20/useGetBalance";
 import useCngnTransferActivity from "@/hooks/ERC20/useCngnTransferActivity";
+import { useRouter } from "next/navigation";
 
 export function BalanceCard() {
+  const router = useRouter();
   const account = useActiveAccount();
   const balance = useGetTokenBalance();
   const { monthly, lastUpdatedAt, isLoading } = useCngnTransferActivity();
@@ -108,8 +110,16 @@ export function BalanceCard() {
         isOpen={showScan}
         onClose={() => setShowScan(false)}
         onDetected={({ recipient }) => {
-          setScanRecipient(recipient);
-          setShowSendToCNGN(true);
+          const value = (recipient || "").trim();
+          if (!value) return;
+          const params = new URLSearchParams();
+          if (value.startsWith("@")) {
+            params.set("username", value);
+          } else {
+            params.set("address", value);
+          }
+          router.push(`/receive?${params.toString()}`);
+          setShowScan(false);
         }}
       />
     </Card>

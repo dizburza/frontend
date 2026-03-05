@@ -5,13 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { ReceiveFlow } from "@/components/receive-flow"
 import { QRScanModal } from "@/components/qr-scan-modal"
-import { SendToCNGNFlow } from "@/components/send-to-cngn-flow"
+import { useRouter } from "next/navigation"
 
 export default function PersonalQRCenterPage() {
+  const router = useRouter()
   const [showReceive, setShowReceive] = useState(false)
   const [showScan, setShowScan] = useState(false)
-  const [showSend, setShowSend] = useState(false)
-  const [scanRecipient, setScanRecipient] = useState<string | undefined>(undefined)
 
   return (
     <div className="px-4 py-6 sm:px-6 sm:py-8 lg:px-8 lg:py-8">
@@ -57,15 +56,17 @@ export default function PersonalQRCenterPage() {
         isOpen={showScan}
         onClose={() => setShowScan(false)}
         onDetected={({ recipient }) => {
-          setScanRecipient(recipient)
-          setShowSend(true)
+          const value = (recipient || "").trim()
+          if (!value) return
+          const params = new URLSearchParams()
+          if (value.startsWith("@")) {
+            params.set("username", value)
+          } else {
+            params.set("address", value)
+          }
+          router.push(`/receive?${params.toString()}`)
+          setShowScan(false)
         }}
-      />
-
-      <SendToCNGNFlow
-        isOpen={showSend}
-        onClose={() => setShowSend(false)}
-        initialRecipient={scanRecipient}
       />
     </div>
   )

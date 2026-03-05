@@ -35,7 +35,7 @@ export function SendToCNGNFlow({ isOpen, onClose, initialRecipient }: Readonly<S
   const account = useActiveAccount()
   const { mutateAsync: sendTx } = useSendTransaction()
 
-  const tokenAddress = process.env.NEXT_PUBLIC_CNGN_ADDRESS as `0x${string}` | undefined
+  const tokenAddress = (process.env.NEXT_PUBLIC_CNGN_ADDRESS || "").trim() as `0x${string}` | ""
   const contract = tokenAddress
     ? getContract({
         address: tokenAddress,
@@ -48,7 +48,7 @@ export function SendToCNGNFlow({ isOpen, onClose, initialRecipient }: Readonly<S
     address: account?.address,
     chain: baseSepolia,
     client: thirdwebClient,
-    tokenAddress,
+    tokenAddress: tokenAddress || undefined,
   })
 
   useEffect(() => {
@@ -76,6 +76,11 @@ export function SendToCNGNFlow({ isOpen, onClose, initialRecipient }: Readonly<S
 
   const isHexAddress = (value: string): value is `0x${string}` => {
     return /^0x[a-fA-F0-9]{40}$/.test(value)
+  }
+
+  const shortAddress = (value: string) => {
+    if (!value) return "--"
+    return `${value.slice(0, 6)}...${value.slice(-4)}`
   }
 
   const parseUsername = (value: string) => {
@@ -299,7 +304,14 @@ export function SendToCNGNFlow({ isOpen, onClose, initialRecipient }: Readonly<S
               <h3 className="font-semibold mb-2">Enter Amount</h3>
               <p className="text-sm text-gray-600 mb-4">Specify the amount you want to send to this account.</p>
               <div className="text-sm text-gray-600 mb-4">
-                Sending to: <span className="font-semibold">{resolvedUsername ? `@${resolvedUsername}` : resolvedRecipient || "--"}</span>
+                Sending to:{" "}
+                <span className="font-semibold">
+                  {(() => {
+                    if (resolvedUsername) return `@${resolvedUsername}`
+                    if (resolvedRecipient) return shortAddress(resolvedRecipient)
+                    return "--"
+                  })()}
+                </span>
               </div>
               <Input
                 placeholder="Enter amount"
@@ -308,7 +320,10 @@ export function SendToCNGNFlow({ isOpen, onClose, initialRecipient }: Readonly<S
                 onChange={(e) => setAmount(e.target.value)}
               />
               <div className="mt-4 text-sm text-gray-600">
-                Available balance: <span className="font-semibold">{balanceData?.displayValue || "--"} cNGN</span>
+                Available balance:{" "}
+                <span className="font-semibold">
+                  {balanceData ? `${balanceData.displayValue} cNGN` : "--"}
+                </span>
               </div>
             </div>
             <Button onClick={handleNext} disabled={!amount || isLoading || !account?.address} className="w-full">
