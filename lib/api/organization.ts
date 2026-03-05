@@ -1,8 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuthCompleted } from "@/hooks/useAutoAuthenticate";
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5050";
-
 // Types
 export interface Organization {
   _id: string;
@@ -51,8 +49,10 @@ async function apiFetch(endpoint: string, options: RequestInit = {}) {
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
   }
-  
-  const response = await fetch(`${BACKEND_URL}${endpoint}`, {
+
+  const url = endpoint.startsWith("/api/") ? endpoint : `/api${endpoint}`;
+
+  const response = await fetch(url, {
     ...options,
     headers,
   });
