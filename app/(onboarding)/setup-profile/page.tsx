@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -11,9 +11,11 @@ import { Label } from "@/components/ui/label"
 import FileUploadArea from "@/components/file-upload-area"
 import { useGlobalLoading } from "@/lib/global-loading"
 import { toast } from "sonner"
+import { useActiveAccount } from "thirdweb/react"
 
 export default function SetupProfilePage() {
   const router = useRouter()
+  const account = useActiveAccount()
   const [isLoading, setIsLoading] = useState(false)
   const { showLoading, hideLoading } = useGlobalLoading()
   const [formData, setFormData] = useState({
@@ -21,6 +23,19 @@ export default function SetupProfilePage() {
     firstName: "",
     email: "",
   })
+
+  useEffect(() => {
+    const address = account?.address
+    if (!address) return
+
+    // After a DB wipe, OrgGuard can redirect based on stale cached auth check.
+    // Clear it here so the next navigation revalidates against the backend.
+    try {
+      localStorage.removeItem(`authCheck:${address}`)
+    } catch {
+      // ignore
+    }
+  }, [account?.address])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
@@ -33,12 +48,63 @@ export default function SetupProfilePage() {
     if (isLoading) return
 
     try {
+      const address = account?.address
+      if (!address) {
+        toast.error("Connect wallet to continue")
+        return
+      }
+
       setIsLoading(true)
       showLoading("Saving profile...")
-      // Store profile data
+
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          walletAddress: address,
+          surname: formData.surname,
+          firstname: formData.firstName,
+          email: formData.email,
+        }),
+      })
+
+      const payload = (await res.json().catch(() => null)) as
+        | {
+            success?: boolean
+            message?: string
+            error?: string
+            data?: {
+              token?: string
+              user?: unknown
+              redirectTo?: string
+            }
+          }
+        | null
+
+      if (!res.ok || !payload?.success) {
+        const msg = payload?.error || payload?.message || `HTTP ${res.status}`
+        toast.error(msg)
+        return
+      }
+
+      // Keep a local copy for convenience, but the source of truth is the backend.
       localStorage.setItem("userProfile", JSON.stringify(formData))
-      toast.success("Profile saved")
-      // Navigate to username selection
+
+      if (payload.data?.token) {
+        localStorage.setItem("token", payload.data.token)
+        localStorage.setItem("token_wallet", address)
+      }
+
+      try {
+        localStorage.removeItem(`authCheck:${address}`)
+      } catch {
+        // ignore
+      }
+
+      toast.success(payload.message || "Profile saved")
       router.push("/personal/wallet")
     } catch (error) {
       console.error(error)
