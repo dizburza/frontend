@@ -133,8 +133,6 @@ function ReceivePageContent() {
       setIsPrompting(true)
       try {
         await ensureBaseSepolia()
-        if (cancelled) return
-        await watchCngnToken()
       } catch {
         // ignore; user may reject prompts
       } finally {
@@ -234,6 +232,16 @@ function ReceivePageContent() {
                     toast.success("cNGN added")
                   } catch (err) {
                     const e = err as { message?: string }
+                    const msg = (e?.message || "").toLowerCase()
+                    if (msg.includes("not supported")) {
+                      const tokenAddress = (process.env.NEXT_PUBLIC_CNGN_ADDRESS || "").trim()
+                      toast.error(
+                        tokenAddress
+                          ? `MetaMask mobile may not support auto-add here. Import manually: Assets → Import tokens → Custom token → ${tokenAddress}`
+                          : "MetaMask mobile may not support auto-add here. Import manually: Assets → Import tokens → Custom token."
+                      )
+                      return
+                    }
                     toast.error(e?.message || "Could not add token")
                   } finally {
                     setIsPrompting(false)
