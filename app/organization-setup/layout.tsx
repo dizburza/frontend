@@ -1,10 +1,23 @@
-import Image from "next/image"
-import type React from "react"
+"use client";
+
+import Image from "next/image";
+import type React from "react";
+import { useActiveAccount } from "thirdweb/react";
+
+const formatAddress = (address?: string) => {
+  const a = (address || "").trim();
+  if (!a) return "";
+  if (a.length <= 12) return a;
+  return `${a.slice(0, 6)}…${a.slice(-4)}`;
+};
+
 export default function OnboardingLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  const account = useActiveAccount();
+
   return (
     <div className="h-screen bg-[#F9F9FE] relative overflow-hidden overflow-y-auto">
 
@@ -14,7 +27,7 @@ export default function OnboardingLayout({
           <Image src="/logo.svg" alt="Logo" width="150" height="200"/>
         </div>
         <div className="flex items-center gap-4">
-          <span className="text-sm text-gray-600">0x12...abcd</span>
+          <span className="text-sm text-gray-600">{formatAddress(account?.address) || "--"}</span>
           <button className="w-10 h-10 border border-gray-300 rounded-lg flex items-center justify-center hover:bg-gray-50">
             <span className="text-lg">👤</span>
           </button>
