@@ -18,7 +18,7 @@ import {
 import useOrgSlug from "@/hooks/useOrgSlug"
 
 // Helper component for copyable wallet address
-function WalletAddress({ address }: { address: string }) {
+function WalletAddress({ address }: Readonly<{ address: string }>) {
   const [copied, setCopied] = useState(false)
   
   const shortenAddress = (addr: string) => {

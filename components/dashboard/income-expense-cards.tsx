@@ -5,35 +5,43 @@ import { ArrowDownLeft, ArrowUpRight } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { useActiveAccount } from "thirdweb/react";
-import { useTransactionSummary } from "@/lib/api/organization";
+import useCngnTransferActivity from "@/hooks/ERC20/useCngnTransferActivity";
 
-export function IncomeExpenseCards() {
+const asHexAddress = (value: string | null | undefined) => {
+  const v = (value || "").trim();
+  if (!v) return undefined;
+  return /^0x[a-fA-F0-9]{40}$/.test(v) ? (v as `0x${string}`) : undefined;
+};
+
+export function IncomeExpenseCards(props?: Readonly<{ address?: string | null }>) {
   const account = useActiveAccount();
-  const address = account?.address ?? null;
-  const { data, loading: isLoading } = useTransactionSummary(address);
+  const address = props?.address ?? account?.address ?? null;
+  const { latestIncomingAmount, latestOutgoingAmount, isLoading } = useCngnTransferActivity({
+    walletAddress: asHexAddress(address),
+  });
 
-  const { incomingTotal, outgoingTotal } = useMemo(() => {
-    const incoming = Number.parseFloat(String(data?.inflowAmount || "0"));
-    const outgoing = Number.parseFloat(String(data?.outflowAmount || "0"));
+  const { incoming, outgoing } = useMemo(() => {
+    const i = Number(latestIncomingAmount || 0);
+    const o = Number(latestOutgoingAmount || 0);
     return {
-      incomingTotal: Number.isFinite(incoming) ? incoming : 0,
-      outgoingTotal: Number.isFinite(outgoing) ? outgoing : 0,
+      incoming: Number.isFinite(i) ? i : 0,
+      outgoing: Number.isFinite(o) ? o : 0,
     };
-  }, [data?.inflowAmount, data?.outflowAmount]);
+  }, [latestIncomingAmount, latestOutgoingAmount]);
 
   const [lastIncomingAmount, setLastIncomingAmount] = useState<number | null>(null);
   const [lastOutgoingAmount, setLastOutgoingAmount] = useState<number | null>(null);
 
   useEffect(() => {
     if (isLoading) return;
-    setLastIncomingAmount(incomingTotal);
-    setLastOutgoingAmount(outgoingTotal);
-  }, [isLoading, incomingTotal, outgoingTotal]);
+    setLastIncomingAmount(incoming);
+    setLastOutgoingAmount(outgoing);
+  }, [isLoading, incoming, outgoing]);
 
   const incomingToDisplay =
-    isLoading && lastIncomingAmount !== null ? lastIncomingAmount : incomingTotal;
+    isLoading && lastIncomingAmount !== null ? lastIncomingAmount : incoming;
   const outgoingToDisplay =
-    isLoading && lastOutgoingAmount !== null ? lastOutgoingAmount : outgoingTotal;
+    isLoading && lastOutgoingAmount !== null ? lastOutgoingAmount : outgoing;
 
   const showUpdating = Boolean(isLoading && (lastIncomingAmount !== null || lastOutgoingAmount !== null));
   const showInitialLoading = Boolean(isLoading && lastIncomingAmount === null && lastOutgoingAmount === null);

@@ -1,12 +1,30 @@
-import Image from "next/image"
-import type React from "react"
-import ConnectWallet from "@/components/ConnectWallet"
-import Link from "next/link"
+"use client";
+
+import Image from "next/image";
+import type React from "react";
+import ConnectWallet from "@/components/ConnectWallet";
+import Link from "next/link";
+import { useActiveAccount, useActiveWallet, useDisconnect } from "thirdweb/react";
+import { clearAuthStorage } from "@/hooks/useAutoAuthenticate";
+import { useRouter } from "next/navigation";
 export default function OnboardingLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  const router = useRouter();
+  const account = useActiveAccount();
+  const wallet = useActiveWallet();
+  const { disconnect } = useDisconnect();
+
+  const handleDisconnect = () => {
+    clearAuthStorage();
+    if (wallet) {
+      disconnect(wallet);
+    }
+    router.push("/");
+  };
+
   return (
     <div className="min-h-screen bg-[#F9F9FE] relative overflow-hidden">
 
@@ -19,6 +37,15 @@ export default function OnboardingLayout({
         </div>
         <div className="flex items-center gap-4">
           <ConnectWallet connectButtonClassName="!cursor-pointer" />
+          {account ? (
+            <button
+              type="button"
+              onClick={handleDisconnect}
+              className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            >
+              Disconnect
+            </button>
+          ) : null}
           {/* <button className="w-10 h-10 border border-gray-300 rounded-lg flex items-center justify-center hover:bg-gray-50">
             <span className="text-lg">👤</span>
           </button> */}

@@ -229,9 +229,11 @@ export default function useCngnTransferActivity(params?: {
   decimals?: number;
   enrichLimit?: number;
   staleTimeMs?: number;
+  walletAddress?: `0x${string}`;
 }) {
   const account = useActiveAccount();
-  const walletAddress = account?.address as `0x${string}` | undefined;
+  const walletAddress =
+    params?.walletAddress || (account?.address as `0x${string}` | undefined);
 
   const tokenAddress = process.env.NEXT_PUBLIC_CNGN_ADDRESS as
     | `0x${string}`

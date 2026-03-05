@@ -2,7 +2,9 @@
 
 import Image from "next/image";
 import type React from "react";
-import { useActiveAccount } from "thirdweb/react";
+import { useActiveAccount, useActiveWallet, useDisconnect } from "thirdweb/react";
+import { clearAuthStorage } from "@/hooks/useAutoAuthenticate";
+import { useRouter } from "next/navigation";
 
 const formatAddress = (address?: string) => {
   const a = (address || "").trim();
@@ -16,7 +18,18 @@ export default function OnboardingLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  const router = useRouter();
   const account = useActiveAccount();
+  const wallet = useActiveWallet();
+  const { disconnect } = useDisconnect();
+
+  const handleDisconnect = () => {
+    clearAuthStorage();
+    if (wallet) {
+      disconnect(wallet);
+    }
+    router.push("/");
+  };
 
   return (
     <div className="h-screen bg-[#F9F9FE] relative overflow-hidden overflow-y-auto">
@@ -28,6 +41,15 @@ export default function OnboardingLayout({
         </div>
         <div className="flex items-center gap-4">
           <span className="text-sm text-gray-600">{formatAddress(account?.address) || "--"}</span>
+          {account ? (
+            <button
+              type="button"
+              onClick={handleDisconnect}
+              className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            >
+              Disconnect
+            </button>
+          ) : null}
           <button className="w-10 h-10 border border-gray-300 rounded-lg flex items-center justify-center hover:bg-gray-50">
             <span className="text-lg">👤</span>
           </button>

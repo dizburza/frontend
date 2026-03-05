@@ -1,16 +1,20 @@
 "use client";
 
 import { Bell, Search } from "lucide-react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import { useActiveAccount } from "thirdweb/react";
+import { useActiveAccount, useActiveWallet, useDisconnect } from "thirdweb/react";
 import { flushBackendSyncQueue, getBackendSyncQueueSize } from "@/lib/backend-sync-queue";
+import { clearAuthStorage } from "@/hooks/useAutoAuthenticate";
 
 export function DashboardHeader() {
   const pathname = usePathname();
+  const router = useRouter();
   const account = useActiveAccount();
+  const wallet = useActiveWallet();
+  const { disconnect } = useDisconnect();
   const [accountType, setAccountType] = useState<
     "personal" | "organization" | null
   >(null);
@@ -26,6 +30,14 @@ export function DashboardHeader() {
 
   const [pendingSyncCount, setPendingSyncCount] = useState(0);
   const [syncingNow, setSyncingNow] = useState(false);
+
+  const handleDisconnect = () => {
+    clearAuthStorage();
+    if (wallet) {
+      disconnect(wallet);
+    }
+    router.push("/");
+  };
 
   useEffect(() => {
     const stored = localStorage.getItem("accountType");
@@ -254,6 +266,16 @@ export function DashboardHeader() {
             <Bell className="w-5 h-5 text-gray-600" />
             <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
           </button>
+
+          {account ? (
+            <button
+              type="button"
+              onClick={handleDisconnect}
+              className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            >
+              Disconnect
+            </button>
+          ) : null}
 
           {/* User Profile */}
           <div className="flex items-center gap-3 pl-4 border-l border-gray-200">

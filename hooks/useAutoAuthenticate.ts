@@ -30,6 +30,27 @@ const AUTH_COMPLETED_EVENT = "auth:completed";
 const TOKEN_STORAGE_KEY = "token";
 const TOKEN_WALLET_STORAGE_KEY = "token_wallet";
 
+export function clearAuthStorage() {
+  try {
+    localStorage.removeItem(TOKEN_STORAGE_KEY);
+    localStorage.removeItem(TOKEN_WALLET_STORAGE_KEY);
+    localStorage.removeItem("accountType");
+
+    const keys: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k) continue;
+      if (k.startsWith("authCheck:")) keys.push(k);
+    }
+
+    for (const k of keys) {
+      localStorage.removeItem(k);
+    }
+  } catch {
+    // ignore
+  }
+}
+
 /**
  * Validates if a JWT token is still valid by checking expiry
  * Note: This is a client-side check, actual validation happens server-side
