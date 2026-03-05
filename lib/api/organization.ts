@@ -59,7 +59,14 @@ async function apiFetch(endpoint: string, options: RequestInit = {}) {
   
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({ message: "Unknown error" }));
-    throw new Error(errorData.message || `HTTP ${response.status}`);
+    const serverMessage = errorData.message as string | undefined;
+    const status = response.status;
+
+    if (status === 401 || status === 403) {
+      throw new Error(serverMessage || `HTTP ${status} (unauthorized)`);
+    }
+
+    throw new Error(serverMessage || `HTTP ${status}`);
   }
   
   return response.json();
@@ -480,6 +487,19 @@ export function useTransactionSummary(
   const status = params?.status;
 
   const refresh = () => setRefreshKey((k) => k + 1);
+
+  useEffect(() => {
+    const handler = () => {
+      if (address) {
+        refresh();
+      }
+    };
+
+    globalThis.addEventListener("cngn:activity:refresh", handler);
+    return () => {
+      globalThis.removeEventListener("cngn:activity:refresh", handler);
+    };
+  }, [address]);
 
   useAuthCompleted(() => {
     if (address) {

@@ -27,6 +27,9 @@ const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:505
 // Global event name for auth completion
 const AUTH_COMPLETED_EVENT = "auth:completed";
 
+const TOKEN_STORAGE_KEY = "token";
+const TOKEN_WALLET_STORAGE_KEY = "token_wallet";
+
 /**
  * Validates if a JWT token is still valid by checking expiry
  * Note: This is a client-side check, actual validation happens server-side
@@ -193,7 +196,8 @@ export function useAutoAuthenticate() {
       }
 
       // 4. Save token
-      localStorage.setItem("token", loginResult.data.token);
+      localStorage.setItem(TOKEN_STORAGE_KEY, loginResult.data.token);
+      localStorage.setItem(TOKEN_WALLET_STORAGE_KEY, address);
       
       // Mark as attempted for this address
       attemptedRef.current.add(address);
@@ -246,15 +250,25 @@ export function useAutoAuthenticate() {
       return;
     }
 
-    // Check if we already have a valid token
-    const existingToken = localStorage.getItem("token");
-    if (isTokenValid(existingToken)) {
+    // Check if we already have a valid token bound to this wallet
+    const existingToken = localStorage.getItem(TOKEN_STORAGE_KEY);
+    const tokenWallet = localStorage.getItem(TOKEN_WALLET_STORAGE_KEY);
+    const hasValidToken = isTokenValid(existingToken);
+    const isTokenForThisWallet = tokenWallet?.toLowerCase() === address.toLowerCase();
+
+    if (hasValidToken && isTokenForThisWallet) {
       setAuthState({
         isAuthenticated: true,
         isLoading: false,
         error: null,
       });
       return;
+    }
+
+    if (hasValidToken && !isTokenForThisWallet) {
+      // Avoid using a token created for a different wallet; backend may reject with 401/403.
+      localStorage.removeItem(TOKEN_STORAGE_KEY);
+      localStorage.removeItem(TOKEN_WALLET_STORAGE_KEY);
     }
 
     // No valid token - trigger auth flow

@@ -14,7 +14,7 @@ export default function TransactionsPage() {
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null)
   const [page, setPage] = useState(1)
   const [limit, setLimit] = useState(10)
-  const [scope, setScope] = useState<"wallet" | "treasury">("wallet")
+  const [scope, setScope] = useState<"wallet" | "treasury">("treasury")
 
   const getPageItems = (currentPage: number, total: number) => {
     const safeTotalPages = Math.max(1, total)
@@ -39,10 +39,6 @@ export default function TransactionsPage() {
   const { data: organization } = useOrganizationBySlug(orgSlug)
 
   const account = useActiveAccount()
-
-  useEffect(() => {
-    setScope(account?.address ? "wallet" : "treasury")
-  }, [account?.address])
 
   useEffect(() => {
     setSearchTerm("")

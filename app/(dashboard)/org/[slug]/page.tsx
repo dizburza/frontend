@@ -38,7 +38,7 @@ export default function OrganizationDashboardPage() {
   const { data: batchesData } = useOrganizationBatches(organizationId);
 
   const account = useActiveAccount();
-  const transactionsAddress = account?.address ?? organization?.contractAddress ?? null;
+  const transactionsAddress = organization?.contractAddress ?? account?.address ?? null;
   const { data: transactionsData } = useTransactionHistory(transactionsAddress, { limit: 5, page: 1 });
 
   const treasuryBalance = useGetOrgTreasuryBalance();
