@@ -3,23 +3,52 @@
 import { Card } from "@/components/ui/card";
 import { ArrowDownLeft, ArrowUpRight } from "lucide-react";
 import Image from "next/image";
-import useCngnTransferActivity from "@/hooks/ERC20/useCngnTransferActivity";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useActiveAccount } from "thirdweb/react";
+import { useTransactionHistory } from "@/lib/api/organization";
 
 export function IncomeExpenseCards() {
-  const { latestIncomingAmount, latestOutgoingAmount, isLoading } = useCngnTransferActivity();
+  const account = useActiveAccount();
+  const address = account?.address ?? null;
+  const { data, loading: isLoading } = useTransactionHistory(address, { limit: 200, page: 1 });
+
+  const { incomingTotal, outgoingTotal } = useMemo(() => {
+    const txs = data?.transactions ?? [];
+
+    const outgoing = txs
+      .filter((t) => t.direction === "sent")
+      .reduce((acc, t) => {
+        const amt = Number.parseFloat(
+          String(t.displayAmount || "0").replaceAll("-", "")
+        );
+        return acc + (Number.isFinite(amt) ? amt : 0);
+      }, 0);
+
+    const incoming = txs
+      .filter((t) => t.direction === "received")
+      .reduce((acc, t) => {
+        const amt = Number.parseFloat(
+          String(t.displayAmount || "0").replaceAll("+", "")
+        );
+        return acc + (Number.isFinite(amt) ? amt : 0);
+      }, 0);
+
+    return { incomingTotal: incoming, outgoingTotal: outgoing };
+  }, [data?.transactions]);
 
   const [lastIncomingAmount, setLastIncomingAmount] = useState<number | null>(null);
   const [lastOutgoingAmount, setLastOutgoingAmount] = useState<number | null>(null);
 
   useEffect(() => {
     if (isLoading) return;
-    setLastIncomingAmount(latestIncomingAmount);
-    setLastOutgoingAmount(latestOutgoingAmount);
-  }, [isLoading, latestIncomingAmount, latestOutgoingAmount]);
+    setLastIncomingAmount(incomingTotal);
+    setLastOutgoingAmount(outgoingTotal);
+  }, [isLoading, incomingTotal, outgoingTotal]);
 
-  const incomingToDisplay = isLoading && lastIncomingAmount !== null ? lastIncomingAmount : latestIncomingAmount;
-  const outgoingToDisplay = isLoading && lastOutgoingAmount !== null ? lastOutgoingAmount : latestOutgoingAmount;
+  const incomingToDisplay =
+    isLoading && lastIncomingAmount !== null ? lastIncomingAmount : incomingTotal;
+  const outgoingToDisplay =
+    isLoading && lastOutgoingAmount !== null ? lastOutgoingAmount : outgoingTotal;
 
   const showUpdating = Boolean(isLoading && (lastIncomingAmount !== null || lastOutgoingAmount !== null));
   const showInitialLoading = Boolean(isLoading && lastIncomingAmount === null && lastOutgoingAmount === null);

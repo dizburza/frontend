@@ -6,10 +6,11 @@ import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { ChevronDown, Search, MoreVertical } from "lucide-react"
-import useCngnTransferActivity from "@/hooks/ERC20/useCngnTransferActivity"
 import useAddressUsernames from "@/hooks/useAddressUsernames"
 import { QRScanModal } from "@/components/qr-scan-modal"
 import { SendToCNGNFlow } from "@/components/send-to-cngn-flow"
+import { useActiveAccount } from "thirdweb/react"
+import { useTransactionHistory } from "@/lib/api/organization"
 
 export default function PersonalPaymentsPage() {
   const [searchTerm, setSearchTerm] = useState("")
@@ -18,6 +19,12 @@ export default function PersonalPaymentsPage() {
   const [scanRecipient, setScanRecipient] = useState<string | undefined>(undefined)
   const [page, setPage] = useState(1)
   const [limit, setLimit] = useState(10)
+
+  const account = useActiveAccount()
+  const address = account?.address ?? null
+  const { data, loading: isLoading, error } = useTransactionHistory(address, { limit: 200, page: 1 })
+
+  const transactions = data?.transactions ?? []
 
   const getPageItems = (currentPage: number, total: number) => {
     const safeTotalPages = Math.max(1, total)
@@ -38,20 +45,26 @@ export default function PersonalPaymentsPage() {
     return items
   }
 
-  const { rows, outgoingTotal, isLoading, error, toShortAddress, lastUpdatedAt } = useCngnTransferActivity()
+  const toShortAddress = (value: string) => {
+    if (!value) return "--"
+    return `${value.slice(0, 6)}...${value.slice(-4)}`
+  }
 
-  const lastUpdatedDisplay = lastUpdatedAt ? new Date(lastUpdatedAt).toLocaleString() : undefined
+  // Treat outgoing transactions as "payments" for this page.
+  const payments = transactions.filter((t) => t.direction === "sent")
 
-  // Treat outgoing cNGN transfers as "payments" for this page.
-  const payments = rows.filter((r) => r.direction === "outgoing")
+  const outgoingTotal = payments.reduce((acc, t) => {
+    const amt = Number.parseFloat(String(t.displayAmount || "0").replaceAll("-", ""))
+    return acc + (Number.isFinite(amt) ? amt : 0)
+  }, 0)
 
   const filtered = (() => {
     const q = searchTerm.trim().toLowerCase()
     if (!q) return payments
 
     return payments.filter((p) => {
-      const counterparty = p.counterparty.toLowerCase()
-      const txHash = p.transactionHash.toLowerCase()
+      const counterparty = (p.toAddress || "").toLowerCase()
+      const txHash = (p.txHash || "").toLowerCase()
       return counterparty.includes(q) || txHash.includes(q)
     })
   })()
@@ -66,7 +79,7 @@ export default function PersonalPaymentsPage() {
   const paginated = filtered.slice(startIndex, startIndex + limit)
   const pageItems = getPageItems(safePage, totalPages)
 
-  const { getUsername } = useAddressUsernames(filtered.map((p) => p.counterparty))
+  const { getUsername } = useAddressUsernames(filtered.map((p) => p.toAddress))
 
   const getStatusColor = (status: string) => {
     return status === "Completed" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
@@ -94,7 +107,7 @@ export default function PersonalPaymentsPage() {
         <StatCard
           label="Total Payments"
           value={String(payments.length)}
-          lastUpdated={isLoading ? "Updating..." : lastUpdatedDisplay}
+          lastUpdated={isLoading ? "Updating..." : undefined}
         />
         <StatCard
           label="Total Sent (cNGN)"
@@ -178,23 +191,25 @@ export default function PersonalPaymentsPage() {
                 }
 
                 return paginated.map((payment, idx) => (
-                  <tr key={payment.id} className="border-b border-gray-100 hover:bg-gray-50">
+                  <tr key={payment._id} className="border-b border-gray-100 hover:bg-gray-50">
                     <td className="py-4 px-4 text-sm text-gray-900">{startIndex + idx + 1}</td>
                     <td className="py-4 px-4 text-sm text-gray-900">
                       {(() => {
-                        const username = getUsername(payment.counterparty)
+                        const username = getUsername(payment.toAddress)
                         const name = username?.trim()
-                        return name || toShortAddress(payment.counterparty)
+                        return name || toShortAddress(payment.toAddress)
                       })()}
                     </td>
                     <td className="py-4 px-4 text-sm font-semibold text-gray-900">
-                      {payment.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      {Number.parseFloat(
+                        String(payment.displayAmount || "0").replaceAll("-", "")
+                      ).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </td>
                     <td className="py-4 px-4 text-sm text-gray-600">
-                      {payment.timestamp ? new Date(payment.timestamp * 1000).toLocaleDateString() : "--"}
+                      {payment.timestamp ? new Date(payment.timestamp).toLocaleDateString() : "--"}
                       <br />
                       <span className="text-xs text-gray-500">
-                        {payment.timestamp ? new Date(payment.timestamp * 1000).toLocaleTimeString() : ""}
+                        {payment.timestamp ? new Date(payment.timestamp).toLocaleTimeString() : ""}
                       </span>
                     </td>
                     <td className="py-4 px-4 text-sm text-gray-600">Sent</td>
