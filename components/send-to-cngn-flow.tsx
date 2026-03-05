@@ -59,7 +59,13 @@ export function SendToCNGNFlow({ isOpen, onClose, initialRecipient }: Readonly<S
     setResolvedUsername(null)
 
     if (typeof initialRecipient === "string") {
-      setRecipient(initialRecipient)
+      const value = initialRecipient.trim()
+      setRecipient(value)
+      if (/^0x[a-fA-F0-9]{40}$/.test(value)) {
+        setResolvedRecipient(value as `0x${string}`)
+        setResolvedUsername(null)
+        setStep("amount")
+      }
     } else {
       setRecipient("")
     }
@@ -114,13 +120,7 @@ export function SendToCNGNFlow({ isOpen, onClose, initialRecipient }: Readonly<S
 
     try {
       showLoading("Resolving username...")
-      const backend = process.env.NEXT_PUBLIC_BACKEND_URL
-      if (!backend) {
-        toast.error("Backend URL not configured")
-        return null
-      }
-
-      const res = await fetch(`${backend}/api/users/resolve/${encodeURIComponent(username)}`)
+      const res = await fetch(`/api/users/resolve/${encodeURIComponent(username)}`)
       const body = (await res.json()) as { success?: boolean; data?: { username?: string; walletAddress?: string }; error?: string }
 
       if (!res.ok || !body?.data?.walletAddress) {

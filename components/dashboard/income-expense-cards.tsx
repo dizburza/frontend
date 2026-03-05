@@ -5,36 +5,21 @@ import { ArrowDownLeft, ArrowUpRight } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { useActiveAccount } from "thirdweb/react";
-import { useTransactionHistory } from "@/lib/api/organization";
+import { useTransactionSummary } from "@/lib/api/organization";
 
 export function IncomeExpenseCards() {
   const account = useActiveAccount();
   const address = account?.address ?? null;
-  const { data, loading: isLoading } = useTransactionHistory(address, { limit: 100, page: 1 });
+  const { data, loading: isLoading } = useTransactionSummary(address);
 
   const { incomingTotal, outgoingTotal } = useMemo(() => {
-    const txs = data?.transactions ?? [];
-
-    const outgoing = txs
-      .filter((t) => t.direction === "sent")
-      .reduce((acc, t) => {
-        const amt = Number.parseFloat(
-          String(t.displayAmount || "0").replaceAll("-", "")
-        );
-        return acc + (Number.isFinite(amt) ? amt : 0);
-      }, 0);
-
-    const incoming = txs
-      .filter((t) => t.direction === "received")
-      .reduce((acc, t) => {
-        const amt = Number.parseFloat(
-          String(t.displayAmount || "0").replaceAll("+", "")
-        );
-        return acc + (Number.isFinite(amt) ? amt : 0);
-      }, 0);
-
-    return { incomingTotal: incoming, outgoingTotal: outgoing };
-  }, [data?.transactions]);
+    const incoming = Number.parseFloat(String(data?.inflowAmount || "0"));
+    const outgoing = Number.parseFloat(String(data?.outflowAmount || "0"));
+    return {
+      incomingTotal: Number.isFinite(incoming) ? incoming : 0,
+      outgoingTotal: Number.isFinite(outgoing) ? outgoing : 0,
+    };
+  }, [data?.inflowAmount, data?.outflowAmount]);
 
   const [lastIncomingAmount, setLastIncomingAmount] = useState<number | null>(null);
   const [lastOutgoingAmount, setLastOutgoingAmount] = useState<number | null>(null);

@@ -192,6 +192,18 @@ export interface TransactionHistoryResponse {
   };
 }
 
+export interface TransactionSummaryResponse {
+  walletAddress: string;
+  status: string;
+  totalCount: number;
+  inflowCount: number;
+  outflowCount: number;
+  inflowAmount: string;
+  outflowAmount: string;
+  inflowAmountRaw: string;
+  outflowAmountRaw: string;
+}
+
 export interface CreateOrganizationRequest {
   name: string;
   contractAddress: string;
@@ -332,6 +344,30 @@ export async function fetchTransactionHistory(
   return response.data || response;
 }
 
+export async function fetchTransactionSummary(
+  address: string,
+  params?: {
+    type?: string;
+    category?: string;
+    startDate?: string;
+    endDate?: string;
+    status?: string;
+  }
+): Promise<TransactionSummaryResponse> {
+  const query = new URLSearchParams();
+  if (params?.type) query.set("type", params.type);
+  if (params?.category) query.set("category", params.category);
+  if (params?.startDate) query.set("startDate", params.startDate);
+  if (params?.endDate) query.set("endDate", params.endDate);
+  if (params?.status) query.set("status", params.status);
+
+  const qs = query.toString();
+  const baseUrl = `/api/transactions/${address}/summary`;
+  const url = qs ? baseUrl + "?" + qs : baseUrl;
+  const response = await apiFetch(url);
+  return response.data || response;
+}
+
 export async function createOrganizationRecord(payload: CreateOrganizationRequest): Promise<Organization> {
   const response = await apiFetch(`/api/organizations`, {
     method: "POST",
@@ -419,6 +455,79 @@ export function useOrganizationEmployees(organizationId: string | null) {
     };
   }, [organizationId, refreshKey]);
   
+  return { data, loading, error, refresh };
+}
+
+export function useTransactionSummary(
+  address: string | null,
+  params?: {
+    type?: string;
+    category?: string;
+    startDate?: string;
+    endDate?: string;
+    status?: string;
+  }
+) {
+  const [data, setData] = useState<TransactionSummaryResponse | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const type = params?.type;
+  const category = params?.category;
+  const startDate = params?.startDate;
+  const endDate = params?.endDate;
+  const status = params?.status;
+
+  const refresh = () => setRefreshKey((k) => k + 1);
+
+  useAuthCompleted(() => {
+    if (address) {
+      refresh();
+    }
+  });
+
+  useEffect(() => {
+    const addr = address;
+    if (!addr) {
+      setLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadSummary() {
+      try {
+        setLoading(true);
+        setError(null);
+        const result = await fetchTransactionSummary(addr as string, {
+          type,
+          category,
+          startDate,
+          endDate,
+          status,
+        });
+        if (!cancelled) {
+          setData(result);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Failed to load transaction summary");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadSummary();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [address, refreshKey, type, category, startDate, endDate, status]);
+
   return { data, loading, error, refresh };
 }
 

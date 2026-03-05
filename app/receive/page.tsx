@@ -58,7 +58,15 @@ async function watchCngnToken() {
   const tokenAddress = process.env.NEXT_PUBLIC_CNGN_ADDRESS
   if (!tokenAddress) throw new Error("Missing NEXT_PUBLIC_CNGN_ADDRESS")
 
-  await ethereum.request({
+  const tokenImage = (() => {
+    try {
+      return new URL("/cngn.svg", globalThis.location.origin).toString()
+    } catch {
+      return undefined
+    }
+  })()
+
+  const added = (await ethereum.request({
     method: "wallet_watchAsset",
     params: [
       {
@@ -67,10 +75,15 @@ async function watchCngnToken() {
           address: tokenAddress,
           symbol: "cNGN",
           decimals: 6,
+          image: tokenImage,
         },
       },
     ],
-  })
+  })) as boolean
+
+  if (!added) {
+    throw new Error("Token was not added")
+  }
 }
 
 const shortAddress = (value: string) => {

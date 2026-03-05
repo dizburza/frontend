@@ -160,6 +160,7 @@ export function QRScanModal({ isOpen, onClose, onDetected }: Readonly<QRScanModa
             if (rawValue) {
               const parsed = parseScannedValueToRecipient(rawValue)
               if (parsed) {
+                stop()
                 onDetected({ recipient: parsed.recipient, address: parsed.address, username: parsed.username })
                 onClose()
                 return
