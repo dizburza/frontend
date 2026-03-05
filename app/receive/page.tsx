@@ -102,6 +102,11 @@ const shortAddress = (value: string) => {
   return `${value.slice(0, 6)}...${value.slice(-4)}`
 }
 
+const copyText = async (value: string) => {
+  if (!value) return
+  await navigator.clipboard.writeText(value)
+}
+
 export default function ReceivePage() {
   return (
     <Suspense>
@@ -156,7 +161,7 @@ function ReceivePageContent() {
   const copy = async (value: string) => {
     if (!value) return
     try {
-      await navigator.clipboard.writeText(value)
+      await copyText(value)
       toast.success("Copied")
     } catch {
       toast.error("Could not copy")
@@ -237,8 +242,25 @@ function ReceivePageContent() {
                       const tokenAddress = (process.env.NEXT_PUBLIC_CNGN_ADDRESS || "").trim()
                       toast.error(
                         tokenAddress
-                          ? `MetaMask mobile may not support auto-add here. Import manually: Assets → Import tokens → Custom token → ${tokenAddress}`
-                          : "MetaMask mobile may not support auto-add here. Import manually: Assets → Import tokens → Custom token."
+                          ? "MetaMask mobile may not support auto-add here. Import manually: Assets → Import tokens → Custom token."
+                          : "MetaMask mobile may not support auto-add here. Import manually: Assets → Import tokens → Custom token.",
+                        {
+                          action: tokenAddress
+                            ? {
+                                label: "Copy contract",
+                                onClick: () => {
+                                  void (async () => {
+                                    try {
+                                      await copyText(tokenAddress)
+                                      toast.success("Contract copied")
+                                    } catch {
+                                      toast.error("Could not copy")
+                                    }
+                                  })()
+                                },
+                              }
+                            : undefined,
+                        }
                       )
                       return
                     }
