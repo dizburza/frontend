@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import { useActiveAccount } from "thirdweb/react";
+import { flushBackendSyncQueue, getBackendSyncQueueSize } from "@/lib/backend-sync-queue";
 
 export function DashboardHeader() {
   const pathname = usePathname();
@@ -22,6 +23,9 @@ export function DashboardHeader() {
     role: string;
     avatar?: string;
   } | null>(null);
+
+  const [pendingSyncCount, setPendingSyncCount] = useState(0);
+  const [syncingNow, setSyncingNow] = useState(false);
 
   useEffect(() => {
     const stored = localStorage.getItem("accountType");
@@ -141,6 +145,38 @@ export function DashboardHeader() {
     fetchProfile();
   }, [account?.address]);
 
+  useEffect(() => {
+    const update = () => {
+      setPendingSyncCount(getBackendSyncQueueSize());
+    };
+
+    update();
+    const interval = setInterval(update, 5_000);
+
+    const onStorage = (e: StorageEvent) => {
+      if (e.key?.startsWith("backendSyncQueue:")) {
+        update();
+      }
+    };
+
+    globalThis.addEventListener("storage", onStorage);
+    return () => {
+      clearInterval(interval);
+      globalThis.removeEventListener("storage", onStorage);
+    };
+  }, []);
+
+  const retrySyncNow = async () => {
+    if (syncingNow) return;
+    try {
+      setSyncingNow(true);
+      await flushBackendSyncQueue({ maxJobs: 10 });
+      setPendingSyncCount(getBackendSyncQueueSize());
+    } finally {
+      setSyncingNow(false);
+    }
+  };
+
   const tabs = (() => {
     if (accountType === "personal") {
       return [
@@ -202,6 +238,15 @@ export function DashboardHeader() {
 
         {/* Right Actions */}
         <div className="flex items-center gap-4">
+          {pendingSyncCount > 0 ? (
+            <button
+              type="button"
+              onClick={() => void retrySyncNow()}
+              className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800 hover:bg-amber-100"
+            >
+              {syncingNow ? "Syncing..." : `Sync pending (${pendingSyncCount})`}
+            </button>
+          ) : null}
           <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
             <Search className="w-5 h-5 text-gray-600" />
           </button>

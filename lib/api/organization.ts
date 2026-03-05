@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuthCompleted } from "@/hooks/useAutoAuthenticate";
+import { enqueueBackendSyncJob } from "@/lib/backend-sync-queue";
 
 // Types
 export interface Organization {
@@ -70,6 +71,54 @@ async function apiFetch(endpoint: string, options: RequestInit = {}) {
   }
   
   return response.json();
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function apiFetchWithRetry<T>(
+  fn: () => Promise<T>,
+  opts?: {
+    attempts?: number;
+    baseDelayMs?: number;
+  }
+): Promise<T> {
+  const attempts = Math.max(1, opts?.attempts ?? 5);
+  const baseDelayMs = Math.max(50, opts?.baseDelayMs ?? 500);
+
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return await fn();
+    } catch (e) {
+      lastError = e;
+      const msg = e instanceof Error ? e.message : String(e);
+
+      const retryable =
+        msg.includes("HTTP 429") ||
+        msg.includes("HTTP 500") ||
+        msg.includes("HTTP 502") ||
+        msg.includes("HTTP 503") ||
+        msg.includes("HTTP 504") ||
+        msg.includes("HTTP 401") ||
+        msg.includes("HTTP 403") ||
+        msg.toLowerCase().includes("network") ||
+        msg.toLowerCase().includes("failed to fetch");
+
+      // Idempotent replay: backend may return conflict for duplicate record.
+      if (msg.includes("HTTP 409")) {
+        throw e;
+      }
+
+      if (!retryable || attempt === attempts) {
+        throw e;
+      }
+
+      const delay = baseDelayMs * 2 ** (attempt - 1);
+      await sleep(delay);
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error("Request failed");
 }
 
 // Types from backend
@@ -268,11 +317,20 @@ export async function recordBatchCreation(payload: {
     employeeName: string;
   }[];
 }): Promise<ApiPaymentBatch> {
-  const response = await apiFetch(`/api/payroll/batches`, {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-  return response.data || response;
+  try {
+    const response = await apiFetchWithRetry(
+      () =>
+        apiFetch(`/api/payroll/batches`, {
+          method: "POST",
+          body: JSON.stringify(payload),
+        }),
+      { attempts: 5, baseDelayMs: 500 }
+    );
+    return response.data || response;
+  } catch (e) {
+    enqueueBackendSyncJob({ endpoint: "/api/payroll/batches", body: payload });
+    throw e;
+  }
 }
 
 export async function recordBatchApproval(
@@ -282,11 +340,21 @@ export async function recordBatchApproval(
     signerName: string;
   }
 ): Promise<ApiPaymentBatch> {
-  const response = await apiFetch(`/api/payroll/batches/${encodeURIComponent(batchName)}/approve`, {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-  return response.data || response;
+  const endpoint = `/api/payroll/batches/${encodeURIComponent(batchName)}/approve`;
+  try {
+    const response = await apiFetchWithRetry(
+      () =>
+        apiFetch(endpoint, {
+          method: "POST",
+          body: JSON.stringify(payload),
+        }),
+      { attempts: 5, baseDelayMs: 500 }
+    );
+    return response.data || response;
+  } catch (e) {
+    enqueueBackendSyncJob({ endpoint, body: payload });
+    throw e;
+  }
 }
 
 export async function recordBatchApprovalRevocation(
@@ -295,11 +363,21 @@ export async function recordBatchApprovalRevocation(
     signerAddress: string;
   }
 ): Promise<ApiPaymentBatch> {
-  const response = await apiFetch(`/api/payroll/batches/${encodeURIComponent(batchName)}/revoke`, {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-  return response.data || response;
+  const endpoint = `/api/payroll/batches/${encodeURIComponent(batchName)}/revoke`;
+  try {
+    const response = await apiFetchWithRetry(
+      () =>
+        apiFetch(endpoint, {
+          method: "POST",
+          body: JSON.stringify(payload),
+        }),
+      { attempts: 5, baseDelayMs: 500 }
+    );
+    return response.data || response;
+  } catch (e) {
+    enqueueBackendSyncJob({ endpoint, body: payload });
+    throw e;
+  }
 }
 
 export async function recordBatchExecution(
@@ -309,18 +387,38 @@ export async function recordBatchExecution(
     txHash: string;
   }
 ): Promise<ApiPaymentBatch> {
-  const response = await apiFetch(`/api/payroll/batches/${encodeURIComponent(batchName)}/execute`, {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-  return response.data || response;
+  const endpoint = `/api/payroll/batches/${encodeURIComponent(batchName)}/execute`;
+  try {
+    const response = await apiFetchWithRetry(
+      () =>
+        apiFetch(endpoint, {
+          method: "POST",
+          body: JSON.stringify(payload),
+        }),
+      { attempts: 5, baseDelayMs: 500 }
+    );
+    return response.data || response;
+  } catch (e) {
+    enqueueBackendSyncJob({ endpoint, body: payload });
+    throw e;
+  }
 }
 
 export async function recordBatchCancellation(batchName: string): Promise<ApiPaymentBatch> {
-  const response = await apiFetch(`/api/payroll/batches/${encodeURIComponent(batchName)}/cancel`, {
-    method: "POST",
-  });
-  return response.data || response;
+  const endpoint = `/api/payroll/batches/${encodeURIComponent(batchName)}/cancel`;
+  try {
+    const response = await apiFetchWithRetry(
+      () =>
+        apiFetch(endpoint, {
+          method: "POST",
+        }),
+      { attempts: 5, baseDelayMs: 500 }
+    );
+    return response.data || response;
+  } catch (e) {
+    enqueueBackendSyncJob({ endpoint, body: {} });
+    throw e;
+  }
 }
 
 export async function fetchTransactionHistory(
@@ -376,11 +474,20 @@ export async function fetchTransactionSummary(
 }
 
 export async function createOrganizationRecord(payload: CreateOrganizationRequest): Promise<Organization> {
-  const response = await apiFetch(`/api/organizations`, {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-  return response.data || response;
+  try {
+    const response = await apiFetchWithRetry(
+      () =>
+        apiFetch(`/api/organizations`, {
+          method: "POST",
+          body: JSON.stringify(payload),
+        }),
+      { attempts: 5, baseDelayMs: 500 }
+    );
+    return response.data || response;
+  } catch (e) {
+    enqueueBackendSyncJob({ endpoint: "/api/organizations", body: payload });
+    throw e;
+  }
 }
 
 export async function updateOrganizationEmployee(
