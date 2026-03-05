@@ -8,7 +8,7 @@ import { toast } from "sonner"
 import { SendToCNGNFlow } from "@/components/send-to-cngn-flow"
 
 type EthereumProvider = {
-  request: (args: { method: string; params?: unknown[] }) => Promise<unknown>
+  request: (args: { method: string; params?: unknown }) => Promise<unknown>
 }
 
 const BASE_SEPOLIA_CHAIN_ID_DEC = 84532
@@ -56,8 +56,20 @@ async function watchCngnToken() {
   const ethereum = getEthereum()
   if (!ethereum) throw new Error("No wallet provider found")
 
-  const tokenAddress = process.env.NEXT_PUBLIC_CNGN_ADDRESS
+  const chainId = (await ethereum.request({ method: "eth_chainId" })) as string
+  if (chainId?.toLowerCase() !== BASE_SEPOLIA_CHAIN_ID_HEX.toLowerCase()) {
+    throw new Error("Switch to Base Sepolia first")
+  }
+
+  // Some wallets require an active account connection before allowing wallet_watchAsset.
+  await ethereum.request({ method: "eth_requestAccounts" })
+
+  const tokenAddress = (process.env.NEXT_PUBLIC_CNGN_ADDRESS || "").trim()
   if (!tokenAddress) throw new Error("Missing NEXT_PUBLIC_CNGN_ADDRESS")
+
+  if (!/^0x[a-fA-F0-9]{40}$/.test(tokenAddress)) {
+    throw new Error("NEXT_PUBLIC_CNGN_ADDRESS is not a valid ERC20 contract address")
+  }
 
   const tokenImage = (() => {
     try {
@@ -69,17 +81,15 @@ async function watchCngnToken() {
 
   const added = (await ethereum.request({
     method: "wallet_watchAsset",
-    params: [
-      {
-        type: "ERC20",
-        options: {
-          address: tokenAddress,
-          symbol: "cNGN",
-          decimals: 6,
-          image: tokenImage,
-        },
+    params: {
+      type: "ERC20",
+      options: {
+        address: tokenAddress,
+        symbol: "cNGN",
+        decimals: 6,
+        image: tokenImage,
       },
-    ],
+    },
   })) as boolean
 
   if (!added) {
@@ -219,10 +229,12 @@ function ReceivePageContent() {
                 void (async () => {
                   setIsPrompting(true)
                   try {
+                    await ensureBaseSepolia()
                     await watchCngnToken()
                     toast.success("cNGN added")
-                  } catch {
-                    toast.error("Could not add token")
+                  } catch (err) {
+                    const e = err as { message?: string }
+                    toast.error(e?.message || "Could not add token")
                   } finally {
                     setIsPrompting(false)
                   }
