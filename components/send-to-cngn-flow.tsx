@@ -350,10 +350,17 @@ export function SendToCNGNFlow({ isOpen, onClose, initialRecipient }: Readonly<S
                 Sending to:{" "}
                 <span className="font-semibold">{recipientLabel}</span>
               </div>
+              {!account?.address && (
+                <div className="mb-4 space-y-3 rounded-md border border-gray-200 bg-white p-4">
+                  <p className="text-sm text-gray-700">Connect your wallet to view balance and send.</p>
+                  <ConnectWallet label="Connect Wallet" />
+                </div>
+              )}
               <Input
                 placeholder="Enter amount"
                 type="number"
                 value={amount}
+                disabled={!account?.address}
                 onChange={(e) => setAmount(e.target.value)}
               />
               <div className="mt-4 text-sm text-gray-600">

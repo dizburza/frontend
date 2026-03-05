@@ -12,14 +12,14 @@ export const thirdwebClient = createThirdwebClient({
 });
 
 export const wallets = [
-  inAppWallet({
-    auth: {
-      options: ["google", "email", "passkey"],
-    },
-  }),
   createWallet("io.metamask"),
   createWallet("com.coinbase.wallet"),
   createWallet("me.rainbow"),
   createWallet("io.rabby"),
   createWallet("io.zerion.wallet"),
+  inAppWallet({
+    auth: {
+      options: ["google", "email", "passkey"],
+    },
+  }),
 ];
