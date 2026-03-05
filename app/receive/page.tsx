@@ -107,6 +107,36 @@ const copyText = async (value: string) => {
   await navigator.clipboard.writeText(value)
 }
 
+const getTokenContractAddress = () => {
+  return (process.env.NEXT_PUBLIC_CNGN_ADDRESS || "").trim()
+}
+
+const manualImportMessage = "MetaMask mobile may not support auto-add here. Import manually: Assets → Import tokens → Custom token."
+
+const isNotSupportedError = (message: string) => {
+  return message.toLowerCase().includes("not supported")
+}
+
+const showManualImportToast = (tokenAddress: string) => {
+  toast.error(manualImportMessage, {
+    action: tokenAddress
+      ? {
+          label: "Copy contract",
+          onClick: () => {
+            void (async () => {
+              try {
+                await copyText(tokenAddress)
+                toast.success("Contract copied")
+              } catch {
+                toast.error("Could not copy")
+              }
+            })()
+          },
+        }
+      : undefined,
+  })
+}
+
 export default function ReceivePage() {
   return (
     <Suspense>
@@ -168,6 +198,37 @@ function ReceivePageContent() {
     }
   }
 
+  const handleAddNetwork = async () => {
+    setIsPrompting(true)
+    try {
+      await ensureBaseSepolia()
+      toast.success("Base Sepolia ready")
+    } catch {
+      toast.error("Could not add/switch network")
+    } finally {
+      setIsPrompting(false)
+    }
+  }
+
+  const handleAddToken = async () => {
+    setIsPrompting(true)
+    try {
+      await ensureBaseSepolia()
+      await watchCngnToken()
+      toast.success("cNGN added")
+    } catch (err) {
+      const e = err as { message?: string }
+      const message = e?.message || ""
+      if (isNotSupportedError(message)) {
+        showManualImportToast(getTokenContractAddress())
+        return
+      }
+      toast.error(message || "Could not add token")
+    } finally {
+      setIsPrompting(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 px-6 py-10">
       <div className="max-w-md mx-auto space-y-4">
@@ -210,17 +271,7 @@ function ReceivePageContent() {
             <Button
               className="bg-blue-600 hover:bg-blue-700"
               onClick={() => {
-                void (async () => {
-                  setIsPrompting(true)
-                  try {
-                    await ensureBaseSepolia()
-                    toast.success("Base Sepolia ready")
-                  } catch {
-                    toast.error("Could not add/switch network")
-                  } finally {
-                    setIsPrompting(false)
-                  }
-                })()
+                void handleAddNetwork()
               }}
               disabled={isPrompting}
             >
@@ -229,46 +280,7 @@ function ReceivePageContent() {
             <Button
               className="bg-blue-600 hover:bg-blue-700"
               onClick={() => {
-                void (async () => {
-                  setIsPrompting(true)
-                  try {
-                    await ensureBaseSepolia()
-                    await watchCngnToken()
-                    toast.success("cNGN added")
-                  } catch (err) {
-                    const e = err as { message?: string }
-                    const msg = (e?.message || "").toLowerCase()
-                    if (msg.includes("not supported")) {
-                      const tokenAddress = (process.env.NEXT_PUBLIC_CNGN_ADDRESS || "").trim()
-                      toast.error(
-                        tokenAddress
-                          ? "MetaMask mobile may not support auto-add here. Import manually: Assets → Import tokens → Custom token."
-                          : "MetaMask mobile may not support auto-add here. Import manually: Assets → Import tokens → Custom token.",
-                        {
-                          action: tokenAddress
-                            ? {
-                                label: "Copy contract",
-                                onClick: () => {
-                                  void (async () => {
-                                    try {
-                                      await copyText(tokenAddress)
-                                      toast.success("Contract copied")
-                                    } catch {
-                                      toast.error("Could not copy")
-                                    }
-                                  })()
-                                },
-                              }
-                            : undefined,
-                        }
-                      )
-                      return
-                    }
-                    toast.error(e?.message || "Could not add token")
-                  } finally {
-                    setIsPrompting(false)
-                  }
-                })()
+                void handleAddToken()
               }}
               disabled={isPrompting}
             >
