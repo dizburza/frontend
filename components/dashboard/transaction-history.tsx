@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -25,6 +26,21 @@ export function TransactionHistory({
 
   const transactions = data?.transactions ?? []
   const recent = transactions.slice(0, limit)
+  const latestTxHash = transactions[0]?.txHash
+  const pagination = data?.pagination
+
+  useEffect(() => {
+    if (!pathname.startsWith("/personal")) return
+
+    console.log("[personal][wallet][tx-history]", {
+      address,
+      isLoading,
+      error,
+      count: transactions.length,
+      pagination,
+      latestTxHash,
+    })
+  }, [pathname, address, isLoading, error, transactions.length, pagination, latestTxHash])
 
   const toShortAddress = (value: string) => {
     if (!value) return "--"

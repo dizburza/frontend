@@ -62,6 +62,19 @@ export default function PersonalPaymentsPage() {
     return acc + (Number.isFinite(amt) ? amt : 0)
   }, 0)
 
+  useEffect(() => {
+    console.log("[personal][payments]", {
+      address,
+      isLoading,
+      error,
+      txCount: transactions.length,
+      paymentsCount: payments.length,
+      outgoingTotal,
+      pagination: data?.pagination,
+      latestTxHash: transactions[0]?.txHash,
+    })
+  }, [address, isLoading, error, transactions.length, payments.length, outgoingTotal, data?.pagination, transactions])
+
   const sendToParam = useMemo(() => {
     const raw = (searchParams.get("sendTo") ?? "").trim()
     return raw || null
