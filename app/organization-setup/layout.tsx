@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import type React from "react";
+import Link from "next/link";
 import { useActiveAccount, useActiveWallet, useDisconnect } from "thirdweb/react";
 import { clearAuthStorage } from "@/hooks/useAutoAuthenticate";
 import { useRouter } from "next/navigation";
@@ -37,7 +38,9 @@ export default function OnboardingLayout({
       {/* Header */}
       <header className="relative z-10 bg-white flex items-center h-[80px] justify-between px-8 py-6 border-b border-gray-200">
         <div className="flex items-center gap-2">
-          <Image src="/logo.svg" alt="Logo" width="150" height="200"/>
+          <Link href="/" className="inline-flex cursor-pointer">
+            <Image src="/logo.svg" alt="Logo" width="150" height="200"/>
+          </Link>
         </div>
         <div className="flex items-center gap-4">
           <span className="text-sm text-gray-600">{formatAddress(account?.address) || "--"}</span>

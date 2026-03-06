@@ -169,7 +169,8 @@ export default function AddSignersPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [numSigners, setNumSigners] = useState(0)
   const [quorum, setQuorum] = useState(0)
-  const [signerRole, setSignerRole] = useState("")
+  const [creatorRole, setCreatorRole] = useState("")
+  const [candidateRole, setCandidateRole] = useState("")
   const [searchQuery, setSearchQuery] = useState("")
   const [signers, setSigners] = useState<Signer[]>([])
   const [searchResults, setSearchResults] = useState<UserLookupResult[]>([])
@@ -235,8 +236,18 @@ export default function AddSignersPage() {
     setSigners(signers.filter((s) => s.id !== id))
   }
 
+  const handleUpdateSignerRole = (id: string, role: string) => {
+    setSigners((prev) =>
+      prev.map((s) => {
+        if (s.id !== id) return s
+        return { ...s, role }
+      })
+    )
+  }
+
   const selectCandidate = (candidate: (typeof searchResults)[number]) => {
     setSelectedCandidate(candidate)
+    setCandidateRole("")
   }
 
   const confirmCandidate = () => {
@@ -252,13 +263,14 @@ export default function AddSignersPage() {
       name: selectedCandidate.fullName || selectedCandidate.username || "Unknown",
       username: selectedCandidate.username ? `@${selectedCandidate.username}` : "",
       walletAddress: selectedCandidate.walletAddress,
-      role: String(signerRole || "Signer").trim() || "Signer",
+      role: String(candidateRole || "Signer").trim() || "Signer",
       avatar: (selectedCandidate.avatar || "?").slice(0, 2).toUpperCase(),
     }
 
     handleAddSigner(newSigner)
     setSearchQuery("")
     setSelectedCandidate(null)
+    setCandidateRole("")
   }
 
   const handleFinishSetup = async () => {
@@ -275,7 +287,7 @@ export default function AddSignersPage() {
       const creatorSigner = {
         address: account.address,
         name: "Creator",
-        role: String(signerRole || "Owner").trim() || "Owner",
+        role: String(creatorRole || "Owner").trim() || "Owner",
       }
 
       const addedSigners = signers.map((s) => ({
@@ -453,15 +465,15 @@ export default function AddSignersPage() {
               </div>
 
               <div>
-                <label htmlFor="signerRole" className="block text-sm text-start font-medium text-[#69696C] mb-2">
-                  Signer&apos;s role
+                <label htmlFor="creatorRole" className="block text-sm text-start font-medium text-[#69696C] mb-2">
+                  Your role (creator)
                 </label>
                 <Input
-                  id="signerRole"
+                  id="creatorRole"
                   type="text"
                   placeholder="Enter role"
-                  value={signerRole}
-                  onChange={(e) => setSignerRole(e.target.value)}
+                  value={creatorRole}
+                  onChange={(e) => setCreatorRole(e.target.value)}
                   className="h-[40px]"
                 />
               </div>
@@ -529,6 +541,22 @@ export default function AddSignersPage() {
                     <p className="text-xs text-gray-600 break-all">
                       <span className="font-medium">Address:</span> {formatAddress(selectedCandidate.walletAddress)}
                     </p>
+                    <div className="mt-3">
+                      <label
+                        htmlFor="candidateRole"
+                        className="block text-xs font-medium text-gray-700 mb-1"
+                      >
+                        Role
+                      </label>
+                      <Input
+                        id="candidateRole"
+                        type="text"
+                        placeholder="e.g. CFO"
+                        value={candidateRole}
+                        onChange={(e) => setCandidateRole(e.target.value)}
+                        className="h-[36px]"
+                      />
+                    </div>
                     {selectedCandidate.currentOrganization ? (
                       <p className="text-xs text-gray-600">
                         <span className="font-medium">Current org:</span> {selectedCandidate.currentOrganization}
@@ -571,6 +599,14 @@ export default function AddSignersPage() {
                             <p className="text-sm font-medium text-gray-900">{signer.name}</p>
                             <p className="text-xs text-gray-500">{signer.username}</p>
                             <p className="text-[10px] text-gray-500 break-all">{formatAddress(signer.walletAddress)}</p>
+                            <div className="mt-1">
+                              <Input
+                                type="text"
+                                value={signer.role}
+                                onChange={(e) => handleUpdateSignerRole(signer.id, e.target.value)}
+                                className="h-[32px] text-xs"
+                              />
+                            </div>
                           </div>
                         </div>
                         <button
