@@ -5,10 +5,61 @@ import { getContract, prepareContractCall, readContract } from "thirdweb";
 import { baseSepolia } from "thirdweb/chains";
 import { thirdwebClient } from "@/app/client";
 
+const DIZBURZA_FACTORY_ABI = [
+  {
+    inputs: [{ internalType: "address", name: "existingOrg", type: "address" }],
+    name: "CreatorAlreadyHasOrganization",
+    type: "error",
+  },
+  { inputs: [], name: "InvalidOrganizationHash", type: "error" },
+  { inputs: [], name: "InvalidSigners", type: "error" },
+  { inputs: [], name: "InvalidQuorum", type: "error" },
+  { inputs: [], name: "OrganizationNotFound", type: "error" },
+  {
+    inputs: [
+      { internalType: "string", name: "organizationHash", type: "string" },
+      { internalType: "address[]", name: "signers", type: "address[]" },
+      { internalType: "uint256", name: "quorum", type: "uint256" },
+    ],
+    name: "createOrganization",
+    outputs: [
+      { internalType: "address", name: "organization", type: "address" },
+    ],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "address", name: "creator", type: "address" }],
+    name: "getOrganizationByCreator",
+    outputs: [{ internalType: "address", name: "", type: "address" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "address", name: "creator", type: "address" }],
+    name: "hasOrganization",
+    outputs: [{ internalType: "bool", name: "", type: "bool" }],
+    stateMutability: "view",
+    type: "function",
+  },
+] as const;
+
+type DizburzaFactoryAbi = typeof DIZBURZA_FACTORY_ABI;
+
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+const isCreatorAlreadyHasOrganizationError = (error: unknown) => {
+  if (!(error instanceof Error)) return false;
+  const msg = (error.message || "").toLowerCase();
+  return (
+    msg.includes("creatoralreadyhasorganization") ||
+    msg.includes("0xaaf77194") ||
+    msg.includes("encoded error signature \"0xaaf77194\"")
+  );
+};
+
 const readOrganizationWithRetry = async (params: {
-  contract: ReturnType<typeof getContract>;
+  contract: ReturnType<typeof getContract<DizburzaFactoryAbi>>;
   creator: string;
 }) => {
   const startedAt = Date.now();
@@ -19,7 +70,7 @@ const readOrganizationWithRetry = async (params: {
     try {
       const deployedAddress: string = await readContract({
         contract: params.contract,
-        method: "function getOrganizationByCreator(address creator) view returns (address)",
+        method: "getOrganizationByCreator",
         params: [params.creator],
       });
       return deployedAddress;
@@ -57,16 +108,34 @@ export function useCreateOrganization() {
       client: thirdwebClient,
       address: factoryAddress,
       chain: baseSepolia,
+      abi: DIZBURZA_FACTORY_ABI,
     });
+
+    const alreadyHasOrg = await readContract({
+      contract,
+      method: "hasOrganization",
+      params: [account.address],
+    });
+    if (alreadyHasOrg) {
+      return await readOrganizationWithRetry({
+        contract,
+        creator: account.address,
+      });
+    }
 
     const tx = prepareContractCall({
       contract,
-      method:
-        "function createOrganization(string organizationHash, address[] signers, uint256 quorum) returns (address)",
+      method: "createOrganization",
       params: [params.organizationHash, params.signers, params.quorum],
     });
 
-    await sendAndConfirmTx(tx);
+    try {
+      await sendAndConfirmTx(tx);
+    } catch (e) {
+      if (!isCreatorAlreadyHasOrganizationError(e)) {
+        throw e;
+      }
+    }
 
     return await readOrganizationWithRetry({
       contract,

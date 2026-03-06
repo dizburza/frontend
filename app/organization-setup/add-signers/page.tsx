@@ -376,6 +376,13 @@ export default function AddSignersPage() {
 
       localStorage.setItem("accountType", "organization")
 
+      try {
+        localStorage.removeItem("orgDetails")
+        localStorage.removeItem("orgProfile")
+      } catch {
+        // ignore
+      }
+
       toast.success("Organization created successfully")
       router.push(`/org/${created.slug}`)
     } catch (error) {
