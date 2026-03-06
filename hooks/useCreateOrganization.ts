@@ -5,6 +5,35 @@ import { getContract, prepareContractCall, readContract } from "thirdweb";
 import { baseSepolia } from "thirdweb/chains";
 import { thirdwebClient } from "@/app/client";
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+const readOrganizationWithRetry = async (params: {
+  contract: ReturnType<typeof getContract>;
+  creator: string;
+}) => {
+  const startedAt = Date.now();
+  const timeoutMs = 30_000;
+  let delayMs = 600;
+
+  while (Date.now() - startedAt < timeoutMs) {
+    try {
+      const deployedAddress: string = await readContract({
+        contract: params.contract,
+        method: "function getOrganizationByCreator(address creator) view returns (address)",
+        params: [params.creator],
+      });
+      return deployedAddress;
+    } catch {
+      await sleep(delayMs);
+      delayMs = Math.min(3_000, Math.floor(delayMs * 1.35));
+    }
+  }
+
+  throw new Error(
+    "Organization deployment was submitted, but the organization could not be fetched yet. Please wait a moment and refresh.",
+  );
+};
+
 export function useCreateOrganization() {
   const account = useActiveAccount();
   const { mutateAsync: sendAndConfirmTx, data, isPending, error } =
@@ -39,13 +68,10 @@ export function useCreateOrganization() {
 
     await sendAndConfirmTx(tx);
 
-    const deployedAddress: string = await readContract({
+    return await readOrganizationWithRetry({
       contract,
-      method: "function getOrganizationByCreator(address creator) view returns (address)",
-      params: [account.address],
+      creator: account.address,
     });
-
-    return deployedAddress;
   };
 
   return { createOrganization, data, isLoading: isPending, error };
