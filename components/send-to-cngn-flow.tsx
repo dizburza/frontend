@@ -11,6 +11,7 @@ import { useActiveAccount, useSendTransaction, useWalletBalance } from "thirdweb
 import { getContract } from "thirdweb"
 import { prepareContractCall } from "thirdweb/transaction"
 import { baseSepolia } from "thirdweb/chains"
+import { eth_getTransactionReceipt, getRpcClient } from "thirdweb/rpc"
 import { thirdwebClient } from "@/app/client"
 import { parseUnits } from "viem"
 import ConnectWallet from "@/components/ConnectWallet"
@@ -33,6 +34,124 @@ function isHexAddress(value: string): value is `0x${string}` {
   return /^0x[a-fA-F0-9]{40}$/.test(value)
 }
 
+const parseUsernameInput = (value: string) => {
+  const trimmed = value.trim()
+  if (!trimmed) return null
+
+  if (trimmed.startsWith("@@")) {
+    return null
+  }
+
+  if (trimmed.startsWith("@") && (trimmed.length === 1 || /\s/.test(trimmed[1] ?? ""))) {
+    return null
+  }
+
+  const cleaned = trimmed.startsWith("@") ? trimmed.slice(1) : trimmed
+  const username = cleaned.trim().toLowerCase()
+  if (!username) return null
+
+  if (!/^[a-z0-9_]{3,32}$/.test(username)) {
+    return null
+  }
+
+  return username
+}
+
+const computeRecipientLabel = (params: {
+  resolvedUsername: string | null
+  resolvedRecipient: `0x${string}` | null
+}) => {
+  if (params.resolvedUsername) return `@${params.resolvedUsername}`
+  if (params.resolvedRecipient) return shortAddress(params.resolvedRecipient)
+  return "--"
+}
+
+const computeToValue = (params: {
+  resolvedUsername: string | null
+  resolvedRecipient: `0x${string}` | null
+  recipientInput: string
+}) => {
+  if (params.resolvedUsername) return `@${params.resolvedUsername}`
+  if (params.resolvedRecipient) return shortAddress(params.resolvedRecipient)
+  if (isHexAddress(params.recipientInput)) return shortAddress(params.recipientInput)
+  return params.recipientInput
+}
+
+const resolveRecipientInput = async (params: {
+  recipient: string
+  showLoading: (message: string) => void
+  hideLoading: () => void
+}): Promise<{ address: `0x${string}`; username: string | null } | null> => {
+  const input = params.recipient.trim()
+  if (!input) return null
+
+  if (isHexAddress(input)) {
+    return { address: input, username: null }
+  }
+
+  const username = parseUsernameInput(input)
+  if (!username) {
+    toast.error("Enter a valid @username or 0x address")
+    return null
+  }
+
+  try {
+    params.showLoading("Resolving username...")
+    const res = await fetch(`/api/users/resolve/${encodeURIComponent(username)}`)
+    const body = (await res.json()) as { success?: boolean; data?: { username?: string; walletAddress?: string }; error?: string }
+
+    if (!res.ok || !body?.data?.walletAddress) {
+      toast.error(body?.error || "Could not resolve username")
+      return null
+    }
+
+    const addr = body.data.walletAddress.trim()
+    if (!isHexAddress(addr)) {
+      toast.error("Resolved address is invalid")
+      return null
+    }
+
+    return {
+      address: addr,
+      username: body.data.username || username,
+    }
+  } catch (e) {
+    console.error(e)
+    toast.error("Could not resolve username")
+    return null
+  } finally {
+    params.hideLoading()
+  }
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+const getTxHashFromSendResult = (result: unknown): `0x${string}` | null => {
+  if (!result) return null
+  if (typeof result === "string" && isHexAddress(result)) return result
+
+  const r = result as { transactionHash?: unknown; receipt?: { transactionHash?: unknown } }
+  const hash = r?.transactionHash ?? r?.receipt?.transactionHash
+  return typeof hash === "string" && isHexAddress(hash) ? (hash) : null
+}
+
+const waitForReceipt = async (hash: `0x${string}`) => {
+  const rpcRequest = getRpcClient({ client: thirdwebClient, chain: baseSepolia })
+
+  const startedAt = Date.now()
+  const timeoutMs = 90_000
+  let delayMs = 1_200
+
+  while (Date.now() - startedAt < timeoutMs) {
+    const receipt = await eth_getTransactionReceipt(rpcRequest, { hash })
+    if (receipt) return receipt
+    await sleep(delayMs)
+    delayMs = Math.min(4_000, Math.floor(delayMs * 1.25))
+  }
+
+  throw new Error("Timed out waiting for transaction confirmation")
+}
+
 export function SendToCNGNFlow({ isOpen, onClose, initialRecipient }: Readonly<SendToCNGNFlowProps>) {
   const [step, setStep] = useState<Step>("recipient")
   const [recipient, setRecipient] = useState("")
@@ -48,11 +167,7 @@ export function SendToCNGNFlow({ isOpen, onClose, initialRecipient }: Readonly<S
 
   const tokenAddress = (process.env.NEXT_PUBLIC_CNGN_ADDRESS || "").trim() as `0x${string}` | ""
   const contract = tokenAddress
-    ? getContract({
-        address: tokenAddress,
-        chain: baseSepolia,
-        client: thirdwebClient,
-      })
+    ? getContract({ address: tokenAddress, chain: baseSepolia, client: thirdwebClient })
     : null
 
   const { data: balanceData } = useWalletBalance({
@@ -62,12 +177,7 @@ export function SendToCNGNFlow({ isOpen, onClose, initialRecipient }: Readonly<S
     tokenAddress: tokenAddress || undefined,
   })
 
-  let recipientLabel = "--"
-  if (resolvedUsername) {
-    recipientLabel = `@${resolvedUsername}`
-  } else if (resolvedRecipient) {
-    recipientLabel = shortAddress(resolvedRecipient)
-  }
+  const recipientLabel = computeRecipientLabel({ resolvedUsername, resolvedRecipient })
 
   let availableBalanceText = "--"
   if (account?.address) {
@@ -111,76 +221,6 @@ export function SendToCNGNFlow({ isOpen, onClose, initialRecipient }: Readonly<S
   }, [account?.address, isOpen, resolvedRecipient, step])
 
   if (!isOpen) return null
-
-  const parseUsername = (value: string) => {
-    const trimmed = value.trim()
-    if (!trimmed) return null
-
-    if (trimmed.startsWith("@@")) {
-      return null
-    }
-
-    if (trimmed.startsWith("@") && (trimmed.length === 1 || /\s/.test(trimmed[1] ?? ""))) {
-      return null
-    }
-
-    const cleaned = trimmed.startsWith("@") ? trimmed.slice(1) : trimmed
-    const username = cleaned.trim().toLowerCase()
-    if (!username) return null
-
-    // Keep it simple + compatible with existing generated usernames (letters/numbers/underscore)
-    if (!/^[a-z0-9_]{3,32}$/.test(username)) {
-      return null
-    }
-
-    return username
-  }
-
-  const resolveRecipient = async (): Promise<
-    | { address: `0x${string}`; username: string | null }
-    | null
-  > => {
-    const input = recipient.trim()
-    if (!input) return null
-
-    if (isHexAddress(input)) {
-      return { address: input, username: null }
-    }
-
-    const username = parseUsername(input)
-    if (!username) {
-      toast.error("Enter a valid @username or 0x address")
-      return null
-    }
-
-    try {
-      showLoading("Resolving username...")
-      const res = await fetch(`/api/users/resolve/${encodeURIComponent(username)}`)
-      const body = (await res.json()) as { success?: boolean; data?: { username?: string; walletAddress?: string }; error?: string }
-
-      if (!res.ok || !body?.data?.walletAddress) {
-        toast.error(body?.error || "Could not resolve username")
-        return null
-      }
-
-      const addr = body.data.walletAddress.trim()
-      if (!isHexAddress(addr)) {
-        toast.error("Resolved address is invalid")
-        return null
-      }
-
-      return {
-        address: addr,
-        username: body.data.username || username,
-      }
-    } catch (e) {
-      console.error(e)
-      toast.error("Could not resolve username")
-      return null
-    } finally {
-      hideLoading()
-    }
-  }
 
   const submitTransfer = async () => {
     try {
@@ -227,9 +267,21 @@ export function SendToCNGNFlow({ isOpen, onClose, initialRecipient }: Readonly<S
         params: [resolvedRecipient, parseUnits(amount, tokenDecimals)],
       })
 
-      await sendTx(tx)
+      const result = await sendTx(tx)
+      const txHash = getTxHashFromSendResult(result)
 
       toast.success("Transfer submitted")
+
+      if (txHash) {
+        showLoading("Waiting for confirmation...")
+        const receipt = await waitForReceipt(txHash)
+        const statusRaw = (receipt as { status?: unknown } | null | undefined)?.status
+        const status = typeof statusRaw === "string" ? statusRaw : undefined
+        if (status?.toLowerCase() === "0x0") {
+          throw new Error("Transaction reverted")
+        }
+      }
+
       globalThis.dispatchEvent(new Event("cngn:activity:refresh"))
       setStep("success")
     } catch (error) {
@@ -247,7 +299,7 @@ export function SendToCNGNFlow({ isOpen, onClose, initialRecipient }: Readonly<S
       if (!recipient) return
       if (isLoading) return
 
-      const result = await resolveRecipient()
+      const result = await resolveRecipientInput({ recipient, showLoading, hideLoading })
       if (!result) return
 
       setResolvedRecipient(result.address)
@@ -278,6 +330,12 @@ export function SendToCNGNFlow({ isOpen, onClose, initialRecipient }: Readonly<S
   }
 
   if (step === "success") {
+    const toValue = computeToValue({
+      resolvedUsername,
+      resolvedRecipient,
+      recipientInput: recipient,
+    })
+
     return (
       <SuccessModal
         title="Send cNGN"
@@ -289,7 +347,7 @@ export function SendToCNGNFlow({ isOpen, onClose, initialRecipient }: Readonly<S
           },
           {
             label: "To",
-            value: resolvedUsername ? `@${resolvedUsername}` : resolvedRecipient || recipient,
+            value: toValue,
           },
           {
             label: "Network",
