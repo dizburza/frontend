@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { ChevronDown, Search, Copy, MoreVertical } from "lucide-react"
 import useOrgSlug from "@/hooks/useOrgSlug"
-import { useOrganizationBySlug, useTransactionHistory } from "@/lib/api/organization"
+import { useOrganizationBySlug, useTransactionHistory, useTransactionSummary } from "@/lib/api/organization"
 import { useActiveAccount } from "thirdweb/react"
 
 export default function TransactionsPage() {
@@ -57,6 +57,11 @@ export default function TransactionsPage() {
     refresh,
   } = useTransactionHistory(queryAddress, { page, limit })
 
+  const { data: summaryData, loading: summaryLoading } = useTransactionSummary(queryAddress)
+
+  const outgoingTotal = Number.parseFloat(String(summaryData?.outflowAmount || "0")) || 0
+  const incomingTotal = Number.parseFloat(String(summaryData?.inflowAmount || "0")) || 0
+
   const transactions = history?.transactions || []
 
   const totalTransactions = history?.pagination?.total ?? transactions.length
@@ -94,20 +99,6 @@ export default function TransactionsPage() {
   } else if (lastUpdatedAt) {
     lastUpdatedText = lastUpdatedAt.toLocaleString()
   }
-
-  const outgoingTotal = transactions
-    .filter((t) => t.direction === "sent")
-    .reduce((acc, t) => {
-      const amt = Number.parseFloat(String(t.displayAmount || "0").replaceAll("-", ""))
-      return acc + (Number.isFinite(amt) ? amt : 0)
-    }, 0)
-
-  const incomingTotal = transactions
-    .filter((t) => t.direction === "received")
-    .reduce((acc, t) => {
-      const amt = Number.parseFloat(String(t.displayAmount || "0").replaceAll("+", ""))
-      return acc + (Number.isFinite(amt) ? amt : 0)
-    }, 0)
 
   const getStatusColor = (status: string) => {
     if (status === "confirmed") return "bg-green-100 text-green-700"
@@ -210,11 +201,19 @@ export default function TransactionsPage() {
         />
         <StatCard
           label="Total Outflow (cNGN)"
-          value={outgoingTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          value={
+            summaryLoading
+              ? "--"
+              : outgoingTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+          }
         />
         <StatCard
           label="Total Inflow (cNGN)"
-          value={incomingTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          value={
+            summaryLoading
+              ? "--"
+              : incomingTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+          }
         />
         <StatCard label="Completed" value={String(transactions.length)} />
       </div>

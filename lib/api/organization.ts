@@ -685,6 +685,31 @@ export function useTransactionHistory(
 
   const refresh = () => setRefreshKey((k) => k + 1);
 
+  useEffect(() => {
+    if (!address) return;
+
+    const refreshNow = () => {
+      refresh();
+    };
+
+    const onFocus = () => refreshNow();
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") {
+        refreshNow();
+      }
+    };
+
+    globalThis.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
+    globalThis.addEventListener("cngn:activity:refresh", refreshNow);
+
+    return () => {
+      globalThis.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+      globalThis.removeEventListener("cngn:activity:refresh", refreshNow);
+    };
+  }, [address]);
+
   useAuthCompleted(() => {
     if (address) {
       refresh();
