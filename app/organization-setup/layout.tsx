@@ -24,12 +24,16 @@ export default function OnboardingLayout({
   const wallet = useActiveWallet();
   const { disconnect } = useDisconnect();
 
-  const handleDisconnect = () => {
+  const handleDisconnect = async () => {
     clearAuthStorage();
-    if (wallet) {
-      disconnect(wallet);
+    try {
+      if (wallet) {
+        await Promise.resolve(disconnect(wallet));
+      }
+    } finally {
+      router.replace("/");
+      router.refresh();
     }
-    router.push("/");
   };
 
   return (

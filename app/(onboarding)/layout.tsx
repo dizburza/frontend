@@ -9,20 +9,24 @@ import { clearAuthStorage } from "@/hooks/useAutoAuthenticate";
 import { useRouter } from "next/navigation";
 export default function OnboardingLayout({
   children,
-}: {
+}: Readonly<{
   children: React.ReactNode
-}) {
+}>) {
   const router = useRouter();
   const account = useActiveAccount();
   const wallet = useActiveWallet();
   const { disconnect } = useDisconnect();
 
-  const handleDisconnect = () => {
+  const handleDisconnect = async () => {
     clearAuthStorage();
-    if (wallet) {
-      disconnect(wallet);
+    try {
+      if (wallet) {
+        await Promise.resolve(disconnect(wallet));
+      }
+    } finally {
+      router.replace("/");
+      router.refresh();
     }
-    router.push("/");
   };
 
   return (

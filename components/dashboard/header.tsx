@@ -31,12 +31,32 @@ export function DashboardHeader() {
   const [pendingSyncCount, setPendingSyncCount] = useState(0);
   const [syncingNow, setSyncingNow] = useState(false);
 
-  const handleDisconnect = () => {
+  type Thenable = { then: (onfulfilled?: () => void, onrejected?: () => void) => unknown };
+  const isThenable = (value: unknown): value is Thenable => {
+    return !!value && typeof value === "object" && "then" in value && typeof (value as { then?: unknown }).then === "function";
+  };
+
+  const handleDisconnect = async () => {
     clearAuthStorage();
-    if (wallet) {
-      disconnect(wallet);
+    try {
+      if (wallet) {
+        await new Promise<void>((resolve) => {
+          try {
+            const result = disconnect(wallet) as unknown;
+            if (isThenable(result)) {
+              result.then(() => resolve(), () => resolve());
+              return;
+            }
+            resolve();
+          } catch {
+            resolve();
+          }
+        });
+      }
+    } finally {
+      router.replace("/");
+      router.refresh();
     }
-    router.push("/");
   };
 
   useEffect(() => {
