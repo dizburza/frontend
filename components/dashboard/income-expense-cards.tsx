@@ -16,6 +16,10 @@ const asHexAddress = (value: string | null | undefined) => {
 export function IncomeExpenseCards(props?: Readonly<{ address?: string | null }>) {
   const account = useActiveAccount();
   const address = props?.address ?? account?.address ?? null;
+  const cacheKey = useMemo(() => {
+    const a = (address || "").trim().toLowerCase();
+    return a ? `cngn:last-inout:${a}` : null;
+  }, [address]);
   const { latestIncomingAmount, latestOutgoingAmount, isLoading } = useCngnTransferActivity({
     walletAddress: asHexAddress(address),
   });
@@ -29,14 +33,51 @@ export function IncomeExpenseCards(props?: Readonly<{ address?: string | null }>
     };
   }, [latestIncomingAmount, latestOutgoingAmount]);
 
-  const [lastIncomingAmount, setLastIncomingAmount] = useState<number | null>(null);
-  const [lastOutgoingAmount, setLastOutgoingAmount] = useState<number | null>(null);
+  const [lastIncomingAmount, setLastIncomingAmount] = useState<number | null>(() => {
+    if (!cacheKey) return null;
+    try {
+      const raw = globalThis.localStorage?.getItem(cacheKey);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as { incoming?: number };
+      return typeof parsed?.incoming === "number" && Number.isFinite(parsed.incoming)
+        ? parsed.incoming
+        : null;
+    } catch {
+      return null;
+    }
+  });
+  const [lastOutgoingAmount, setLastOutgoingAmount] = useState<number | null>(() => {
+    if (!cacheKey) return null;
+    try {
+      const raw = globalThis.localStorage?.getItem(cacheKey);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as { outgoing?: number };
+      return typeof parsed?.outgoing === "number" && Number.isFinite(parsed.outgoing)
+        ? parsed.outgoing
+        : null;
+    } catch {
+      return null;
+    }
+  });
 
   useEffect(() => {
     if (isLoading) return;
     setLastIncomingAmount(incoming);
     setLastOutgoingAmount(outgoing);
   }, [isLoading, incoming, outgoing]);
+
+  useEffect(() => {
+    if (isLoading) return;
+    if (!cacheKey) return;
+    try {
+      globalThis.localStorage?.setItem(
+        cacheKey,
+        JSON.stringify({ incoming, outgoing, updatedAt: Date.now() }),
+      );
+    } catch {
+      // ignore
+    }
+  }, [cacheKey, isLoading, incoming, outgoing]);
 
   const incomingToDisplay =
     isLoading && lastIncomingAmount !== null ? lastIncomingAmount : incoming;

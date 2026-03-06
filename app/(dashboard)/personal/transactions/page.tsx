@@ -22,26 +22,6 @@ export default function PersonalTransactionsPage() {
   const totalPages = data?.pagination?.totalPages ?? 1
   const hasMore = data?.pagination?.hasMore ?? false
 
-  useEffect(() => {
-    console.log("[personal][transactions][history]", {
-      address,
-      page,
-      limit,
-      isLoading,
-      pagination: data?.pagination,
-      count: transactions.length,
-      latestTxHash: transactions[0]?.txHash,
-    })
-  }, [address, page, limit, isLoading, data?.pagination, transactions.length, transactions])
-
-  useEffect(() => {
-    console.log("[personal][transactions][summary]", {
-      address,
-      summaryLoading,
-      summaryData,
-    })
-  }, [address, summaryLoading, summaryData])
-
   // Reset pagination on wallet switch
   useEffect(() => {
     setPage(1)
