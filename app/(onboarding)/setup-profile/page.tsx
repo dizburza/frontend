@@ -55,16 +55,39 @@ export default function SetupProfilePage() {
       }
 
       setIsLoading(true)
+
+      // Register now proves control of the address. Without this anyone could
+      // claim a wallet they do not own and be handed a session for it.
+      showLoading("Confirm signature to continue...")
+
+      const challengeRes = await fetch(`/api/auth/message/${address}`, {
+        credentials: "include",
+      })
+      const challenge = (await challengeRes.json().catch(() => null)) as
+        | { data?: { message?: string } }
+        | null
+
+      const message = challenge?.data?.message
+      if (!message) {
+        toast.error("Could not start sign-in. Please try again.")
+        return
+      }
+
+      const signature = await account.signMessage({ message })
+
       showLoading("Saving profile...")
 
       const res = await fetch("/api/auth/register", {
         method: "POST",
+        // Register signs the user in, so the response sets the session cookie.
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
           Accept: "application/json",
         },
         body: JSON.stringify({
           walletAddress: address,
+          signature,
           surname: formData.surname,
           firstname: formData.firstName,
           email: formData.email,
@@ -77,7 +100,6 @@ export default function SetupProfilePage() {
             message?: string
             error?: string
             data?: {
-              token?: string
               user?: unknown
               redirectTo?: string
             }
@@ -93,10 +115,6 @@ export default function SetupProfilePage() {
       // Keep a local copy for convenience, but the source of truth is the backend.
       localStorage.setItem("userProfile", JSON.stringify(formData))
 
-      if (payload.data?.token) {
-        localStorage.setItem("token", payload.data.token)
-        localStorage.setItem("token_wallet", address)
-      }
 
       try {
         localStorage.removeItem(`authCheck:${address}`)

@@ -1,9 +1,10 @@
 "use client";
 
-import { useSendAndConfirmTransaction, useActiveAccount } from "thirdweb/react";
+import { activeChain } from "@/constants/chain";
+import { useActiveAccount } from "thirdweb/react";
 import { getContract, prepareContractCall, readContract } from "thirdweb";
-import { baseSepolia } from "thirdweb/chains";
 import { thirdwebClient } from "@/app/client";
+import { useSponsoredTransaction } from "@/hooks/useSponsoredTransaction";
 
 const DIZBURZA_FACTORY_ABI = [
   {
@@ -18,7 +19,7 @@ const DIZBURZA_FACTORY_ABI = [
   {
     inputs: [
       { internalType: "string", name: "organizationHash", type: "string" },
-      { internalType: "address[]", name: "signers", type: "address[]" },
+      { internalType: "uint256", name: "targetSignerCount", type: "uint256" },
       { internalType: "uint256", name: "quorum", type: "uint256" },
     ],
     name: "createOrganization",
@@ -87,12 +88,14 @@ const readOrganizationWithRetry = async (params: {
 
 export function useCreateOrganization() {
   const account = useActiveAccount();
-  const { mutateAsync: sendAndConfirmTx, data, isPending, error } =
-    useSendAndConfirmTransaction();
+  const { send } = useSponsoredTransaction();
 
+  // The creator is the sole signer on chain at creation. The rest are added
+  // afterwards with addSigner, and once the declared count is reached every
+  // further change needs quorum.
   const createOrganization = async (params: {
     organizationHash: string;
-    signers: string[];
+    targetSignerCount: bigint;
     quorum: bigint;
   }) => {
     if (!account?.address) {
@@ -107,7 +110,7 @@ export function useCreateOrganization() {
     const contract = getContract({
       client: thirdwebClient,
       address: factoryAddress,
-      chain: baseSepolia,
+      chain: activeChain,
       abi: DIZBURZA_FACTORY_ABI,
     });
 
@@ -126,22 +129,24 @@ export function useCreateOrganization() {
     const tx = prepareContractCall({
       contract,
       method: "createOrganization",
-      params: [params.organizationHash, params.signers, params.quorum],
+      params: [params.organizationHash, params.targetSignerCount, params.quorum],
     });
 
     try {
-      await sendAndConfirmTx(tx);
+      await send(tx);
     } catch (e) {
       if (!isCreatorAlreadyHasOrganizationError(e)) {
         throw e;
       }
     }
 
+    // A sponsored send returns once submitted, so the address may not be
+    // readable yet. The retry loop was already here for the same reason.
     return await readOrganizationWithRetry({
       contract,
       creator: account.address,
     });
   };
 
-  return { createOrganization, data, isLoading: isPending, error };
+  return { createOrganization };
 }

@@ -8,19 +8,6 @@ export type Employee = {
   salary: number
 }
 
-export type Proposal = {
-  id: string
-  title: string
-  description: string
-  amount: number
-  status: string
-  timeLeft: string
-  votesFor: number
-  votesAgainst: number
-  createdAt: string
-  createdBy: string
-}
-
 export type PaymentBatchRecipient = {
   surname: string
   firstName: string
@@ -46,12 +33,3 @@ export type Signer = {
   avatar: string
 }
 
-export type VotingLogItem = {
-  id: number
-  signer: string
-  handle: string
-  role: string
-  decision: string
-  timestamp: string
-  avatar: string
-}

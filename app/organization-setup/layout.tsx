@@ -7,6 +7,7 @@ import { useActiveAccount, useActiveWallet, useDisconnect } from "thirdweb/react
 import { clearAuthStorage } from "@/hooks/useAutoAuthenticate";
 import { useRouter } from "next/navigation";
 
+
 const formatAddress = (address?: string) => {
   const a = (address || "").trim();
   if (!a) return "";

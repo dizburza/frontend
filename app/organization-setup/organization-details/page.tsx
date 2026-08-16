@@ -1,13 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import StepIndicator from "@/components/step-indicator";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import FileUploadArea from "@/components/file-upload-area";
+import { checkOrganizationIdentifiers } from "@/lib/api/organization";
 import { toast } from "sonner";
+
+type IdentifierState = {
+  registrationTaken: boolean;
+  tinTaken: boolean;
+};
 
 export default function OrganizationDetailsPage() {
   const router = useRouter();
@@ -16,8 +22,47 @@ export default function OrganizationDetailsPage() {
     industry: "",
     registrationType: "",
     registrationNumber: "",
+    taxIdentificationNumber: "",
     country: "",
   });
+  const [identifiers, setIdentifiers] = useState<IdentifierState>({
+    registrationTaken: false,
+    tinTaken: false,
+  });
+
+  const { registrationNumber, taxIdentificationNumber } = formData;
+
+  // Told here rather than at submit, because by then the organization contract
+  // has already been deployed and cannot be taken back.
+  useEffect(() => {
+    if (!registrationNumber && !taxIdentificationNumber) {
+      setIdentifiers({ registrationTaken: false, tinTaken: false });
+      return;
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        const result = await checkOrganizationIdentifiers({
+          registrationNumber,
+          taxIdentificationNumber,
+        });
+        if (cancelled) return;
+        setIdentifiers({
+          registrationTaken: !result.registrationNumberAvailable,
+          tinTaken: !result.taxIdentificationNumberAvailable,
+        });
+      } catch {
+        // A failed check must not block the form. The unique index and the
+        // recheck before deployment still catch a clash.
+      }
+    }, 400);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [registrationNumber, taxIdentificationNumber]);
 
   const steps = [
     {
@@ -45,6 +90,11 @@ export default function OrganizationDetailsPage() {
 
   const handleContinue = async () => {
     if (isLoading) return;
+
+    if (identifiers.registrationTaken || identifiers.tinTaken) {
+      toast.error("Those company details are already registered on Dizburza");
+      return;
+    }
 
     try {
       setIsLoading(true);
@@ -159,6 +209,37 @@ export default function OrganizationDetailsPage() {
                     })
                   }
                 />
+                {identifiers.registrationTaken && (
+                  <p className="mt-1 text-xs text-red-600">
+                    This registration number already belongs to an organization on Dizburza.
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label
+                  htmlFor="taxIdentificationNumber"
+                  className="block text-sm font-medium text-[#69696C] mb-2"
+                >
+                  Tax Identification Number
+                </label>
+                <Input
+                  id="taxIdentificationNumber"
+                  type="text"
+                  placeholder="e.g 12345678-0001"
+                  value={formData.taxIdentificationNumber}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      taxIdentificationNumber: e.target.value,
+                    })
+                  }
+                />
+                {identifiers.tinTaken && (
+                  <p className="mt-1 text-xs text-red-600">
+                    This TIN already belongs to an organization on Dizburza.
+                  </p>
+                )}
               </div>
 
               <div>

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
 import StepIndicator from "@/components/step-indicator"
 import { Button } from "@/components/ui/button"
@@ -9,8 +9,13 @@ import { Card } from "@/components/ui/card"
 import type { Signer } from "@/lib/types/payloads"
 import { toast } from "sonner"
 import { useActiveAccount } from "thirdweb/react"
-import { createOrganizationRecord } from "@/lib/api/organization"
+import {
+  checkOrganizationIdentifiers,
+  createOrganizationRecord,
+} from "@/lib/api/organization"
 import { useCreateOrganization } from "@/hooks/useCreateOrganization"
+import { hasSessionFor } from "@/lib/session"
+import { getTokenConfig } from "@/lib/token"
 
 type UserLookupResult = {
   username?: string
@@ -38,128 +43,51 @@ const normalizeUsername = (value: string) => {
   return cleaned
 }
 
-const getBackendUrl = () => process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5050"
-
-const fetchUserByAddress = async (backendUrl: string, address: string, signal: AbortSignal) => {
-  const res = await fetch(`${backendUrl}/api/users/search-address/${address}`, {
-    method: "GET",
-    headers: {
-      Accept: "application/json",
-    },
-    signal,
-  })
-
-  if (!res.ok) return null
-
-  const payload = (await res.json()) as {
-    data?: {
-      user?: {
-        username?: string
-        fullName?: string
-        avatar?: string
-        walletAddress: string
-        currentOrganization?: string | null
-      }
-      canBeAdded?: boolean
-    }
-  }
-
-  const u = payload.data?.user
-  if (!u) return null
-
-  return {
-    username: u.username,
-    fullName: u.fullName,
-    walletAddress: u.walletAddress,
-    avatar: u.avatar,
-    currentOrganization: u.currentOrganization,
-    canBeAdded: Boolean(payload.data?.canBeAdded),
-  } satisfies UserLookupResult
-}
-
-const fetchUserByUsername = async (backendUrl: string, username: string, signal: AbortSignal) => {
-  const res = await fetch(`${backendUrl}/api/users/search/${username}`, {
-    method: "GET",
-    headers: {
-      Accept: "application/json",
-    },
-    signal,
-  })
-
-  if (!res.ok) return null
-
-  const payload = (await res.json()) as {
-    data?: {
-      user?: {
-        username?: string
-        fullName?: string
-        avatar?: string
-        walletAddress: string
-        currentOrganization?: string | null
-      }
-      canBeAdded?: boolean
-    }
-  }
-
-  const u = payload.data?.user
-  if (!u) return null
-
-  return {
-    username: u.username,
-    fullName: u.fullName,
-    walletAddress: u.walletAddress,
-    avatar: u.avatar,
-    currentOrganization: u.currentOrganization,
-    canBeAdded: Boolean(payload.data?.canBeAdded),
-  } satisfies UserLookupResult
-}
-
-const fetchSuggestions = async (backendUrl: string, query: string, signal: AbortSignal) => {
-  const suggest = await fetch(`${backendUrl}/api/users/suggest?query=${encodeURIComponent(query)}`, {
-    method: "GET",
-    headers: {
-      Accept: "application/json",
-    },
-    signal,
-  })
-
-  if (!suggest.ok) return []
-
-  const suggestPayload = (await suggest.json()) as {
-    data?: { suggestions?: { username?: string; fullName?: string; avatar?: string }[] }
-  }
-
-  return suggestPayload.data?.suggestions || []
-}
-
-const searchUsers = async (backendUrl: string, rawQuery: string, signal: AbortSignal) => {
+/**
+ * Lookups go through the Next proxy so the session cookie is attached, and
+ * they are exact match. There is deliberately no prefix search: typing two
+ * letters and getting a list of real people back was a way to walk the whole
+ * user base from outside.
+ */
+const lookupUser = async (rawQuery: string, signal: AbortSignal) => {
   const raw = rawQuery.trim()
-  if (!raw) return [] as UserLookupResult[]
+  if (!raw) return null
 
-  if (isAddressQuery(raw)) {
-    const resolved = await fetchUserByAddress(backendUrl, raw, signal)
-    return resolved ? [resolved] : ([] as UserLookupResult[])
-  }
+  const path = isAddressQuery(raw)
+    ? `/api/users/search-address/${raw}`
+    : `/api/users/search/${encodeURIComponent(normalizeUsername(raw))}`
 
-  const q = normalizeUsername(raw)
-  if (q.length < 2) return [] as UserLookupResult[]
+  const res = await fetch(path, {
+    method: "GET",
+    headers: { Accept: "application/json" },
+    credentials: "include",
+    signal,
+  })
 
-  const suggestions = await fetchSuggestions(backendUrl, q, signal)
-  const usernames: string[] = []
-  for (const s of suggestions) {
-    if (s.username) {
-      usernames.push(s.username)
+  if (!res.ok) return null
+
+  const payload = (await res.json()) as {
+    data?: {
+      user?: {
+        username?: string
+        fullName?: string
+        avatar?: string
+        walletAddress: string
+      }
+      canBeAdded?: boolean
     }
-    if (usernames.length >= 6) break
   }
 
-  const results: UserLookupResult[] = []
-  for (const uname of usernames) {
-    const found = await fetchUserByUsername(backendUrl, uname, signal)
-    if (found) results.push(found)
-  }
+  const u = payload.data?.user
+  if (!u) return null
 
-  return results
+  return {
+    username: u.username,
+    fullName: u.fullName,
+    walletAddress: u.walletAddress,
+    avatar: u.avatar,
+    canBeAdded: Boolean(payload.data?.canBeAdded),
+  } satisfies UserLookupResult
 }
 
 export default function AddSignersPage() {
@@ -175,6 +103,7 @@ export default function AddSignersPage() {
   const [signers, setSigners] = useState<Signer[]>([])
   const [searchResults, setSearchResults] = useState<UserLookupResult[]>([])
   const [isSearching, setIsSearching] = useState(false)
+  const [hasSearched, setHasSearched] = useState(false)
   const [selectedCandidate, setSelectedCandidate] = useState<UserLookupResult | null>(null)
 
   const steps = [
@@ -183,48 +112,36 @@ export default function AddSignersPage() {
     { number: 3, title: "Add Signers", subtitle: "", completed: false, active: true },
   ]
 
-  const debounceQuery = useMemo(() => searchQuery.trim(), [searchQuery])
   const hasSearchQuery = searchQuery.trim().length > 0
-  const hasSearchResults = searchResults.length > 0
-  const showSearching = hasSearchQuery && isSearching
-  const showResults = hasSearchQuery && !isSearching && hasSearchResults
-  const showNoResults = hasSearchQuery && !isSearching && !hasSearchResults
+  const showSearching = isSearching
+  const showResults = hasSearched && !isSearching && searchResults.length > 0
+  const showNoResults = hasSearched && !isSearching && searchResults.length === 0
 
-  useEffect(() => {
-    if (!debounceQuery) {
-      setSearchResults([])
-      setSelectedCandidate(null)
-      return
-    }
+  // Runs on submit, not on every keystroke. Typing ahead would fire a lookup
+  // per character and spend the rate limit before the name was finished.
+  const runLookup = async () => {
+    const query = searchQuery.trim()
+    if (!query || isSearching) return
 
     const controller = new AbortController()
-    const runSearch = async () => {
-      try {
-        setIsSearching(true)
-        setSearchResults([])
-        setSelectedCandidate(null)
 
-        const results = await searchUsers(getBackendUrl(), debounceQuery, controller.signal)
-        setSearchResults(results)
-      } catch (e) {
-        const isAbort = e instanceof Error && e.name === "AbortError"
-        if (!isAbort) {
-          toast.error("Could not search users")
-        }
-      } finally {
-        setIsSearching(false)
+    try {
+      setIsSearching(true)
+      setSearchResults([])
+      setSelectedCandidate(null)
+      setHasSearched(true)
+
+      const found = await lookupUser(query, controller.signal)
+      setSearchResults(found ? [found] : [])
+    } catch (e) {
+      const isAbort = e instanceof Error && e.name === "AbortError"
+      if (!isAbort) {
+        toast.error("Could not look up that user")
       }
+    } finally {
+      setIsSearching(false)
     }
-
-    const handle = setTimeout(() => {
-      void runSearch()
-    }, 350)
-
-    return () => {
-      controller.abort()
-      clearTimeout(handle)
-    }
-  }, [debounceQuery])
+  }
 
   const handleAddSigner = (signer: Signer) => {
     if (!signers.some((s) => s.walletAddress.toLowerCase() === signer.walletAddress.toLowerCase())) {
@@ -322,6 +239,7 @@ export default function AddSignersPage() {
         industry?: string
         registrationType?: string
         registrationNumber?: string
+        taxIdentificationNumber?: string
         country?: string
       }
 
@@ -357,10 +275,40 @@ export default function AddSignersPage() {
       )
       const organizationHash = "0x" + encodeHex(rawHash)
 
+      // Saving the record needs a session. Checked before deploying rather
+      // than after, because a contract cannot be undeployed and the run would
+      // otherwise end with an organization on chain that Dizburza has no
+      // record of.
+      if (!hasSessionFor(account.address)) {
+        toast.error("Your session has expired. Reconnect your wallet and sign in to continue.")
+        return
+      }
+
+      // Deployment cannot be undone, so the identifiers are confirmed unclaimed
+      // one last time before the transaction goes out.
+      if (orgDetails.registrationNumber || orgDetails.taxIdentificationNumber) {
+        const availability = await checkOrganizationIdentifiers({
+          registrationNumber: orgDetails.registrationNumber,
+          taxIdentificationNumber: orgDetails.taxIdentificationNumber,
+        })
+
+        if (!availability.registrationNumberAvailable) {
+          toast.error("That registration number is already registered to another organization")
+          return
+        }
+        if (!availability.taxIdentificationNumberAvailable) {
+          toast.error("That TIN is already registered to another organization")
+          return
+        }
+      }
+
       toast.message("Deploying organization contract...")
+      // On chain the creator is the only signer at this point. The addresses
+      // collected here are recorded off chain and added with addSigner, which
+      // is why only the count goes to the contract.
       const contractAddress = await createOrganization({
         organizationHash,
-        signers: signerPayload.map((s) => s.address),
+        targetSignerCount: BigInt(signerPayload.length),
         quorum: BigInt(quorum),
       })
 
@@ -373,6 +321,7 @@ export default function AddSignersPage() {
         businessEmail,
         businessInfo: {
           registrationNumber: orgDetails.registrationNumber,
+          taxIdentificationNumber: orgDetails.taxIdentificationNumber,
           registrationType: orgDetails.registrationType,
         },
         signers: signerPayload,
@@ -381,7 +330,9 @@ export default function AddSignersPage() {
           industry: orgDetails.industry,
         },
         settings: {
-          payrollCurrency: "cNGN",
+          // Recorded against the organization, so it has to be the token this
+          // deployment actually pays in rather than a literal.
+          payrollCurrency: (await getTokenConfig()).symbol,
           timeZone: "Africa/Lagos",
         },
       })
@@ -486,16 +437,38 @@ export default function AddSignersPage() {
                   <Input
                     id="signerUsernameSearch"
                     type="text"
-                    placeholder="Search @username or 0x..."
+                    placeholder="Enter the full @username or 0x address"
                     value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="h-[40px]"
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value)
+                      setHasSearched(false)
+                      setSearchResults([])
+                      setSelectedCandidate(null)
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault()
+                        void runLookup()
+                      }
+                    }}
+                    className="h-[40px] pr-10"
                   />
-                  <button className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</button>
+                  <button
+                    type="button"
+                    aria-label="Look up user"
+                    disabled={!hasSearchQuery || isSearching}
+                    onClick={() => void runLookup()}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 disabled:opacity-40"
+                  >
+                    🔍
+                  </button>
                 </div>
+                <p className="mt-1 text-xs text-gray-500">
+                  Enter the username in full. Dizburza does not suggest other people&apos;s usernames.
+                </p>
 
                 {/* Search results */}
-                {hasSearchQuery && (
+                {(hasSearched || isSearching) && (
                   <div className="mt-2 space-y-2 max-h-24 overflow-y-auto">
                     {showSearching ? <div className="p-3 text-sm text-gray-500">Searching...</div> : null}
                     {showNoResults ? <div className="p-3 text-sm text-gray-500">No results</div> : null}
