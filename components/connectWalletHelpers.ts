@@ -1,33 +1,11 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Account } from "thirdweb/wallets";
 import { getBasename } from "@superdevfavour/basename";
 import type { useRouter } from "next/navigation";
+import { fetchSessionProfile, isWalletRegistered } from "@/lib/session";
+import { useAuthCompleted } from "@/hooks/useAutoAuthenticate";
 
 type AppRouter = ReturnType<typeof useRouter>;
-
-type ApiResponse<T> = {
-  success: boolean;
-  message?: string;
-  data?: T;
-  error?: string;
-  details?: unknown;
-};
-
-type AuthCheckData = {
-  isRegistered: boolean;
-  user?: {
-    username?: string;
-    surname?: string;
-    firstname?: string;
-    fullName?: string;
-    avatar?: string;
-    role?: "user" | "employee" | "signer" | "admin";
-    organizationSlug?: string;
-    jobDetails?: {
-      jobRole?: string;
-    };
-  };
-};
 
 type CachedAuthCheck = {
   isRegistered: boolean;
@@ -80,45 +58,80 @@ const tryRedirectFromCache = (params: {
   }
 };
 
-const fetchAuthCheck = async (params: { address: string; router: AppRouter }) => {
-  const { address, router } = params;
-
+/**
+ * The connected wallet's own profile.
+ *
+ * The session is the source of truth. Auto-authentication runs on connect, so
+ * `/auth/me` normally answers; when it has not completed yet we fall back to
+ * asking only whether this wallet is registered, which is all the public route
+ * will tell us now.
+ */
+/** Each request gets its own budget, rather than sharing one across both. */
+const withTimeout = async <T>(
+  run: (signal: AbortSignal) => Promise<T>,
+  ms = 8000
+): Promise<T> => {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 4000);
+  const timeoutId = setTimeout(() => controller.abort(), ms);
 
   try {
-    const upstream = `/api/auth/check/${address}`;
-
-    const res = await fetch(upstream, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      signal: controller.signal,
-    });
-
-    if (!res.ok) {
-      router.push("/setup-profile");
-      return null;
-    }
-
-    const payload = (await res.json()) as ApiResponse<AuthCheckData>;
-    const data = payload.data;
-    return {
-      isRegistered: Boolean(data?.isRegistered),
-      username: data?.user?.username,
-      fullName: data?.user?.fullName,
-      avatar: data?.user?.avatar,
-      role: data?.user?.role || "user",
-      organizationSlug: data?.user?.organizationSlug,
-      jobRole: data?.user?.jobDetails?.jobRole,
-    };
-  } catch {
-    router.push("/setup-profile");
-    return null;
+    return await run(controller.signal);
   } finally {
     clearTimeout(timeoutId);
   }
+};
+
+/**
+ * `pending` and `redirected` are kept apart because the caller has to treat them
+ * oppositely: one means ask again later, the other means the navigation already
+ * happened. Collapsing both into `null` is what made the caller unable to tell
+ * "no answer yet" from "done".
+ */
+type AuthCheckResult =
+  | { status: "profile"; profile: Omit<CachedAuthCheck, "savedAt"> }
+  | { status: "redirected" }
+  | { status: "pending" };
+
+const fetchAuthCheck = async (params: {
+  address: string;
+  router: AppRouter;
+}): Promise<AuthCheckResult> => {
+  const { address, router } = params;
+
+  const profile = await withTimeout((signal) => fetchSessionProfile(signal));
+
+  if (profile) {
+    return {
+      status: "profile",
+      profile: {
+        isRegistered: true,
+        username: profile.username,
+        fullName: profile.fullName,
+        avatar: profile.avatar,
+        role: (profile.role ?? "user") as CachedAuthCheck["role"],
+        organizationSlug: profile.organizationSlug ?? undefined,
+        jobRole: profile.jobRole ?? undefined,
+      },
+    };
+  }
+
+  const registered = await withTimeout((signal) => isWalletRegistered(address, signal));
+
+  // Null is "could not find out", not "no". Sending a registered person to
+  // profile setup because a request was slow is worse than showing them nothing:
+  // they have an account, and the page invites them to make a second one. The
+  // effect only appears when the backend is cold, which is exactly when it is
+  // hardest to attribute.
+  if (registered === null) return { status: "pending" };
+
+  if (!registered) {
+    router.push("/setup-profile");
+    return { status: "redirected" };
+  }
+
+  // Registered, but sign-in has not produced a session yet. Redirecting now
+  // would fight it, so wait to be asked again once it has.
+  return { status: "pending" };
 };
 
 const isHexPrefixedAddress = (address: string): address is `0x${string}` => {
@@ -189,80 +202,78 @@ export const useRedirectOnFirstConnect = (params: {
   router: ReturnType<typeof useRouter>;
 }) => {
   const { account, onConnect, router } = params;
-  const [prevAccount, setPrevAccount] = useState<Account | undefined>(
-    undefined,
-  );
+
+  // Latched per address, and only once the check reaches an answer. Latching on
+  // the attempt instead is what stranded people on the landing page: the first
+  // attempt runs before sign-in has produced a session, so it can only say "not
+  // yet", and a latch set there means nothing ever asks again.
+  const settledFor = useRef<string | null>(null);
+  const announcedFor = useRef<string | null>(null);
+  const [recheck, setRecheck] = useState(0);
+
+  // Held in a ref so an inline callback from the caller does not re-run the
+  // effect on every render.
+  const onConnectRef = useRef(onConnect);
+  onConnectRef.current = onConnect;
+
+  // Sign-in completing is the trigger this was missing. It fires once the
+  // session cookie is set, which is the first moment the check can succeed.
+  useAuthCompleted(useCallback(() => setRecheck((n) => n + 1), []));
 
   useEffect(() => {
-    const redirectForAccount = async () => {
-      if (!account || prevAccount) return;
+    const address = account?.address;
 
-      if (onConnect) {
-        onConnect();
+    if (!address) {
+      settledFor.current = null;
+      announcedFor.current = null;
+      return;
+    }
+
+    if (announcedFor.current !== address) {
+      announcedFor.current = address;
+      onConnectRef.current?.();
+    }
+
+    if (settledFor.current === address) return;
+
+    let live = true;
+
+    void (async () => {
+      const cacheKey = `authCheck:${address}`;
+      if (tryRedirectFromCache({ cacheKey, router })) {
+        settledFor.current = address;
+        return;
       }
 
-      const cacheKey = `authCheck:${account.address}`;
-      const redirectedFromCache = tryRedirectFromCache({ cacheKey, router });
-      if (redirectedFromCache) return;
+      const result = await fetchAuthCheck({ address, router });
+      if (!live || result.status === "pending") return;
 
-      const fetched = await fetchAuthCheck({
-        address: account.address,
-        router,
-      });
-      if (!fetched) return;
+      settledFor.current = address;
+      if (result.status === "redirected") return;
+
+      const { profile } = result;
 
       try {
-        const toCache: CachedAuthCheck = {
-          isRegistered: fetched.isRegistered,
-          username: fetched.username,
-          fullName: fetched.fullName,
-          avatar: fetched.avatar,
-          role: fetched.role || "user",
-          organizationSlug: fetched.organizationSlug,
-          jobRole: fetched.jobRole,
-          savedAt: Date.now(),
-        };
+        const toCache: CachedAuthCheck = { ...profile, savedAt: Date.now() };
         localStorage.setItem(cacheKey, JSON.stringify(toCache));
       } catch {
         // ignore quota errors
       }
 
-      if (!fetched.isRegistered) {
+      const redirect = getRedirectPathForRole(profile.role, profile.organizationSlug);
+      if (!redirect) {
         router.push("/setup-profile");
         return;
       }
 
-      const redirect = getRedirectPathForRole(fetched.role, fetched.organizationSlug);
-      if (redirect) {
-        localStorage.setItem("accountType", redirect.accountType);
-        router.push(redirect.path);
-        return;
-      }
+      localStorage.setItem("accountType", redirect.accountType);
+      router.push(redirect.path);
+    })();
 
-      router.push("/setup-profile");
+    return () => {
+      live = false;
     };
-
-    redirectForAccount();
-    setPrevAccount(account);
-  }, [account, onConnect, prevAccount, router]);
-};
-
-export const useAutoSwitchToBaseSepolia = (params: {
-  account: Account | undefined;
-  isOnCorrectChain: boolean;
-  switchToBaseSepolia: () => void | Promise<unknown>;
-}) => {
-  const { account, isOnCorrectChain, switchToBaseSepolia } = params;
-
-  useEffect(() => {
-    if (account && !isOnCorrectChain) {
-      const timer = setTimeout(() => {
-        Promise.resolve(switchToBaseSepolia()).catch(() => undefined);
-      }, 1000);
-
-      return () => clearTimeout(timer);
-    }
-  }, [account, isOnCorrectChain, switchToBaseSepolia]);
+  }, [account?.address, router, recheck]);
 };
 
 export const getDisplayName = (params: {

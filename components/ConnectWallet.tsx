@@ -1,18 +1,16 @@
 "use client";
 
+import { activeChain } from "@/constants/chain";
 import { thirdwebClient, wallets } from "@/app/client";
 import { useRouter } from "next/navigation";
 import { ConnectButton, darkTheme, useActiveAccount } from "thirdweb/react";
 import {
   getDisplayName,
-  useAutoSwitchToBaseSepolia,
   useBasename,
   useConnectMetadata,
   useMounted,
   useRedirectOnFirstConnect,
 } from "./connectWalletHelpers";
-import { useChainSwitch } from "@/hooks/useChainSwitch";
-import { baseSepolia } from "thirdweb/chains";
 
 interface ConnectWalletProps {
   onConnect?: () => void;
@@ -28,18 +26,11 @@ const ConnectWallet = ({
   const mounted = useMounted();
   const account = useActiveAccount();
   const router = useRouter();
-  const { isOnCorrectChain, switchToBaseSepolia } = useChainSwitch();
 
   const metadata = useConnectMetadata();
   const { basename, isLoadingBasename } = useBasename(account?.address);
 
   useRedirectOnFirstConnect({ account, onConnect, router });
-  useAutoSwitchToBaseSepolia({
-    account,
-    isOnCorrectChain,
-    switchToBaseSepolia,
-  });
-
   const displayName = getDisplayName({
     account,
     basename,
@@ -86,8 +77,8 @@ const ConnectWallet = ({
         }}
         wallets={wallets}
         connectModal={{ size: "compact" }}
-        chain={baseSepolia}
-        chains={[baseSepolia]}
+        chain={activeChain}
+        chains={[activeChain]}
         theme={darkTheme({
           colors: {
             primaryButtonBg: "#454ADE",
