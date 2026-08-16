@@ -8,6 +8,8 @@ import { toast } from "sonner"
 import { SendToCNGNFlow } from "@/components/send-to-cngn-flow"
 import { useActiveAccount } from "thirdweb/react"
 import ConnectWallet from "@/components/ConnectWallet"
+import { getTokenConfig } from "@/lib/token"
+import { useToken } from "@/hooks/useToken"
 
 type EthereumProvider = {
   request: (args: { method: string; params?: unknown }) => Promise<unknown>
@@ -54,7 +56,15 @@ async function ensureBaseSepolia() {
   }
 }
 
-async function watchCngnToken() {
+/**
+ * Adds the payroll token to the user's wallet.
+ *
+ * Every field comes from the backend's token config. Address, symbol and
+ * decimals were previously an env var and two literals, so after a token swap
+ * this would have written the wrong name and the wrong precision into
+ * someone's wallet, where it then persists.
+ */
+async function watchPayrollToken() {
   const ethereum = getEthereum()
   if (!ethereum) throw new Error("No wallet provider found")
 
@@ -66,16 +76,15 @@ async function watchCngnToken() {
   // Some wallets require an active account connection before allowing wallet_watchAsset.
   await ethereum.request({ method: "eth_requestAccounts" })
 
-  const tokenAddress = (process.env.NEXT_PUBLIC_CNGN_ADDRESS || "").trim()
-  if (!tokenAddress) throw new Error("Missing NEXT_PUBLIC_CNGN_ADDRESS")
+  const token = await getTokenConfig()
 
-  if (!/^0x[a-fA-F0-9]{40}$/.test(tokenAddress)) {
-    throw new Error("NEXT_PUBLIC_CNGN_ADDRESS is not a valid ERC20 contract address")
+  if (!/^0x[a-fA-F0-9]{40}$/.test(token.address)) {
+    throw new Error("Configured token address is not a valid ERC20 contract address")
   }
 
   const tokenImage = (() => {
     try {
-      return new URL("/cngn.svg", globalThis.location.origin).toString()
+      return new URL(token.logoUrl ?? "/token.svg", globalThis.location.origin).toString()
     } catch {
       return undefined
     }
@@ -86,9 +95,9 @@ async function watchCngnToken() {
     params: {
       type: "ERC20",
       options: {
-        address: tokenAddress,
-        symbol: "cNGN",
-        decimals: 6,
+        address: token.address,
+        symbol: token.symbol,
+        decimals: token.decimals,
         image: tokenImage,
       },
     },
@@ -154,6 +163,7 @@ export default function ReceiveClientPage() {
 }
 
 function ReceivePageContent() {
+  const { symbol } = useToken()
   const params = useSearchParams()
   const address = (params.get("address") || "").trim()
   const username = (params.get("username") || "").trim().replace(/^@/, "")
@@ -166,10 +176,10 @@ function ReceivePageContent() {
   const displayUsername = username ? `@${username}` : ""
 
   const title = useMemo(() => {
-    if (displayUsername) return `Send cNGN to ${displayUsername}`
-    if (address) return `Send cNGN to ${shortAddress(address)}`
+    if (displayUsername) return `Send ${symbol} to ${displayUsername}`
+    if (address) return `Send ${symbol} to ${shortAddress(address)}`
     return "Receive"
-  }, [address, displayUsername])
+  }, [address, displayUsername, symbol])
 
   useEffect(() => {
     let cancelled = false
@@ -222,8 +232,8 @@ function ReceivePageContent() {
     setIsPrompting(true)
     try {
       await ensureBaseSepolia()
-      await watchCngnToken()
-      toast.success("cNGN added")
+      await watchPayrollToken()
+      toast.success(`${symbol} added`)
     } catch (err) {
       const e = err as { message?: string }
       const message = e?.message || ""
@@ -244,21 +254,21 @@ function ReceivePageContent() {
           <div className="w-full space-y-6">
             <div className="space-y-2 text-center">
               <h1 className="text-2xl font-bold text-gray-900">Connect your wallet</h1>
-              <p className="text-sm text-gray-600">To send cNGN securely on Base Sepolia, connect your wallet first.</p>
+              <p className="text-sm text-gray-600">To send {symbol} securely on Base Sepolia, connect your wallet first.</p>
             </div>
 
             <Card className="p-6">
               <div className="space-y-4">
                 <div className="space-y-1">
                   <p className="text-sm font-medium text-gray-900">You&apos;re about to send</p>
-                  <p className="text-sm text-gray-700">Token: cNGN</p>
+                  <p className="text-sm text-gray-700">Token: {symbol}</p>
                   <p className="text-sm text-gray-700">Network: Base Sepolia ({BASE_SEPOLIA_CHAIN_ID_DEC})</p>
                 </div>
 
                 <div className="rounded-md border bg-white p-3">
                   <p className="text-xs text-gray-600">Wallet</p>
                   <p className="mt-1 text-sm text-gray-900">
-                    Not connected. Make sure you select the wallet/account that has your cNGN.
+                    Not connected. Make sure you select the wallet/account that has your {symbol}.
                   </p>
                 </div>
 
@@ -272,7 +282,7 @@ function ReceivePageContent() {
                 </div>
 
                 <p className="text-xs text-gray-500">
-                  After connecting, you&apos;ll be able to add the network/token and send cNGN.
+                  After connecting, you&apos;ll be able to add the network/token and send {symbol}.
                 </p>
               </div>
             </Card>
@@ -300,7 +310,7 @@ function ReceivePageContent() {
 
           <div>
             <p className="text-sm text-gray-600 mb-2">Token</p>
-            <p className="font-medium text-gray-900">cNGN</p>
+            <p className="font-medium text-gray-900">{symbol}</p>
           </div>
 
           <div className="space-y-2">
@@ -351,7 +361,7 @@ function ReceivePageContent() {
             onClick={() => setShowSend(true)}
             disabled={isPrompting || (!address && !displayUsername)}
           >
-            Send cNGN
+            Send {symbol}
           </Button>
         </Card>
 

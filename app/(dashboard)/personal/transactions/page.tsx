@@ -7,8 +7,10 @@ import { Input } from "@/components/ui/input"
 import { ChevronDown, Search, Copy, MoreVertical } from "lucide-react"
 import { useActiveAccount } from "thirdweb/react"
 import { useTransactionHistory, useTransactionSummary } from "@/lib/api/organization"
+import { useToken } from "@/hooks/useToken"
 
 export default function PersonalTransactionsPage() {
+  const { symbol } = useToken()
   const [searchTerm, setSearchTerm] = useState("")
   const [page, setPage] = useState(1)
   const [limit, setLimit] = useState(10)
@@ -88,7 +90,7 @@ export default function PersonalTransactionsPage() {
     }
 
     return transactions.map((tx, idx) => (
-      <tr key={tx._id} className="border-b border-gray-100 hover:bg-gray-50">
+      <tr key={tx.id} className="border-b border-gray-100 hover:bg-gray-50">
         <td className="py-4 px-4 text-sm text-gray-900">{idx + 1}</td>
         <td className="py-4 px-4 text-sm text-gray-900">
           {tx.direction === "received" ? "Inflow from" : "Outflow to"}{" "}
@@ -162,7 +164,7 @@ export default function PersonalTransactionsPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard label="Total Transactions" value={String(transactions.length)} />
         <StatCard
-          label="Total Outflow (cNGN)"
+          label={`Total Outflow (${symbol})`}
           value={
             summaryLoading
               ? "--"
@@ -170,7 +172,7 @@ export default function PersonalTransactionsPage() {
           }
         />
         <StatCard
-          label="Total Inflow (cNGN)"
+          label={`Total Inflow (${symbol})`}
           value={
             summaryLoading
               ? "--"
@@ -214,7 +216,7 @@ export default function PersonalTransactionsPage() {
               <tr className="border-b border-gray-200">
                 <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">#</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">DESCRIPTION</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">AMOUNT (cNGN)</th>
+                <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">AMOUNT ({symbol})</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">TYPE</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">DATE</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">STATUS</th>

@@ -1,5 +1,6 @@
 "use client"
 
+import { activeChain } from "@/constants/chain";
 import { useEffect, useMemo, useState } from "react"
 import { StatCard } from "@/components/stat-card"
 import { Card } from "@/components/ui/card"
@@ -19,12 +20,14 @@ import {
 } from "@/lib/api/organization"
 import useOrgSlug from "@/hooks/useOrgSlug"
 import { toast } from "sonner"
-import { useActiveAccount, useSendAndConfirmTransaction } from "thirdweb/react"
+import { useActiveAccount } from "thirdweb/react"
 import { getContract, prepareContractCall } from "thirdweb"
-import { baseSepolia } from "thirdweb/chains"
 import { thirdwebClient } from "@/app/client"
+import { useToken } from "@/hooks/useToken"
+import { useSponsoredTransaction } from "@/hooks/useSponsoredTransaction"
 
 export default function PaymentsPage() {
+  const { symbol } = useToken()
   const [searchTerm, setSearchTerm] = useState("")
   const [showBatchModal, setShowBatchModal] = useState(false)
   const [page, setPage] = useState(1)
@@ -52,14 +55,14 @@ export default function PaymentsPage() {
 
   const orgSlug = useOrgSlug()
   const { data: organization } = useOrganizationBySlug(orgSlug)
-  const { data: batchesData, loading: batchesLoading, error, refresh } = useOrganizationBatches(organization?._id || null)
+  const { data: batchesData, loading: batchesLoading, error, refresh } = useOrganizationBatches(organization?.id || null)
   const { data: transactionsData } = useTransactionHistory(
     organization?.contractAddress || null,
     { limit: 100 }
   )
 
   const account = useActiveAccount()
-  const { mutateAsync: sendAndConfirmTx } = useSendAndConfirmTransaction()
+  const { send } = useSponsoredTransaction()
 
   const accountAddressLower = (account?.address || "").toLowerCase()
 
@@ -134,7 +137,7 @@ export default function PaymentsPage() {
 
   useEffect(() => {
     setPage(1)
-  }, [organization?._id, searchTerm, limit])
+  }, [organization?.id, searchTerm, limit])
 
   const totalPages = Math.max(1, Math.ceil(filteredBatches.length / limit))
   const safePage = Math.min(Math.max(1, page), totalPages)
@@ -181,7 +184,7 @@ export default function PaymentsPage() {
         return
       }
 
-      if (!organization?._id || !organization.contractAddress) {
+      if (!organization?.id || !organization.contractAddress) {
         toast.error("Missing organization details")
         return
       }
@@ -194,7 +197,7 @@ export default function PaymentsPage() {
       const contract = getContract({
         client: thirdwebClient,
         address: organization.contractAddress,
-        chain: baseSepolia,
+        chain: activeChain,
       })
 
       const tx = prepareContractCall({
@@ -203,7 +206,7 @@ export default function PaymentsPage() {
         params: [batchName],
       })
 
-      await sendAndConfirmTx(tx)
+      await send(tx)
 
       await recordBatchApproval(batchName, {
         signerAddress: account.address,
@@ -244,7 +247,7 @@ export default function PaymentsPage() {
       const contract = getContract({
         client: thirdwebClient,
         address: organization.contractAddress,
-        chain: baseSepolia,
+        chain: activeChain,
       })
 
       const tx = prepareContractCall({
@@ -253,11 +256,11 @@ export default function PaymentsPage() {
         params: [batchName],
       })
 
-      const receipt = await sendAndConfirmTx(tx)
+      const { transactionHash } = await send(tx)
 
       await recordBatchExecution(batchName, {
         executorAddress: account.address,
-        txHash: receipt.transactionHash,
+        txHash: transactionHash,
       })
 
       refresh()
@@ -294,7 +297,7 @@ export default function PaymentsPage() {
       const contract = getContract({
         client: thirdwebClient,
         address: organization.contractAddress,
-        chain: baseSepolia,
+        chain: activeChain,
       })
 
       const tx = prepareContractCall({
@@ -303,7 +306,7 @@ export default function PaymentsPage() {
         params: [batchName],
       })
 
-      await sendAndConfirmTx(tx)
+      await send(tx)
 
       await recordBatchApprovalRevocation(batchName, {
         signerAddress: account.address,
@@ -343,7 +346,7 @@ export default function PaymentsPage() {
       const contract = getContract({
         client: thirdwebClient,
         address: organization.contractAddress,
-        chain: baseSepolia,
+        chain: activeChain,
       })
 
       const tx = prepareContractCall({
@@ -352,7 +355,7 @@ export default function PaymentsPage() {
         params: [batchName],
       })
 
-      await sendAndConfirmTx(tx)
+      await send(tx)
 
       await recordBatchCancellation(batchName)
       refresh()
@@ -400,11 +403,11 @@ export default function PaymentsPage() {
         />
         <StatCard label="Pending Approval" value={stats.pending.toString()} />
         <StatCard
-          label="Outflow (cNGN)"
+          label={`Outflow (${symbol})`}
           value={outflow.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         />
         <StatCard
-          label="Inflow (cNGN)"
+          label={`Inflow (${symbol})`}
           value={inflow.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         />
       </div>
@@ -452,7 +455,7 @@ export default function PaymentsPage() {
                 <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">#</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">BATCH NAME</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">INITIATED BY</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">TOTAL AMOUNT (cNGN)</th>
+                <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">TOTAL AMOUNT ({symbol})</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">DATE</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">EMPLOYEES</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">STATUS</th>
@@ -673,7 +676,7 @@ export default function PaymentsPage() {
 
       {showBatchModal && (
         <BatchPaymentCreationModal 
-          organizationId={organization?._id}
+          organizationId={organization?.id}
           organizationAddress={organization?.contractAddress}
           onClose={() => setShowBatchModal(false)} 
           onPaymentCreated={handlePaymentCreated}

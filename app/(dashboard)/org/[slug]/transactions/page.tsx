@@ -8,8 +8,10 @@ import { ChevronDown, Search, Copy, MoreVertical } from "lucide-react"
 import useOrgSlug from "@/hooks/useOrgSlug"
 import { useOrganizationBySlug, useTransactionHistory, useTransactionSummary } from "@/lib/api/organization"
 import { useActiveAccount } from "thirdweb/react"
+import { useToken } from "@/hooks/useToken"
 
 export default function TransactionsPage() {
+  const { symbol } = useToken()
   const [searchTerm, setSearchTerm] = useState("")
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null)
   const [page, setPage] = useState(1)
@@ -200,7 +202,7 @@ export default function TransactionsPage() {
           lastUpdated={lastUpdatedText}
         />
         <StatCard
-          label="Total Outflow (cNGN)"
+          label={`Total Outflow (${symbol})`}
           value={
             summaryLoading
               ? "--"
@@ -208,7 +210,7 @@ export default function TransactionsPage() {
           }
         />
         <StatCard
-          label="Total Inflow (cNGN)"
+          label={`Total Inflow (${symbol})`}
           value={
             summaryLoading
               ? "--"
@@ -252,7 +254,7 @@ export default function TransactionsPage() {
               <tr className="border-b border-gray-200">
                 <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">#</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">DESCRIPTION</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">AMOUNT (cNGN)</th>
+                <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">AMOUNT ({symbol})</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">TYPE</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">DATE</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">STATUS</th>
@@ -274,7 +276,7 @@ export default function TransactionsPage() {
                   const directionLabel = tx.direction === "received" ? "Inflow" : "Outflow"
 
                   return (
-                    <tr key={tx._id} className="border-b border-gray-100 hover:bg-gray-50">
+                    <tr key={tx.id} className="border-b border-gray-100 hover:bg-gray-50">
                       <td className="py-4 px-4 text-sm text-gray-900">{index + 1}</td>
                       <td className="py-4 px-4 text-sm text-gray-900">
                         {description}

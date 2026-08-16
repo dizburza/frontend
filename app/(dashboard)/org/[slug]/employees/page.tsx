@@ -16,6 +16,7 @@ import {
   removeOrganizationEmployee 
 } from "@/lib/api/organization"
 import useOrgSlug from "@/hooks/useOrgSlug"
+import { useToken } from "@/hooks/useToken"
 
 // Helper component for copyable wallet address
 function WalletAddress({ address }: Readonly<{ address: string }>) {
@@ -50,7 +51,10 @@ function WalletAddress({ address }: Readonly<{ address: string }>) {
   )
 }
 
+const HIGH_SALARY_THRESHOLD = 500_000
+
 export default function EmployeesPage() {
+  const { symbol } = useToken()
   const [searchTerm, setSearchTerm] = useState("")
   const [filterBy, setFilterBy] = useState<"all" | "new" | "high-salary">("all")
   const [sortBy, setSortBy] = useState<"name" | "salary" | "date">("name")
@@ -93,7 +97,7 @@ export default function EmployeesPage() {
 
   const orgSlug = useOrgSlug()
   const { data: organization, loading: orgLoading } = useOrganizationBySlug(orgSlug)
-  const { data: employeesData, loading: employeesLoading, error, refresh } = useOrganizationEmployees(organization?._id || null)
+  const { data: employeesData, loading: employeesLoading, error, refresh } = useOrganizationEmployees(organization?.id || null)
 
   const employees = employeesData?.employees?.map(mapApiEmployeeToEmployee) || []
   const totalEmployees = employeesData?.totalEmployees || 0
@@ -124,7 +128,7 @@ export default function EmployeesPage() {
 
   const stats = [
     { 
-      label: "Total Salary Payout (cNGN)", 
+      label: `Total Salary Payout (${symbol})`,
       value: totalSalaryPayout.toLocaleString(),
       lastUpdated: lastUpdatedText,
     },
@@ -161,7 +165,11 @@ export default function EmployeesPage() {
         return new Date(emp.joinedAt) > oneMonthAgo
       })
     } else if (filterBy === "high-salary") {
-      filtered = filtered.filter(emp => emp.salary >= 500) // 500k cNGN / 1000 = 500 (display value)
+      // emp.salary is the human figure the backend formatted, so the threshold
+      // is the amount the label promises. It used to be 500, left over from a
+      // scaling step that no longer exists, so the filter fired a thousand
+      // times too low.
+      filtered = filtered.filter(emp => emp.salary >= HIGH_SALARY_THRESHOLD)
     }
 
     // Apply sort
@@ -185,7 +193,7 @@ export default function EmployeesPage() {
 
   useEffect(() => {
     setPage(1)
-  }, [organization?._id, searchTerm, filterBy, sortBy, limit])
+  }, [organization?.id, searchTerm, filterBy, sortBy, limit])
 
   const totalPages = Math.max(1, Math.ceil(filteredEmployees.length / limit))
   const safePage = Math.min(Math.max(1, page), totalPages)
@@ -242,7 +250,7 @@ export default function EmployeesPage() {
   const filterOptions = [
     { value: "all", label: "All Employees" },
     { value: "new", label: "New Employees (Last 30 days)" },
-    { value: "high-salary", label: "High Salary (≥500k cNGN)" },
+    { value: "high-salary", label: `High Salary (≥500k ${symbol})` },
   ]
 
   const sortOptions = [
@@ -254,18 +262,6 @@ export default function EmployeesPage() {
   const getFilterLabel = () => filterOptions.find(opt => opt.value === filterBy)?.label || "All Employees"
   const getSortLabel = () => sortOptions.find(opt => opt.value === sortBy)?.label || "Name"
 
-  const toChainSalary = (humanSalary: string) => {
-    const trimmed = (humanSalary || "").trim()
-    if (!trimmed) return undefined
-
-    try {
-      const asNumber = Number(trimmed)
-      if (!Number.isFinite(asNumber)) return trimmed
-      return String(Math.round(asNumber * 1_000_000))
-    } catch {
-      return trimmed
-    }
-  }
 
   const handleEmployeeAdded = () => {
     refresh()
@@ -273,14 +269,16 @@ export default function EmployeesPage() {
   }
 
   const handleSaveEdit = async () => {
-    if (!editingEmployee || !organization?._id) return
+    if (!editingEmployee || !organization?.id) return
     if (editingEmployee.isSigner) return
 
     setIsSavingEdit(true)
     try {
-      await updateOrganizationEmployee(organization._id, editingEmployee.username, {
+      await updateOrganizationEmployee(organization.id, editingEmployee.username, {
         jobRole: editingEmployee.jobRole,
-        salary: toChainSalary(editingEmployee.salary),
+        // Sent as the human figure. The backend scales it by the token's
+        // decimals, which is the only place that knows the precision.
+        salary: editingEmployee.salary.trim() || undefined,
         department: editingEmployee.department,
         employeeId: editingEmployee.employeeId,
       })
@@ -296,11 +294,11 @@ export default function EmployeesPage() {
   }
 
   const handleDeleteEmployee = async (username: string) => {
-    if (!organization?._id) return
+    if (!organization?.id) return
 
     setIsDeleting(true)
     try {
-      await removeOrganizationEmployee(organization._id, username)
+      await removeOrganizationEmployee(organization.id, username)
       refresh()
       toast.success("Employee removed")
     } catch (err) {
@@ -391,7 +389,7 @@ export default function EmployeesPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label htmlFor="edit-employee-salary" className="block text-sm font-medium text-gray-700 mb-1">Salary (cNGN)</label>
+                  <label htmlFor="edit-employee-salary" className="block text-sm font-medium text-gray-700 mb-1">Salary ({symbol})</label>
                   <Input
                     id="edit-employee-salary"
                     type="number"
@@ -616,7 +614,7 @@ export default function EmployeesPage() {
                 <TableHead>USERNAME</TableHead>
                 <TableHead>WALLET ADDRESS</TableHead>
                 <TableHead>ROLE</TableHead>
-                <TableHead>SALARY (cNGN)</TableHead>
+                <TableHead>SALARY ({symbol})</TableHead>
                 <TableHead>LAST UPDATED BY</TableHead>
                 <TableHead className="w-12">ACTION</TableHead>
               </TableRow>
@@ -771,7 +769,7 @@ export default function EmployeesPage() {
 
       {showAddEmployeeModal && (
         <AddEmployeeModal 
-          organizationId={organization?._id}
+          organizationId={organization?.id}
           onClose={() => setShowAddEmployeeModal(false)} 
           onEmployeeAdded={handleEmployeeAdded}
         />

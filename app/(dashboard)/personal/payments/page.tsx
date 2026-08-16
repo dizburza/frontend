@@ -9,11 +9,15 @@ import { ChevronDown, Search, MoreVertical } from "lucide-react"
 import useAddressUsernames from "@/hooks/useAddressUsernames"
 import { QRScanModal } from "@/components/qr-scan-modal"
 import { SendToCNGNFlow } from "@/components/send-to-cngn-flow"
+import { CreateCashLinkModal } from "@/components/cashlink/create-cashlink-modal"
+import { CashLinkList } from "@/components/cashlink/cashlink-list"
 import { useActiveAccount } from "thirdweb/react"
 import { useTransactionHistory } from "@/lib/api/organization"
 import { useRouter, useSearchParams } from "next/navigation"
+import { useToken } from "@/hooks/useToken"
 
 export default function PersonalPaymentsPage() {
+  const { symbol } = useToken()
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -21,6 +25,8 @@ export default function PersonalPaymentsPage() {
   const [showScan, setShowScan] = useState(false)
   const [showSend, setShowSend] = useState(false)
   const [scanRecipient, setScanRecipient] = useState<string | undefined>(undefined)
+  const [showCashLink, setShowCashLink] = useState(false)
+  const [cashLinkRefresh, setCashLinkRefresh] = useState(0)
   const [page, setPage] = useState(1)
   const [limit, setLimit] = useState(10)
 
@@ -112,10 +118,22 @@ export default function PersonalPaymentsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <h1 className="text-3xl font-bold text-gray-900">Payments</h1>
-        <Button className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto" onClick={() => setShowScan(true)}>
-          Scan to Send
-        </Button>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <Button variant="outline" className="w-full sm:w-auto" onClick={() => setShowCashLink(true)}>
+            Send by link
+          </Button>
+          <Button className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto" onClick={() => setShowScan(true)}>
+            Scan to Send
+          </Button>
+        </div>
       </div>
+
+      {/* Links the caller has sent. The note lives here and nowhere a claimer
+          can reach. */}
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold text-gray-900">Sent by link</h2>
+        <CashLinkList refreshKey={cashLinkRefresh} />
+      </section>
 
       {/* Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -125,7 +143,7 @@ export default function PersonalPaymentsPage() {
           lastUpdated={isLoading ? "Updating..." : undefined}
         />
         <StatCard
-          label="Total Sent (cNGN)"
+          label={`Total Sent (${symbol})`}
           value={
             isLoading
               ? "--"
@@ -170,7 +188,7 @@ export default function PersonalPaymentsPage() {
               <tr className="border-b border-gray-200">
                 <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">#</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">RECIPIENT</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">AMOUNT (cNGN)</th>
+                <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">AMOUNT ({symbol})</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">DATE</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">TYPE</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">STATUS</th>
@@ -210,7 +228,7 @@ export default function PersonalPaymentsPage() {
                 }
 
                 return paginated.map((payment, idx) => (
-                  <tr key={payment._id} className="border-b border-gray-100 hover:bg-gray-50">
+                  <tr key={payment.id} className="border-b border-gray-100 hover:bg-gray-50">
                     <td className="py-4 px-4 text-sm text-gray-900">{startIndex + idx + 1}</td>
                     <td className="py-4 px-4 text-sm text-gray-900">
                       {(() => {
@@ -349,6 +367,13 @@ export default function PersonalPaymentsPage() {
         onClose={() => setShowSend(false)}
         initialRecipient={scanRecipient}
       />
+
+      {showCashLink && (
+        <CreateCashLinkModal
+          onClose={() => setShowCashLink(false)}
+          onCreated={() => setCashLinkRefresh((n) => n + 1)}
+        />
+      )}
     </div>
   )
 }

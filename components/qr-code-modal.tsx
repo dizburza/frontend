@@ -7,12 +7,14 @@ import { useActiveAccount } from "thirdweb/react"
 import { useEffect, useMemo, useState } from "react"
 import QRCode from "react-qr-code"
 import { toast } from "sonner"
+import { useToken } from "@/hooks/useToken"
 
 interface QRCodeModalProps {
   onClose: () => void
 }
 
 export function QRCodeModal({ onClose }: Readonly<QRCodeModalProps>) {
+  const { symbol } = useToken()
   const account = useActiveAccount()
   const address = account?.address || ""
 
@@ -91,7 +93,7 @@ export function QRCodeModal({ onClose }: Readonly<QRCodeModalProps>) {
       if (navigator.share) {
         await navigator.share({
           title: "Dizburza Receive",
-          text: `Send cNGN to: ${shareValue}`,
+          text: `Send ${symbol} to: ${shareValue}`,
         })
         toast.success("Shared")
         return

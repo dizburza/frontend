@@ -6,8 +6,10 @@ import { Button } from "@/components/ui/button"
 import { ReceiveFlow } from "@/components/receive-flow"
 import { QRScanModal } from "@/components/qr-scan-modal"
 import { useRouter } from "next/navigation"
+import { useToken } from "@/hooks/useToken"
 
 export default function PersonalQRCenterPage() {
+  const { symbol } = useToken()
   const router = useRouter()
   const [showReceive, setShowReceive] = useState(false)
   const [showScan, setShowScan] = useState(false)
@@ -40,7 +42,7 @@ export default function PersonalQRCenterPage() {
           <CardContent>
             <div className="flex flex-col items-center gap-6">
               <div className="text-center">
-                <p className="text-gray-600 mb-4">Scan a Dizburza QR code to send cNGN</p>
+                <p className="text-gray-600 mb-4">Scan a Dizburza QR code to send {symbol}</p>
                 <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => setShowScan(true)}>
                   Open Scanner
                 </Button>

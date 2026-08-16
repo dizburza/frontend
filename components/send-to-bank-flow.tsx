@@ -7,6 +7,8 @@ import { BankSelectionModal } from "@/components/bank-selection-modal"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { useGlobalLoading } from "@/lib/global-loading"
+import { useBalance } from "@/hooks/useBalance"
+import { useToken } from "@/hooks/useToken"
 import { toast } from "sonner"
 
 interface SendToBankFlowProps {
@@ -23,6 +25,8 @@ export function SendToBankFlow({ isOpen, onClose }: Readonly<SendToBankFlowProps
   const [amount, setAmount] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const { showLoading, hideLoading } = useGlobalLoading()
+  const { balance } = useBalance()
+  const { symbol } = useToken()
 
   if (!isOpen) return null
 
@@ -137,7 +141,12 @@ export function SendToBankFlow({ isOpen, onClose }: Readonly<SendToBankFlowProps
                 onChange={(e) => setAmount(e.target.value)}
               />
               <div className="mt-4 text-sm text-gray-600">
-                Available balance: <span className="font-semibold">25 cNGN</span>
+                Available balance:{" "}
+                <span className="font-semibold">
+                  {balance === null
+                    ? "--"
+                    : `${balance.toLocaleString()} ${symbol}`.trim()}
+                </span>
               </div>
             </div>
             <Button onClick={handleNext} disabled={!amount || isLoading} className="w-full">
