@@ -1,10 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuthCompleted } from "@/hooks/useAutoAuthenticate";
+import { useCachedResource } from "@/hooks/useCachedResource";
 import { enqueueBackendSyncJob } from "@/lib/backend-sync-queue";
 
 // Types
 export interface Organization {
-  _id: string;
+  id: string;
   name: string;
   slug: string;
   contractAddress: string;
@@ -13,17 +14,24 @@ export interface Organization {
   businessEmail: string;
   businessInfo?: {
     registrationNumber?: string;
+    taxIdentificationNumber?: string;
     registrationType?: string;
   };
   signers: {
     address: string;
     name: string;
-    role: string;
-    addedAt: string;
+    role: "owner" | "signer";
+    joinedAt: string;
     isActive: boolean;
   }[];
   quorum: number;
-  employees: string[];
+  employees: {
+    id: string | null;
+    username: string | null;
+    fullName: string;
+    walletAddress: string;
+    avatar: string | null;
+  }[];
   metadata?: {
     industry?: string;
     size?: string;
@@ -40,22 +48,20 @@ export interface Organization {
 
 // API Functions
 async function apiFetch(endpoint: string, options: RequestInit = {}) {
-  const token = localStorage.getItem("token");
   
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...(options.headers as Record<string, string>),
   };
   
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-  }
 
   const url = endpoint.startsWith("/api/") ? endpoint : `/api${endpoint}`;
 
   const response = await fetch(url, {
     ...options,
     headers,
+    // Session lives in an httpOnly cookie, so it has to be sent explicitly.
+    credentials: "include",
   });
   
   if (!response.ok) {
@@ -143,6 +149,8 @@ export interface ApiEmployee {
   jobDetails?: {
     jobRole?: string;
     salary?: string;
+    salaryFormatted?: string;
+    currency?: string;
     department?: string;
     joinedAt?: string;
     employeeId?: string;
@@ -151,7 +159,7 @@ export interface ApiEmployee {
 }
 
 export interface ApiPaymentBatch {
-  _id: string;
+  id: string;
   batchName: string;
   organizationId: string;
   organizationAddress: string;
@@ -164,6 +172,7 @@ export interface ApiPaymentBatch {
     employeeName: string;
   }[];
   totalAmount: string;
+  totalAmountFormatted?: string;
   status: "pending" | "approved" | "executed" | "cancelled" | "expired";
   approvals: {
     signerAddress: string;
@@ -206,14 +215,14 @@ export interface BatchesResponse {
   };
 }
 
+// The history join attaches names only, never an id.
 export interface ApiTransactionUser {
-  _id: string;
-  username?: string;
-  fullName?: string;
+  username: string;
+  fullName: string | null;
 }
 
 export interface ApiTransaction {
-  _id: string;
+  id: string;
   txHash: string;
   type: string;
   fromAddress: string;
@@ -233,8 +242,10 @@ export interface ApiTransaction {
   timestamp: string;
   direction?: "sent" | "received";
   displayAmount?: string;
-  fromUserId?: ApiTransactionUser;
-  toUserId?: ApiTransactionUser;
+  fromUserId?: string | null;
+  toUserId?: string | null;
+  fromUser?: ApiTransactionUser | null;
+  toUser?: ApiTransactionUser | null;
 }
 
 export interface TransactionHistoryResponse {
@@ -268,6 +279,7 @@ export interface CreateOrganizationRequest {
   businessEmail: string;
   businessInfo?: {
     registrationNumber?: string;
+    taxIdentificationNumber?: string;
     registrationType?: string;
   };
   signers: {
@@ -473,6 +485,30 @@ export async function fetchTransactionSummary(
   return response.data || response;
 }
 
+export interface IdentifierAvailability {
+  registrationNumberAvailable: boolean;
+  taxIdentificationNumberAvailable: boolean;
+}
+
+/**
+ * A company registration and a TIN are claimed once and never reused. Checked
+ * while the form is being filled in, and again before the contract is
+ * deployed, since deployment cannot be undone if the record is then rejected.
+ */
+export async function checkOrganizationIdentifiers(input: {
+  registrationNumber?: string;
+  taxIdentificationNumber?: string;
+}): Promise<IdentifierAvailability> {
+  const params = new URLSearchParams();
+  if (input.registrationNumber) params.set("registrationNumber", input.registrationNumber);
+  if (input.taxIdentificationNumber) {
+    params.set("taxIdentificationNumber", input.taxIdentificationNumber);
+  }
+
+  const response = await apiFetch(`/api/organizations/identifiers/available?${params}`);
+  return response.data || response;
+}
+
 export async function createOrganizationRecord(payload: CreateOrganizationRequest): Promise<Organization> {
   try {
     const response = await apiFetchWithRetry(
@@ -572,6 +608,14 @@ export function useOrganizationEmployees(organizationId: string | null) {
   return { data, loading, error, refresh };
 }
 
+/**
+ * Aggregated inflow/outflow totals for an address.
+ *
+ * Backed by the shared cache: paints from localStorage on mount, revalidates in
+ * the background, and refreshes when the realtime stream reports activity for
+ * this address. Previously this refetched from scratch on every page visit and
+ * showed an empty state while it did.
+ */
 export function useTransactionSummary(
   address: string | null,
   params?: {
@@ -582,82 +626,51 @@ export function useTransactionSummary(
     status?: string;
   }
 ) {
-  const [data, setData] = useState<TransactionSummaryResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
-
   const type = params?.type;
   const category = params?.category;
   const startDate = params?.startDate;
   const endDate = params?.endDate;
   const status = params?.status;
 
-  const refresh = () => setRefreshKey((k) => k + 1);
+  const normalized = (address || "").toLowerCase();
+  const filterKey = [type, category, startDate, endDate, status]
+    .map((v) => v ?? "")
+    .join("|");
 
-  useEffect(() => {
-    const handler = () => {
-      if (address) {
-        refresh();
-      }
-    };
+  const key = normalized ? `summary:${normalized}:${filterKey}` : null;
 
-    globalThis.addEventListener("cngn:activity:refresh", handler);
-    return () => {
-      globalThis.removeEventListener("cngn:activity:refresh", handler);
-    };
-  }, [address]);
+  const fetcher = useCallback(
+    () =>
+      fetchTransactionSummary(normalized, {
+        type,
+        category,
+        startDate,
+        endDate,
+        status,
+      }),
+    [normalized, type, category, startDate, endDate, status]
+  );
 
-  useAuthCompleted(() => {
-    if (address) {
-      refresh();
-    }
+  const resource = useCachedResource<TransactionSummaryResponse>(key, fetcher, {
+    refreshEvent: "cngn:activity:refresh",
   });
 
-  useEffect(() => {
-    const addr = address;
-    if (!addr) {
-      setLoading(false);
-      return;
-    }
+  useAuthCompleted(resource.refresh);
 
-    let cancelled = false;
-
-    async function loadSummary() {
-      try {
-        setLoading(true);
-        setError(null);
-        const result = await fetchTransactionSummary(addr as string, {
-          type,
-          category,
-          startDate,
-          endDate,
-          status,
-        });
-        if (!cancelled) {
-          setData(result);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Failed to load transaction summary");
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    }
-
-    loadSummary();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [address, refreshKey, type, category, startDate, endDate, status]);
-
-  return { data, loading, error, refresh };
+  return {
+    data: resource.data,
+    loading: resource.isLoading,
+    error: resource.error?.message ?? null,
+    refresh: resource.refresh,
+  };
 }
 
+/**
+ * Paginated transaction history for an address, served from the indexer.
+ *
+ * Each page is cached under its own key, so paging back and forth is instant
+ * rather than a fresh round trip per click.
+ */
 export function useTransactionHistory(
   address: string | null,
   params?: {
@@ -670,11 +683,6 @@ export function useTransactionHistory(
     status?: string;
   }
 ) {
-  const [data, setData] = useState<TransactionHistoryResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
-
   const page = params?.page;
   const limit = params?.limit;
   const type = params?.type;
@@ -683,89 +691,58 @@ export function useTransactionHistory(
   const endDate = params?.endDate;
   const status = params?.status;
 
-  const refresh = () => setRefreshKey((k) => k + 1);
+  const normalized = (address || "").toLowerCase();
+  const filterKey = [page, limit, type, category, startDate, endDate, status]
+    .map((v) => v ?? "")
+    .join("|");
 
-  useEffect(() => {
-    if (!address) return;
+  const key = normalized ? `history:${normalized}:${filterKey}` : null;
 
-    const refreshNow = () => {
-      refresh();
-    };
+  const fetcher = useCallback(
+    () =>
+      fetchTransactionHistory(normalized, {
+        page,
+        limit,
+        type,
+        category,
+        startDate,
+        endDate,
+        status,
+      }),
+    [normalized, page, limit, type, category, startDate, endDate, status]
+  );
 
-    const onFocus = () => refreshNow();
-    const onVisibility = () => {
-      if (document.visibilityState === "visible") {
-        refreshNow();
-      }
-    };
-
-    globalThis.addEventListener("focus", onFocus);
-    document.addEventListener("visibilitychange", onVisibility);
-    globalThis.addEventListener("cngn:activity:refresh", refreshNow);
-
-    return () => {
-      globalThis.removeEventListener("focus", onFocus);
-      document.removeEventListener("visibilitychange", onVisibility);
-      globalThis.removeEventListener("cngn:activity:refresh", refreshNow);
-    };
-  }, [address]);
-
-  useAuthCompleted(() => {
-    if (address) {
-      refresh();
-    }
+  const resource = useCachedResource<TransactionHistoryResponse>(key, fetcher, {
+    refreshEvent: "cngn:activity:refresh",
   });
 
+  useAuthCompleted(resource.refresh);
+
+  // Revalidate when the tab regains focus, so a screen left open in a
+  // background tab is current the moment the user returns to it.
+  const { refresh } = resource;
   useEffect(() => {
-    const addr = address;
-    if (!addr) {
-      setLoading(false);
-      return;
-    }
+    if (!key) return;
 
-    let cancelled = false;
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
 
-    async function loadHistory() {
-      try {
-        setLoading(true);
-        setError(null);
-        if (!addr) {
-          return;
-        }
-
-        const result = await fetchTransactionHistory(addr, {
-          page,
-          limit,
-          type,
-          category,
-          startDate,
-          endDate,
-          status,
-        });
-        if (!cancelled) {
-          setData(result);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setError(
-            err instanceof Error ? err.message : "Failed to load transactions"
-          );
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    }
-
-    loadHistory();
+    globalThis.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", onVisibility);
 
     return () => {
-      cancelled = true;
+      globalThis.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [address, refreshKey, page, limit, type, category, startDate, endDate, status]);
+  }, [key, refresh]);
 
-  return { data, loading, error, refresh };
+  return {
+    data: resource.data,
+    loading: resource.isLoading,
+    error: resource.error?.message ?? null,
+    refresh: resource.refresh,
+  };
 }
 
 export function useOrganizationBatches(organizationId: string | null) {
@@ -880,9 +857,9 @@ export function mapApiEmployeeToEmployee(apiEmployee: ApiEmployee): {
     performedByWalletAddress?: string;
   } | null;
 } {
-  // Salary is stored with 6 extra decimals for blockchain (divide by 10^6)
-  const rawSalary = Number.parseFloat(apiEmployee.jobDetails?.salary || "0");
-  const displaySalary = rawSalary / 1_000_000;
+  // Formatted by the backend, which is the only side that knows the token's
+  // precision. The raw fallback is there for responses predating that field.
+  const displaySalary = Number.parseFloat(apiEmployee.jobDetails?.salaryFormatted || "0");
   
   return {
     id: apiEmployee._id,
@@ -919,11 +896,10 @@ export function mapApiBatchToPaymentBatch(apiBatch: ApiPaymentBatch): {
   txHash?: string;
   recipients: { surname: string; firstName: string; salary: string }[];
 } {
-  const rawTotal = Number.parseFloat(apiBatch.totalAmount || "0");
-  const displayTotal = rawTotal / 1_000_000;
+  const displayTotal = Number.parseFloat(apiBatch.totalAmountFormatted || "0");
 
   return {
-    id: apiBatch._id,
+    id: apiBatch.id,
     batchName: apiBatch.batchName,
     creatorAddress: apiBatch.creatorAddress,
     creatorJobRole: apiBatch.creatorJobRole,

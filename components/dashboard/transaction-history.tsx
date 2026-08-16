@@ -12,11 +12,13 @@ import useAddressUsernames from "@/hooks/useAddressUsernames"
 import { useActiveAccount } from "thirdweb/react"
 import { useTransactionHistory } from "@/lib/api/organization"
 import { ethers } from "ethers"
+import { useToken } from "@/hooks/useToken"
 
 export function TransactionHistory({
   viewAllHref = "/",
   limit = 10,
 }: Readonly<{ viewAllHref?: string; limit?: number }>) {
+  const { symbol } = useToken()
   const pathname = usePathname()
 
   const account = useActiveAccount()
@@ -93,7 +95,7 @@ export function TransactionHistory({
       })()
 
       return (
-        <tr key={tx._id} className="border-b border-gray-100 hover:bg-gray-50">
+        <tr key={tx.id} className="border-b border-gray-100 hover:bg-gray-50">
         <td className="py-4 px-4">{idx + 1}</td>
         <td className="py-4 px-4">{tx.direction === "received" ? "Inflow" : "Outflow"}</td>
         <td className="py-4 px-4">
@@ -172,7 +174,7 @@ export function TransactionHistory({
               <th className="text-left py-3 px-4 font-semibold text-gray-600">#</th>
               <th className="text-left py-3 px-4 font-semibold text-gray-600">OPERATION TYPE</th>
               <th className="text-left py-3 px-4 font-semibold text-gray-600">RECIPIENT</th>
-              <th className="text-left py-3 px-4 font-semibold text-gray-600">AMOUNT (cNGN)</th>
+              <th className="text-left py-3 px-4 font-semibold text-gray-600">AMOUNT ({symbol})</th>
               <th className="text-left py-3 px-4 font-semibold text-gray-600">GAS FEE</th>
               <th className="text-left py-3 px-4 font-semibold text-gray-600">DATE</th>
               <th className="text-left py-3 px-4 font-semibold text-gray-600">STATUS</th>

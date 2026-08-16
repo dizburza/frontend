@@ -11,14 +11,16 @@ import { QRScanModal } from "@/components/qr-scan-modal";
 import Image from "next/image";
 import { useActiveAccount } from "thirdweb/react";
 import useGetTokenBalance from "@/hooks/ERC20/useGetBalance";
-import useCngnTransferActivity from "@/hooks/ERC20/useCngnTransferActivity";
+import useTransactionActivity from "@/hooks/useTransactionActivity";
 import { useRouter } from "next/navigation";
+import { useToken } from "@/hooks/useToken"
 
 export function BalanceCard() {
+  const { symbol, logoUrl } = useToken()
   const router = useRouter();
   const account = useActiveAccount();
   const balance = useGetTokenBalance();
-  const { monthly, lastUpdatedAt, isLoading } = useCngnTransferActivity();
+  const { monthly, lastUpdatedAt, isLoading } = useTransactionActivity();
   const [showBalance, setShowBalance] = useState(true);
   const [showSendToCNGN, setShowSendToCNGN] = useState(false);
   const [showSendToBank, setShowSendToBank] = useState(false);
@@ -76,8 +78,8 @@ export function BalanceCard() {
             {balanceDisplay}
           </span>
           <div className="flex">
-          <Image src={"/cngn.svg"} alt="cNGN" width={24} height={24} />
-          <span className="text-gray-600">cNGN</span></div>
+          <Image src={logoUrl} alt={symbol} width={24} height={24} />
+          <span className="text-gray-600">{symbol}</span></div>
         </div>
         <p className="text-sm text-green-600"> {changeDisplay}</p>
         <p className="text-xs text-gray-500">Last updated: {isLoading ? "Updating..." : lastUpdatedDisplay}</p>

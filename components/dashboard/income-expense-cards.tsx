@@ -3,103 +3,31 @@
 import { Card } from "@/components/ui/card";
 import { ArrowDownLeft, ArrowUpRight } from "lucide-react";
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
 import { useActiveAccount } from "thirdweb/react";
-import useCngnTransferActivity from "@/hooks/ERC20/useCngnTransferActivity";
+import useTransactionActivity from "@/hooks/useTransactionActivity";
+import { useToken } from "@/hooks/useToken"
 
-const asHexAddress = (value: string | null | undefined) => {
-  const v = (value || "").trim();
-  if (!v) return undefined;
-  return /^0x[a-fA-F0-9]{40}$/.test(v) ? (v as `0x${string}`) : undefined;
-};
+const formatAmount = (value: number) =>
+  value.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 
 export function IncomeExpenseCards(props?: Readonly<{ address?: string | null }>) {
+  const { symbol, logoUrl } = useToken()
   const account = useActiveAccount();
   const address = props?.address ?? account?.address ?? null;
-  const cacheKey = useMemo(() => {
-    const a = (address || "").trim().toLowerCase();
-    return a ? `cngn:last-inout:${a}` : null;
-  }, [address]);
-  const { latestIncomingAmount, latestOutgoingAmount, isLoading } = useCngnTransferActivity({
-    walletAddress: asHexAddress(address),
-  });
 
-  const { incoming, outgoing } = useMemo(() => {
-    const i = Number(latestIncomingAmount || 0);
-    const o = Number(latestOutgoingAmount || 0);
-    return {
-      incoming: Number.isFinite(i) ? i : 0,
-      outgoing: Number.isFinite(o) ? o : 0,
-    };
-  }, [latestIncomingAmount, latestOutgoingAmount]);
+  // Totals, not the single most recent transfer. These cards say Inflow and
+  // Outflow, and the summary endpoint aggregates them server-side.
+  const { incomingTotal, outgoingTotal, isLoading, isValidating } =
+    useTransactionActivity({ walletAddress: address ?? undefined });
 
-  const [lastIncomingAmount, setLastIncomingAmount] = useState<number | null>(() => {
-    if (!cacheKey) return null;
-    try {
-      const raw = globalThis.localStorage?.getItem(cacheKey);
-      if (!raw) return null;
-      const parsed = JSON.parse(raw) as { incoming?: number };
-      return typeof parsed?.incoming === "number" && Number.isFinite(parsed.incoming)
-        ? parsed.incoming
-        : null;
-    } catch {
-      return null;
-    }
-  });
-  const [lastOutgoingAmount, setLastOutgoingAmount] = useState<number | null>(() => {
-    if (!cacheKey) return null;
-    try {
-      const raw = globalThis.localStorage?.getItem(cacheKey);
-      if (!raw) return null;
-      const parsed = JSON.parse(raw) as { outgoing?: number };
-      return typeof parsed?.outgoing === "number" && Number.isFinite(parsed.outgoing)
-        ? parsed.outgoing
-        : null;
-    } catch {
-      return null;
-    }
-  });
-
-  useEffect(() => {
-    if (isLoading) return;
-    setLastIncomingAmount(incoming);
-    setLastOutgoingAmount(outgoing);
-  }, [isLoading, incoming, outgoing]);
-
-  useEffect(() => {
-    if (isLoading) return;
-    if (!cacheKey) return;
-    try {
-      globalThis.localStorage?.setItem(
-        cacheKey,
-        JSON.stringify({ incoming, outgoing, updatedAt: Date.now() }),
-      );
-    } catch {
-      // ignore
-    }
-  }, [cacheKey, isLoading, incoming, outgoing]);
-
-  const incomingToDisplay =
-    isLoading && lastIncomingAmount !== null ? lastIncomingAmount : incoming;
-  const outgoingToDisplay =
-    isLoading && lastOutgoingAmount !== null ? lastOutgoingAmount : outgoing;
-
-  const showUpdating = Boolean(isLoading && (lastIncomingAmount !== null || lastOutgoingAmount !== null));
-  const showInitialLoading = Boolean(isLoading && lastIncomingAmount === null && lastOutgoingAmount === null);
-
-  const incomingDisplay = showInitialLoading
-    ? "Loading..."
-    : incomingToDisplay.toLocaleString(undefined, {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      });
-
-  const outgoingDisplay = showInitialLoading
-    ? "Loading..."
-    : outgoingToDisplay.toLocaleString(undefined, {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      });
+  // The cache layer hands back persisted values on mount, so a reload shows
+  // real numbers immediately and only ever renders "Loading..." on first visit.
+  const incomingDisplay = isLoading ? "Loading..." : formatAmount(incomingTotal);
+  const outgoingDisplay = isLoading ? "Loading..." : formatAmount(outgoingTotal);
+  const statusLabel = !isLoading && isValidating ? "Updating..." : " ";
 
   return (
     <div className="flex flex-col gap-4 h-full">
@@ -110,11 +38,11 @@ export function IncomeExpenseCards(props?: Readonly<{ address?: string | null }>
             <div className="flex items-baseline gap-2">
               <span className="text-xl sm:text-2xl font-bold">{incomingDisplay}</span>
               <div className="flex items-center">
-                <Image src={"/cngn.svg"} alt="cNGN" width={24} height={24} />
-                <span className="text-gray-600">cNGN</span>
+                <Image src={logoUrl} alt={symbol} width={24} height={24} />
+                <span className="text-gray-600">{symbol}</span>
               </div>
             </div>
-            <p className="text-gray-500 text-xs mt-2">{showUpdating ? "Updating..." : " "}</p>
+            <p className="text-gray-500 text-xs mt-2">{statusLabel}</p>
           </div>
           <ArrowDownLeft className="text-green-600" size={24} />
         </div>
@@ -126,12 +54,12 @@ export function IncomeExpenseCards(props?: Readonly<{ address?: string | null }>
             <p className="text-gray-600 text-sm mb-2">Outflow</p>
             <div className="flex items-baseline gap-2">
               <span className="text-xl sm:text-2xl font-bold">{outgoingDisplay}</span>
-               <div className="flex items-center">
-                <Image src={"/cngn.svg"} alt="cNGN" width={24} height={24} />
-                <span className="text-gray-600">cNGN</span>
+              <div className="flex items-center">
+                <Image src={logoUrl} alt={symbol} width={24} height={24} />
+                <span className="text-gray-600">{symbol}</span>
               </div>
             </div>
-            <p className="text-gray-500 text-xs mt-2">{showUpdating ? "Updating..." : " "}</p>
+            <p className="text-gray-500 text-xs mt-2">{statusLabel}</p>
           </div>
           <ArrowUpRight className="text-red-600" size={24} />
         </div>

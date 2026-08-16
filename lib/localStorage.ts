@@ -1,7 +1,7 @@
 // Utility functions for managing localStorage data during a session
 // This will be lost after page refresh since there's no backend
 
-import { mockEmployees, mockProposals, mockOrganizations } from "./static/mock-data"
+import { mockEmployees, mockOrganizations } from "./static/mock-data"
 
 const canUseLocalStorage = () => globalThis.window !== undefined && globalThis.localStorage !== undefined
 
@@ -19,18 +19,6 @@ export function getSessionEmployees() {
   return mockEmployees.list
 }
 
-export function getSessionProposals() {
-  if (!canUseLocalStorage()) return mockProposals.list
-  const stored = localStorage.getItem("sessionProposals")
-  if (stored) {
-    try {
-      return JSON.parse(stored)
-    } catch {
-      return mockProposals.list
-    }
-  }
-  return mockProposals.list
-}
 
 export function getSessionSigners() {
   if (!canUseLocalStorage()) return mockOrganizations.current.signers
@@ -83,51 +71,6 @@ export function addEmployeeToSession(employee: {
   return updatedEmployees
 }
 
-// Add new proposal to session
-export function addProposalToSession(proposal: {
-  title: string
-  amount: string
-  description: string
-  startDate: string
-  endDate: string
-}) {
-  if (!canUseLocalStorage()) return mockProposals.list
-  const proposals = getSessionProposals()
-  const newProposal = {
-    id: `prop_${Date.now()}`,
-    title: proposal.title,
-    description: proposal.description,
-    amount: Number(proposal.amount),
-    status: "In progress" as const,
-    timeLeft: "34 hrs 56 mins",
-    votesFor: 0,
-    votesAgainst: 0,
-    createdAt: new Date().toISOString().split("T")[0],
-    createdBy: "Current User",
-  }
-  const updatedProposals = [...proposals, newProposal]
-  localStorage.setItem("sessionProposals", JSON.stringify(updatedProposals))
-  return updatedProposals
-}
-
-// Update proposal vote in session
-export function updateProposalVote(proposalId: string, vote: "for" | "against") {
-  if (!canUseLocalStorage()) return mockProposals.list
-  const proposals = getSessionProposals()
-  const updatedProposals = proposals.map((p: typeof mockProposals.list[0]) => {
-    if (p.id === proposalId) {
-      return {
-        ...p,
-        votesFor: vote === "for" ? p.votesFor + 1 : p.votesFor,
-        votesAgainst: vote === "against" ? p.votesAgainst + 1 : p.votesAgainst,
-      }
-    }
-    return p
-  })
-  localStorage.setItem("sessionProposals", JSON.stringify(updatedProposals))
-  return updatedProposals
-}
-
 // Add signers to session
 export function addSignersToSession(signers: Array<{
   id: string
@@ -178,7 +121,6 @@ export function getOrganizationSigners() {
 export function resetSessionData() {
   if (!canUseLocalStorage()) return
   localStorage.removeItem("sessionEmployees")
-  localStorage.removeItem("sessionProposals")
   localStorage.removeItem("sessionSigners")
   localStorage.removeItem("sessionOrganizationSigners")
   localStorage.removeItem("sessionPaymentBatches")

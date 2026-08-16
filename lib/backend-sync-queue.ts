@@ -79,20 +79,17 @@ export function enqueueBackendSyncJob(input: {
 }
 
 async function sendJob(job: SyncJob) {
-  const token = localStorage.getItem("token");
 
   const headers: Record<string, string> = {
     Accept: "application/json",
     "Content-Type": "application/json",
   };
 
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
-  }
 
   const res = await fetch(job.request.endpoint, {
     method: job.request.method,
     headers,
+    credentials: "include",
     body: JSON.stringify(job.request.body),
   });
 

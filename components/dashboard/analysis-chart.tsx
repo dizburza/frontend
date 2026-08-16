@@ -2,10 +2,10 @@
 
 import { Card } from "@/components/ui/card"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
-import useCngnTransferActivity from "@/hooks/ERC20/useCngnTransferActivity"
+import useTransactionActivity from "@/hooks/useTransactionActivity"
 
 export function AnalysisChart() {
-  const { monthly } = useCngnTransferActivity()
+  const { monthly } = useTransactionActivity()
 
   const hasEnoughData = monthly.length >= 2
 

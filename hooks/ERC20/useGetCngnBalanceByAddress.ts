@@ -1,16 +1,15 @@
-import { useWalletBalance } from "thirdweb/react";
-import { thirdwebClient } from "@/app/client";
-import { baseSepolia } from "thirdweb/chains";
+import { useBalance } from "@/hooks/useBalance";
 
+/**
+ * Kept as a thin shim so existing call sites don't change shape.
+ *
+ * Previously this wrapped thirdweb's `useWalletBalance`, which meant an RPC
+ * `balanceOf` on every mount. It now reads the backend's cached value, which
+ * paints instantly from localStorage and updates over the realtime stream.
+ */
 const useGetCngnBalanceByAddress = (address?: string | null) => {
-  const { data } = useWalletBalance({
-    address: address || undefined,
-    chain: baseSepolia,
-    client: thirdwebClient,
-    tokenAddress: process.env.NEXT_PUBLIC_CNGN_ADDRESS,
-  });
-
-  return data?.displayValue ? Number.parseFloat(data.displayValue) : null;
+  const { balance } = useBalance(address);
+  return balance;
 };
 
 export default useGetCngnBalanceByAddress;
