@@ -8,6 +8,7 @@ import Image from "next/image";
 import { useActiveAccount, useActiveWallet, useDisconnect } from "thirdweb/react";
 import { flushBackendSyncQueue, getBackendSyncQueueSize } from "@/lib/backend-sync-queue";
 import { clearAuthStorage } from "@/hooks/useAutoAuthenticate";
+import { fetchSessionProfile } from "@/lib/session";
 
 export function DashboardHeader() {
   const pathname = usePathname();
@@ -135,30 +136,9 @@ export function DashboardHeader() {
       if (hasCache) return;
 
       try {
-        const upstream = `/api/auth/check/${address}`;
-
-        const res = await fetch(upstream, {
-          method: "GET",
-          headers: {
-            Accept: "application/json",
-          },
-        });
-
-        if (!res.ok) return;
-
-        const payload = (await res.json()) as {
-          data?: {
-            user?: {
-              username?: string;
-              fullName?: string;
-              avatar?: string;
-              role?: string;
-              organizationSlug?: string;
-            };
-          };
-        };
-
-        const user = payload.data?.user;
+        // The header only ever shows the signed-in person, so it reads the
+        // session rather than an address supplied by the page.
+        const user = await fetchSessionProfile();
         if (!user?.username) return;
 
         setProfile({

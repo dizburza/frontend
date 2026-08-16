@@ -5,6 +5,7 @@ import type React from "react";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useActiveAccount } from "thirdweb/react";
+import { fetchSessionProfile } from "@/lib/session";
 
 type CachedAuthCheck = {
   isRegistered: boolean;
@@ -75,45 +76,22 @@ export default function OrgGuard(
 
     const fetchAuthCheck = async () => {
       try {
-        const upstream = `/api/auth/check/${address}`;
+        // This guard runs inside the dashboard, so a session already exists and
+        // the profile comes from it rather than from an address anyone can name.
+        const user = await fetchSessionProfile();
 
-        const res = await fetch(upstream, {
-          method: "GET",
-          headers: { Accept: "application/json" },
-        });
-
-        if (!res.ok) {
+        if (!user) {
           router.replace("/setup-profile");
           return;
         }
 
-        const payload = (await res.json()) as {
-          data?: {
-            isRegistered?: boolean;
-            user?: {
-              role?: "employee" | "signer" | "admin";
-              organizationSlug?: string;
-              username?: string;
-              fullName?: string;
-              avatar?: string;
-            };
-          };
-        };
-
-        const isRegistered = Boolean(payload.data?.isRegistered);
-        if (!isRegistered) {
-          router.replace("/setup-profile");
-          return;
-        }
-
-        const user = payload.data?.user;
         const toCache: CachedAuthCheck = {
-          isRegistered,
-          role: user?.role || "user",
-          organizationSlug: user?.organizationSlug,
-          username: user?.username,
-          fullName: user?.fullName,
-          avatar: user?.avatar,
+          isRegistered: true,
+          role: (user.role ?? "user") as CachedAuthCheck["role"],
+          organizationSlug: user.organizationSlug ?? undefined,
+          username: user.username,
+          fullName: user.fullName,
+          avatar: user.avatar,
           savedAt: Date.now(),
         };
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useCallback, useState, useRef } from "react";
 import { useActiveAccount } from "thirdweb/react";
+import { endSession, fetchSessionProfile, hasSessionFor } from "@/lib/session";
 
 interface AuthState {
   isAuthenticated: boolean;
@@ -12,7 +13,6 @@ interface AuthState {
 interface LoginResponse {
   success: boolean;
   data?: {
-    token: string;
     user: {
       username: string;
       fullName?: string;
@@ -22,18 +22,14 @@ interface LoginResponse {
   error?: string;
 }
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5050";
-
 // Global event name for auth completion
 const AUTH_COMPLETED_EVENT = "auth:completed";
 
-const TOKEN_STORAGE_KEY = "token";
-const TOKEN_WALLET_STORAGE_KEY = "token_wallet";
-
 export function clearAuthStorage() {
+  // Clears the session cookie server-side; nothing sensitive is held locally.
+  void endSession();
+
   try {
-    localStorage.removeItem(TOKEN_STORAGE_KEY);
-    localStorage.removeItem(TOKEN_WALLET_STORAGE_KEY);
     localStorage.removeItem("accountType");
 
     const keys: string[] = [];
@@ -50,32 +46,6 @@ export function clearAuthStorage() {
     // ignore
   }
 }
-
-/**
- * Validates if a JWT token is still valid by checking expiry
- * Note: This is a client-side check, actual validation happens server-side
- */
-const isTokenValid = (token: string | null): boolean => {
-  if (!token) return false;
-  
-  try {
-    // JWT tokens have 3 parts separated by dots
-    const parts = token.split(".");
-    if (parts.length !== 3) return false;
-    
-    // Decode payload (middle part)
-    const payload = JSON.parse(atob(parts[1]));
-    
-    // Check if token is expired
-    if (payload.exp && Date.now() >= payload.exp * 1000) {
-      return false;
-    }
-    
-    return true;
-  } catch {
-    return false;
-  }
-};
 
 /**
  * Hook to automatically authenticate user when wallet connects
@@ -98,7 +68,11 @@ export function useAutoAuthenticate() {
     error: null,
   });
   
-  // Track if we've already attempted auth for this session
+  // Addresses whose sign-in failed, so a rejected signature is not re-prompted
+  // in a loop. Success is deliberately not recorded here: the session hint
+  // already stops a signed-in address from signing again, and latching on
+  // success meant a disconnect followed by a reconnect was refused outright,
+  // because this hook lives at the root and its refs outlive the connection.
   const attemptedRef = useRef<Set<string>>(new Set());
   // Track if auth is currently in progress to prevent duplicates
   const inProgressRef = useRef(false);
@@ -108,7 +82,9 @@ export function useAutoAuthenticate() {
    */
   const getAuthMessage = useCallback(async (address: string): Promise<string | null> => {
     try {
-      const response = await fetch(`${BACKEND_URL}/api/auth/message/${address}`);
+      const response = await fetch(`/api/auth/message/${address}`, {
+        credentials: "include",
+      });
       const data = await response.json();
       
       if (data.success && data.data?.message) {
@@ -148,17 +124,20 @@ export function useAutoAuthenticate() {
    * Login with signature
    */
   const login = useCallback(async (
-    address: string, 
-    message: string, 
+    address: string,
     signature: string
   ): Promise<LoginResponse | null> => {
     try {
-      const response = await fetch(`${BACKEND_URL}/api/auth/login`, {
+      // Signature only. The server rebuilds the message from the challenge it
+      // issued, so there is nothing here worth forging.
+      const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        // The response sets an httpOnly session cookie; nothing is returned
+        // for the client to store.
+        credentials: "include",
         body: JSON.stringify({
           walletAddress: address,
-          message,
           signature,
         }),
       });
@@ -186,6 +165,7 @@ export function useAutoAuthenticate() {
       // 1. Get auth message
       const message = await getAuthMessage(address);
       if (!message) {
+        attemptedRef.current.add(address);
         setAuthState({
           isAuthenticated: false,
           isLoading: false,
@@ -197,6 +177,7 @@ export function useAutoAuthenticate() {
       // 2. Sign message
       const signature = await signMessage(message);
       if (!signature) {
+        attemptedRef.current.add(address);
         setAuthState(prev => ({
           ...prev,
           isLoading: false,
@@ -206,8 +187,9 @@ export function useAutoAuthenticate() {
       }
 
       // 3. Login
-      const loginResult = await login(address, message, signature);
-      if (!loginResult?.success || !loginResult.data?.token) {
+      const loginResult = await login(address, signature);
+      if (!loginResult?.success) {
+        attemptedRef.current.add(address);
         setAuthState({
           isAuthenticated: false,
           isLoading: false,
@@ -216,13 +198,6 @@ export function useAutoAuthenticate() {
         return;
       }
 
-      // 4. Save token
-      localStorage.setItem(TOKEN_STORAGE_KEY, loginResult.data.token);
-      localStorage.setItem(TOKEN_WALLET_STORAGE_KEY, address);
-      
-      // Mark as attempted for this address
-      attemptedRef.current.add(address);
-      
       setAuthState({
         isAuthenticated: true,
         isLoading: false,
@@ -235,6 +210,7 @@ export function useAutoAuthenticate() {
       console.log("[useAutoAuthenticate] Authentication successful");
     } catch (error) {
       console.error("[useAutoAuthenticate] Auth flow error:", error);
+      attemptedRef.current.add(address);
       setAuthState({
         isAuthenticated: false,
         isLoading: false,
@@ -262,7 +238,9 @@ export function useAutoAuthenticate() {
     const address = account?.address;
     
     if (!address) {
-      // Wallet disconnected - reset state
+      // Disconnecting forgets the failures too, so reconnecting is a fresh
+      // start rather than something a latch from the last connection refuses.
+      attemptedRef.current.clear();
       setAuthState({
         isAuthenticated: false,
         isLoading: false,
@@ -271,28 +249,30 @@ export function useAutoAuthenticate() {
       return;
     }
 
-    // Check if we already have a valid token bound to this wallet
-    const existingToken = localStorage.getItem(TOKEN_STORAGE_KEY);
-    const tokenWallet = localStorage.getItem(TOKEN_WALLET_STORAGE_KEY);
-    const hasValidToken = isTokenValid(existingToken);
-    const isTokenForThisWallet = tokenWallet?.toLowerCase() === address.toLowerCase();
+    // The session cookie is httpOnly, so this reads the non-secret hint the
+    // backend sets alongside it. Believing it costs no round trip, which is the
+    // whole point, but it is checked behind rather than taken on trust: the two
+    // cookies can disagree, and a hint that outlives its session would otherwise
+    // leave this convinced it is signed in while every request is refused.
+    if (hasSessionFor(address)) {
+      setAuthState({ isAuthenticated: true, isLoading: false, error: null });
 
-    if (hasValidToken && isTokenForThisWallet) {
-      setAuthState({
-        isAuthenticated: true,
-        isLoading: false,
-        error: null,
+      let live = true;
+      void fetchSessionProfile().then((profile) => {
+        // `fetchSessionProfile` clears the hint on a 401, so by here the state
+        // is already corrected and signing in is the right next move.
+        if (!live || profile || hasSessionFor(address)) return;
+
+        setAuthState({ isAuthenticated: false, isLoading: false, error: null });
+        void performAuth(address);
       });
-      return;
+
+      return () => {
+        live = false;
+      };
     }
 
-    if (hasValidToken && !isTokenForThisWallet) {
-      // Avoid using a token created for a different wallet; backend may reject with 401/403.
-      localStorage.removeItem(TOKEN_STORAGE_KEY);
-      localStorage.removeItem(TOKEN_WALLET_STORAGE_KEY);
-    }
-
-    // No valid token - trigger auth flow
+    // No session for this wallet, so sign in
     performAuth(address);
   }, [account?.address, performAuth]);
 

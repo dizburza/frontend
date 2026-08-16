@@ -20,8 +20,10 @@ const proxy = async (
   const upstreamUrl = createUpstreamUrl(request, path);
 
   const headers = new Headers(request.headers);
-  headers.set("accept", "application/json");
   headers.delete("host");
+  // The browser talks to this origin, so the backend needs to be told which
+  // origin the request really came from for its CSRF check to pass.
+  headers.set("origin", new URL(request.url).origin);
 
   const method = request.method.toUpperCase();
   const hasBody = method !== "GET" && method !== "HEAD";
@@ -34,16 +36,39 @@ const proxy = async (
     redirect: "manual",
   });
 
-  const contentType = upstreamRes.headers.get("content-type") || "";
-  const isJson = contentType.includes("application/json");
+  const responseHeaders = new Headers({ "cache-control": "no-store" });
 
+  // Session cookies are set by the backend and must survive the hop, otherwise
+  // login succeeds upstream and the browser never receives the session.
+  // getSetCookie keeps multiple Set-Cookie headers separate; joining them into
+  // one string would corrupt cookies whose values contain commas.
+  for (const cookie of upstreamRes.headers.getSetCookie?.() ?? []) {
+    responseHeaders.append("set-cookie", cookie);
+  }
+
+  const contentType = upstreamRes.headers.get("content-type") || "";
+
+  // Server-sent events must stream through untouched. Buffering the body here
+  // would hold every event until the connection closed.
+  if (contentType.includes("text/event-stream")) {
+    responseHeaders.set("content-type", "text/event-stream");
+    responseHeaders.set("connection", "keep-alive");
+    responseHeaders.set("x-accel-buffering", "no");
+
+    return new Response(upstreamRes.body, {
+      status: upstreamRes.status,
+      headers: responseHeaders,
+    });
+  }
+
+  const isJson = contentType.includes("application/json");
   const body: unknown = isJson ? await upstreamRes.json() : await upstreamRes.text();
 
-  return Response.json(body, {
+  responseHeaders.set("content-type", isJson ? "application/json" : "text/plain");
+
+  return new Response(isJson ? JSON.stringify(body) : String(body), {
     status: upstreamRes.status,
-    headers: {
-      "cache-control": "no-store",
-    },
+    headers: responseHeaders,
   });
 };
 
