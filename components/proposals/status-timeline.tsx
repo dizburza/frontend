@@ -2,15 +2,54 @@
 
 import { Card } from "@/components/ui/card"
 import { CheckCircle2, Circle } from "lucide-react"
+import type { Proposal } from "@/lib/api/proposals"
+import { statusLabel } from "@/lib/proposal-format"
 
-export function StatusTimeline() {
+const formatMoment = (value: string | null) =>
+  value
+    ? new Date(value).toLocaleString(undefined, {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      })
+    : ""
+
+/**
+ * The proposal's own history. There is no "disbursed" step: a proposal records
+ * a decision, and paying it out is a separate payroll batch with its own quorum
+ * on chain.
+ */
+export function StatusTimeline({ proposal }: Readonly<{ proposal: Proposal }>) {
+  const decided = proposal.status !== "open"
+  const windowClosed = decided || new Date(proposal.closesAt).getTime() < Date.now()
+
   const statuses = [
-    { id: "draft-created", label: "Draft Created", role: "CEO", timestamp: "Wed, Oct 8 - 10:42 AM", completed: true },
-    { id: "submitted-for-review", label: "Submitted for Review", role: "", timestamp: "Wed, Oct 8 - 12:42 PM", completed: true },
-    { id: "signing-started", label: "Signing Started", role: "", timestamp: "Wed, Oct 10 - 10:42 AM", completed: true },
-    { id: "signing-ended", label: "Signing ended", role: "", timestamp: "Wed, Oct 16 - 10:42 AM", completed: false },
-    { id: "signed", label: "Signed", role: "", timestamp: "Wed, Oct 16 - 10:43 AM", completed: false },
-    { id: "disbursed", label: "Disbursed", role: "", timestamp: "Wed, Oct 16 - 10:44 AM", completed: false },
+    {
+      id: "created",
+      label: "Proposal raised",
+      timestamp: formatMoment(proposal.createdAt),
+      completed: true,
+    },
+    {
+      id: "signing-open",
+      label: "Signing opened",
+      timestamp: formatMoment(proposal.opensAt),
+      completed: true,
+    },
+    {
+      id: "signing-closed",
+      label: "Signing closes",
+      timestamp: formatMoment(proposal.closesAt),
+      completed: windowClosed,
+    },
+    {
+      id: "decided",
+      label: decided ? statusLabel[proposal.status] : "Awaiting quorum",
+      timestamp: formatMoment(proposal.decidedAt),
+      completed: decided,
+    },
   ]
 
   return (
@@ -20,7 +59,6 @@ export function StatusTimeline() {
       <div className="space-y-4">
         {statuses.map((status, index) => (
           <div key={status.id} className="flex gap-4">
-            {/* Timeline dot */}
             <div className="flex flex-col items-center">
               {status.completed ? (
                 <CheckCircle2 size={24} className="text-blue-600" />
@@ -32,11 +70,11 @@ export function StatusTimeline() {
               )}
             </div>
 
-            {/* Content */}
             <div className="pb-4">
-              <p className="text-sm text-gray-500">{status.timestamp}</p>
+              {status.timestamp && (
+                <p className="text-sm text-gray-500">{status.timestamp}</p>
+              )}
               <p className="font-semibold text-gray-900">{status.label}</p>
-              {status.role && <p className="text-xs text-gray-500">{status.role}</p>}
             </div>
           </div>
         ))}

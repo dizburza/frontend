@@ -7,19 +7,33 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { X } from "lucide-react"
 import { ProposalPreviewModal } from "./proposal-preview-modal"
+import { useToken } from "@/hooks/useToken"
+import { toast } from "sonner"
 
 interface CreateProposalModalProps {
+  organizationId?: string
   onClose: () => void
   onProposalCreated?: () => void
 }
 
-export function CreateProposalModal({ onClose, onProposalCreated }: Readonly<CreateProposalModalProps>) {
+/** Voting runs for a week unless the raiser picks another closing date. */
+const defaultClosesAt = () => {
+  const date = new Date()
+  date.setDate(date.getDate() + 7)
+  return date.toISOString().slice(0, 10)
+}
+
+export function CreateProposalModal({
+  organizationId,
+  onClose,
+  onProposalCreated,
+}: Readonly<CreateProposalModalProps>) {
+  const { symbol } = useToken()
   const [step, setStep] = useState<"form" | "preview">("form")
   const [formData, setFormData] = useState({
     title: "",
     amount: "",
-    startDate: "Oct 21,2025",
-    endDate: "Oct 21,2025",
+    closesAt: defaultClosesAt(),
     description: "",
   })
 
@@ -29,6 +43,14 @@ export function CreateProposalModal({ onClose, onProposalCreated }: Readonly<Cre
   }
 
   const handlePreview = () => {
+    if (!formData.title.trim()) {
+      toast.error("Give the proposal a title")
+      return
+    }
+    if (new Date(formData.closesAt).getTime() <= Date.now()) {
+      toast.error("The voting window must close in the future")
+      return
+    }
     setStep("preview")
   }
 
@@ -37,7 +59,15 @@ export function CreateProposalModal({ onClose, onProposalCreated }: Readonly<Cre
   }
 
   if (step === "preview") {
-    return <ProposalPreviewModal formData={formData} onBack={handleBack} onClose={onClose} onProposalCreated={onProposalCreated} />
+    return (
+      <ProposalPreviewModal
+        formData={formData}
+        organizationId={organizationId}
+        onBack={handleBack}
+        onClose={onClose}
+        onProposalCreated={onProposalCreated}
+      />
+    )
   }
 
   return (
@@ -70,7 +100,7 @@ export function CreateProposalModal({ onClose, onProposalCreated }: Readonly<Cre
 
           {/* Request Amount */}
           <div>
-            <label htmlFor="requestAmount" className="block text-sm font-medium text-gray-700 mb-2">Request Amount (cNGN)</label>
+            <label htmlFor="requestAmount" className="block text-sm font-medium text-gray-700 mb-2">Request Amount ({symbol})</label>
             <Input
               id="requestAmount"
               name="amount"
@@ -81,16 +111,22 @@ export function CreateProposalModal({ onClose, onProposalCreated }: Readonly<Cre
             />
           </div>
 
-          {/* Dates */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="startDate" className="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
-              <Input id="startDate" name="startDate" value={formData.startDate} onChange={handleInputChange} className="w-full" />
-            </div>
-            <div>
-              <label htmlFor="endDate" className="block text-sm font-medium text-gray-700 mb-2">End Date</label>
-              <Input id="endDate" name="endDate" value={formData.endDate} onChange={handleInputChange} className="w-full" />
-            </div>
+          {/* Voting window */}
+          <div>
+            <label htmlFor="closesAt" className="block text-sm font-medium text-gray-700 mb-2">
+              Signing closes on
+            </label>
+            <Input
+              id="closesAt"
+              name="closesAt"
+              type="date"
+              value={formData.closesAt}
+              onChange={handleInputChange}
+              className="w-full"
+            />
+            <p className="text-xs text-gray-500 mt-2">
+              Signers can vote until this date. Reaching quorum either way decides it sooner.
+            </p>
           </div>
 
           {/* Description */}

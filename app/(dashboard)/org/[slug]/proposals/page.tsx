@@ -8,14 +8,27 @@ import { Search, Filter, ArrowUpDown } from "lucide-react"
 import { ProposalStatCard } from "@/components/proposals/proposal-stat-card"
 import { ProposalTable } from "@/components/proposals/proposal-table"
 import { CreateProposalModal } from "@/components/proposals/create-proposal-modal"
-import { getSessionProposals } from "@/lib/localStorage"
-import type { Proposal } from "@/lib/types/payloads"
+import { useOrganizationBySlug } from "@/lib/api/organization"
+import { useOrganizationProposals } from "@/lib/api/proposals"
+import useOrgSlug from "@/hooks/useOrgSlug"
 
 export default function ProposalsPage() {
+  const orgSlug = useOrgSlug()
+  const { data: organization } = useOrganizationBySlug(orgSlug)
+  const {
+    data: proposalData,
+    loading,
+    error,
+    refresh,
+  } = useOrganizationProposals(organization?.id ?? null)
+
   const [showCreateModal, setShowCreateModal] = useState(false)
-  const [proposals, setProposals] = useState<Proposal[]>(getSessionProposals())
+  const [search, setSearch] = useState("")
   const [page, setPage] = useState(1)
   const [limit, setLimit] = useState(10)
+
+  const allProposals = proposalData?.proposals ?? []
+  const stats_ = proposalData?.stats
 
   const getPageItems = (currentPage: number, total: number) => {
     const safeTotalPages = Math.max(1, total)
@@ -36,14 +49,14 @@ export default function ProposalsPage() {
     return items
   }
   
-  // Refresh proposals when a new one is created
-  const handleProposalCreated = () => {
-    setProposals(getSessionProposals())
-  }
+  const query = search.trim().toLowerCase()
+  const proposals = query
+    ? allProposals.filter((p) => p.title.toLowerCase().includes(query))
+    : allProposals
 
   useEffect(() => {
     setPage(1)
-  }, [limit, proposals.length])
+  }, [limit, query, allProposals.length])
 
   const totalPages = Math.max(1, Math.ceil(proposals.length / limit))
   const safePage = Math.min(Math.max(1, page), totalPages)
@@ -51,15 +64,13 @@ export default function ProposalsPage() {
   const paginatedProposals = proposals.slice(startIndex, startIndex + limit)
   const pageItems = getPageItems(safePage, totalPages)
 
-  const totalProposals = proposals.length
-  const approvedProposals = proposals.filter((p: Proposal) => p.status === "Completed").length
-  const rejectedProposals = proposals.filter((p: Proposal) => p.status === "Rejected").length
+  const lastUpdated = loading ? "updating ..." : "just now"
 
   const stats = [
-    { label: "Total Proposals Created", value: totalProposals.toString(), lastUpdated: "1 min ago" },
-    { label: "Approved Proposals", value: approvedProposals.toString(), lastUpdated: "1 min ago" },
-    { label: "Rejected Proposals", value: rejectedProposals.toString(), lastUpdated: "1 min ago" },
-    { label: "My Proposals", value: "1", link: "View proposal" },
+    { label: "Total Proposals Created", value: String(stats_?.total ?? 0), lastUpdated },
+    { label: "Approved Proposals", value: String(stats_?.passed ?? 0), lastUpdated },
+    { label: "Rejected Proposals", value: String(stats_?.rejected ?? 0), lastUpdated },
+    { label: "Open for Signing", value: String(stats_?.open ?? 0), lastUpdated },
   ]
 
   return (
@@ -91,7 +102,12 @@ export default function ProposalsPage() {
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 mb-6">
           <div className="flex-1 relative">
             <Search size={18} className="absolute left-3 top-3 text-gray-400" />
-            <Input placeholder="Search for proposals" className="pl-10" />
+            <Input
+              placeholder="Search for proposals"
+              className="pl-10"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
           </div>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" className="gap-2 bg-transparent">
@@ -105,7 +121,11 @@ export default function ProposalsPage() {
           </div>
         </div>
 
-        <ProposalTable proposals={paginatedProposals} />
+        {error ? (
+          <p className="py-8 text-center text-sm text-red-600">{error}</p>
+        ) : (
+          <ProposalTable proposals={paginatedProposals} startIndex={startIndex} />
+        )}
 
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-6">
           <div className="flex items-center gap-3 text-sm text-gray-600">
@@ -185,9 +205,10 @@ export default function ProposalsPage() {
 
       {/* Create Proposal Modal */}
       {showCreateModal && (
-        <CreateProposalModal 
-          onClose={() => setShowCreateModal(false)} 
-          onProposalCreated={handleProposalCreated}
+        <CreateProposalModal
+          organizationId={organization?.id}
+          onClose={() => setShowCreateModal(false)}
+          onProposalCreated={refresh}
         />
       )}
     </div>

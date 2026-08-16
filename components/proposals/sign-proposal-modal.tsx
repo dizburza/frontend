@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { X } from "lucide-react"
-import { updateProposalVote } from "@/lib/localStorage"
+import { voteOnProposal } from "@/lib/api/proposals"
 import { useGlobalLoading } from "@/lib/global-loading"
 import { toast } from "sonner"
 
@@ -25,19 +25,17 @@ export function SignProposalModal({ onClose, proposalId, onVoteSubmitted }: Read
       setIsLoading(true)
       showLoading("Submitting signature...")
 
-      // Update proposal vote in session
-      updateProposalVote(proposalId, vote)
-      toast.success("Vote submitted")
+      await voteOnProposal(proposalId, vote)
+      toast.success("Signature recorded")
 
-      // Notify parent to refresh
-      if (onVoteSubmitted) {
-        onVoteSubmitted()
-      }
-
+      onVoteSubmitted?.()
       onClose()
     } catch (error) {
       console.error(error)
-      toast.error("Could not submit vote. Please try again.")
+      // The server explains why: not a signer, already voted, or closed.
+      toast.error(
+        error instanceof Error ? error.message : "Could not submit your vote"
+      )
     } finally {
       hideLoading()
       setIsLoading(false)

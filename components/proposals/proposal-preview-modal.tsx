@@ -4,34 +4,61 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { X, ChevronLeft } from "lucide-react"
 import { ProposalSuccessModal } from "./proposal-success-modal"
-import { addProposalToSession } from "@/lib/localStorage"
+import { createProposal } from "@/lib/api/proposals"
+import { useToken } from "@/hooks/useToken"
+import { toast } from "sonner"
 
 interface ProposalPreviewModalProps {
   formData: {
     title: string
     amount: string
-    startDate: string
-    endDate: string
+    closesAt: string
     description: string
   }
+  organizationId?: string
   onBack: () => void
   onClose: () => void
   onProposalCreated?: () => void
 }
 
-export function ProposalPreviewModal({ formData, onBack, onClose, onProposalCreated }: Readonly<ProposalPreviewModalProps>) {
+export function ProposalPreviewModal({
+  formData,
+  organizationId,
+  onBack,
+  onClose,
+  onProposalCreated,
+}: Readonly<ProposalPreviewModalProps>) {
+  const { symbol } = useToken()
   const [showSuccess, setShowSuccess] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const handleSubmit = () => {
-    // Add proposal to session storage
-    addProposalToSession(formData)
-    
-    // Notify parent to refresh
-    if (onProposalCreated) {
-      onProposalCreated()
+  const handleSubmit = async () => {
+    if (isSubmitting) return
+
+    if (!organizationId) {
+      toast.error("Organization not loaded yet. Try again in a moment.")
+      return
     }
-    
-    setShowSuccess(true)
+
+    try {
+      setIsSubmitting(true)
+
+      await createProposal({
+        organizationId,
+        title: formData.title.trim(),
+        description: formData.description.trim() || undefined,
+        amount: formData.amount.trim() || undefined,
+        // End of the chosen day, so a proposal closing "today" still has today.
+        closesAt: new Date(`${formData.closesAt}T23:59:59`).toISOString(),
+      })
+
+      onProposalCreated?.()
+      setShowSuccess(true)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not raise the proposal")
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   if (showSuccess) {
@@ -60,19 +87,20 @@ export function ProposalPreviewModal({ formData, onBack, onClose, onProposalCrea
 
           <div>
             <h3 className="text-2xl font-bold mb-4">{formData.title}</h3>
-            <div className="grid grid-cols-3 gap-4 mb-6 text-sm">
+            <div className="grid grid-cols-2 gap-4 mb-6 text-sm">
               <div>
-                <p className="text-gray-600">Created by:</p>
-                <p className="font-medium">CEO</p>
+                <p className="text-gray-600">Amount requested:</p>
+                <p className="font-medium">
+                  {formData.amount ? `${symbol} ${formData.amount}` : "None"}
+                </p>
               </div>
               <div>
-                <p className="text-gray-600">Created on:</p>
-                <p className="font-medium">Oct 7, 2025</p>
+                <p className="text-gray-600">Signing closes:</p>
+                <p className="font-medium">
+                  {new Date(formData.closesAt).toLocaleDateString()}
+                </p>
               </div>
-              <div>
-                <p className="text-gray-600">Amount Requested:</p>
-                <p className="font-medium">cNGN {formData.amount}</p>
-              </div>
+
             </div>
           </div>
 
@@ -87,8 +115,12 @@ export function ProposalPreviewModal({ formData, onBack, onClose, onProposalCrea
           <Button variant="outline" onClick={onBack}>
             Back
           </Button>
-          <Button onClick={handleSubmit} className="bg-blue-600 hover:bg-blue-700 text-white">
-            Submit
+          <Button
+            onClick={handleSubmit}
+            disabled={isSubmitting}
+            className="bg-blue-600 hover:bg-blue-700 text-white"
+          >
+            {isSubmitting ? "Submitting..." : "Submit"}
           </Button>
         </div>
       </div>
