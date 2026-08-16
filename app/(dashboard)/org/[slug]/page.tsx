@@ -6,7 +6,6 @@ import { AnalysisChart } from "@/components/dashboard/analysis-chart";
 import AddSignersModal from "@/components/organization/add-signers-modal";
 import { useMemo, useState } from "react";
 import {
-  mockProposals,
 } from "@/lib/static/mock-data";
 import Image from "next/image";
 import { Copy, Info } from "lucide-react";
@@ -20,8 +19,12 @@ import {
 } from "@/lib/api/organization";
 import { useActiveAccount } from "thirdweb/react";
 import useGetOrgTreasuryBalance from "@/hooks/ERC20/useGetOrgTreasuryBalance";
+import { useToken } from "@/hooks/useToken"
+import { useOrganizationProposals } from "@/lib/api/proposals";
+import { statusClasses, statusLabel, timeLeftLabel } from "@/lib/proposal-format";
 
 export default function OrganizationDashboardPage() {
+  const { symbol, logoUrl } = useToken()
   const [isAddSignersOpen, setIsAddSignersOpen] = useState(false);
 
   const orgSlug = useOrgSlug();
@@ -33,9 +36,10 @@ export default function OrganizationDashboardPage() {
   const { data: organization, loading: orgLoading, error: orgError, refresh: refreshOrg } =
     useOrganizationBySlug(orgSlug);
 
-  const organizationId = organization?._id ?? null;
+  const organizationId = organization?.id ?? null;
   const { data: employeesData } = useOrganizationEmployees(organizationId);
   const { data: batchesData } = useOrganizationBatches(organizationId);
+  const { data: proposalData } = useOrganizationProposals(organizationId);
 
   const account = useActiveAccount();
   const transactionsAddress = organization?.contractAddress ?? account?.address ?? null;
@@ -43,7 +47,7 @@ export default function OrganizationDashboardPage() {
 
   const treasuryBalance = useGetOrgTreasuryBalance();
 
-  const proposals = mockProposals.list;
+  const proposals = (proposalData?.proposals ?? []).slice(0, 5);
 
   const toShortAddress = (value: string) => {
     if (!value) return "--";
@@ -270,8 +274,8 @@ export default function OrganizationDashboardPage() {
                     {treasuryBalance === null ? "--" : treasuryBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </p>
                   <div className="flex items-center">
-                    <Image src={"/cngn.svg"} alt="cNGN" width={24} height={24} />
-                    <span className="text-[#26297A] text-center">cNGN</span>
+                    <Image src={logoUrl} alt={symbol} width={24} height={24} />
+                    <span className="text-[#26297A] text-center">{symbol}</span>
                   </div>
                 </div>
                 <p className="text-sm text-gray-500">
@@ -306,14 +310,14 @@ export default function OrganizationDashboardPage() {
                 <div className="p-4 bg-gray-50 col-span-3 rounded-lg">
                   <p className="text-xs text-[#26297A] mb-2">Pending</p>
                   <div className="flex gap-2">
-                    <Image src={"/cngn.svg"} alt="cNGN" width={24} height={24} />
+                    <Image src={logoUrl} alt={symbol} width={24} height={24} />
                     <p className="text-lg font-bold text-[#26297A]">{batchStats.pending.toLocaleString()}.00</p>
                   </div>
                 </div>
                 <div className="p-4 bg-gray-50 rounded-lg col-span-3">
                   <p className="text-xs text-[#26297A] mb-2">Paid</p>
                   <div className="flex gap-2">
-                    <Image src={"/cngn.svg"} alt="cNGN" width={24} height={24} />
+                    <Image src={logoUrl} alt={symbol} width={24} height={24} />
                     <p className="text-lg font-bold text-[#26297A]">{batchStats.executed.toLocaleString()}.00</p>
                   </div>
                 </div>
@@ -420,16 +424,12 @@ export default function OrganizationDashboardPage() {
                     >
                       <td className="py-3 px-2">{index + 1}</td>
                       <td className="py-3 px-2">{proposal.title}</td>
-                      <td className="py-3 px-2 text-gray-600">{proposal.timeLeft}</td>
+                      <td className="py-3 px-2 text-gray-600">
+                        {timeLeftLabel(proposal.closesAt, proposal.status)}
+                      </td>
                       <td className="py-3 px-2">
-                        <span
-                          className={`px-2 py-1 text-xs rounded ${
-                            proposal.status === "Completed"
-                              ? "bg-green-100 text-green-800"
-                              : "bg-yellow-100 text-yellow-800"
-                          }`}
-                        >
-                          {proposal.status}
+                        <span className={`px-2 py-1 text-xs rounded ${statusClasses[proposal.status]}`}>
+                          {statusLabel[proposal.status]}
                         </span>
                       </td>
                     </tr>
@@ -461,7 +461,7 @@ export default function OrganizationDashboardPage() {
                   <th className="text-left py-2 px-2 text-gray-600 font-medium">Description</th>
                   <th className="text-left py-2 px-2 text-gray-600 font-medium">From</th>
                   <th className="text-left py-2 px-2 text-gray-600 font-medium">To</th>
-                  <th className="text-left py-2 px-2 text-gray-600 font-medium">Amount (cNGN)</th>
+                  <th className="text-left py-2 px-2 text-gray-600 font-medium">Amount ({symbol})</th>
                   <th className="text-left py-2 px-2 text-gray-600 font-medium">Status</th>
                 </tr>
               </thead>
@@ -475,7 +475,7 @@ export default function OrganizationDashboardPage() {
                 ) : (
                   (transactionsData?.transactions || []).map((tx, index) => (
                     <tr
-                      key={tx._id}
+                      key={tx.id}
                       className={
                         index < Math.min((transactionsData?.transactions || []).length, 5) - 1
                           ? "border-b border-gray-100"

@@ -26,7 +26,8 @@
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.3.1",
     "tailwindcss-animate": "^1.0.7",
-    "thirdweb": "^5.118.2"
+    "thirdweb": "^5.118.2",
+    "viem": "^2.55.13"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

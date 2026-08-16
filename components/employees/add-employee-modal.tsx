@@ -7,22 +7,20 @@ import { Input } from "@/components/ui/input"
 import { X, ChevronLeft, Upload, Download, FileSpreadsheet, AlertCircle, CheckCircle, Loader2 } from "lucide-react"
 import { AddEmployeeSuccessModal } from "./add-employee-success-modal"
 import { addEmployeeToSession } from "@/lib/localStorage"
+import { useToken } from "@/hooks/useToken"
 
-// Local apiFetch helper
+// Goes through the same-origin proxy rather than straight to the backend, so
+// the session cookie is actually sent.
 async function apiFetch(endpoint: string, options: RequestInit = {}) {
-  const token = localStorage.getItem("token")
-  const backendBaseUrl = (process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5050").replace(/\/$/, "").replace(/\/api$/, "")
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...(options.headers as Record<string, string>),
   }
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`
-  }
-  
-  const response = await fetch(`${backendBaseUrl}${endpoint}`, {
+
+  const response = await fetch(endpoint.startsWith("/api/") ? endpoint : `/api${endpoint}`, {
     ...options,
     headers,
+    credentials: "include",
   })
   
   if (!response.ok) {
@@ -43,18 +41,14 @@ async function apiFetch(endpoint: string, options: RequestInit = {}) {
 }
 
 async function backendFetchBlob(endpoint: string, options: RequestInit = {}) {
-  const token = localStorage.getItem("token")
-  const backendBaseUrl = (process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5050").replace(/\/$/, "").replace(/\/api$/, "")
   const headers: Record<string, string> = {
     ...(options.headers as Record<string, string>),
   }
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`
-  }
 
-  const response = await fetch(`${backendBaseUrl}${endpoint}`, {
+  const response = await fetch(endpoint.startsWith("/api/") ? endpoint : `/api${endpoint}`, {
     ...options,
     headers,
+    credentials: "include",
   })
 
   if (!response.ok) {
@@ -107,6 +101,7 @@ function SingleEmployeeForm({
   isResolvingUsername: boolean
   isAutofilled: boolean
 }>) {
+  const { symbol } = useToken()
   return (
     <div className="space-y-4">
       <p className="text-sm text-gray-600">Enter the details of your new employee to add them to your organization.</p>
@@ -217,7 +212,7 @@ function SingleEmployeeForm({
       </div>
 
       <div>
-        <label htmlFor="salary" className="block text-sm font-medium text-gray-700 mb-1">Salary (cNGN) *</label>
+        <label htmlFor="salary" className="block text-sm font-medium text-gray-700 mb-1">Salary ({symbol}) *</label>
         <Input
           id="salary"
           name="salary"

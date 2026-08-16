@@ -1,5 +1,6 @@
 "use client"
 
+import { activeChain } from "@/constants/chain";
 import type React from "react"
 import { useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
@@ -9,10 +10,12 @@ import { Card } from "@/components/ui/card"
 import { SuccessModal } from "@/components/success-modal"
 import { mapApiEmployeeToEmployee, recordBatchCreation, useOrganizationEmployees } from "@/lib/api/organization"
 import { toast } from "sonner"
-import { useActiveAccount, useSendAndConfirmTransaction } from "thirdweb/react"
+import { useActiveAccount } from "thirdweb/react"
 import { getContract, prepareContractCall } from "thirdweb"
-import { baseSepolia } from "thirdweb/chains"
 import { thirdwebClient } from "@/app/client"
+import { toBaseUnits } from "@/lib/token"
+import { useToken } from "@/hooks/useToken"
+import { useSponsoredTransaction } from "@/hooks/useSponsoredTransaction"
 
 interface BatchPaymentCreationModalProps {
   onClose: () => void
@@ -27,8 +30,9 @@ export function BatchPaymentCreationModal({
   organizationId,
   organizationAddress,
 }: Readonly<BatchPaymentCreationModalProps>) {
+  const { symbol } = useToken()
   const account = useActiveAccount()
-  const { mutateAsync: sendAndConfirmTx } = useSendAndConfirmTransaction()
+  const { send } = useSponsoredTransaction()
   const [step, setStep] = useState<"details" | "employees" | "preview" | "success">("details")
   const [selectedEmployees, setSelectedEmployees] = useState<string[]>([])
   const [employeeSearch, setEmployeeSearch] = useState("")
@@ -111,18 +115,18 @@ export function BatchPaymentCreationModal({
         return
       }
 
-      // Convert human salary to base units (cNGN decimals = 6)
+      // Scaled by the token's real decimals rather than an assumed six, and
+      // through BigInt rather than a float, so a large payroll cannot lose
+      // precision on its way into the contract call.
       const recipients = selectedEmployeeData.map((e) => e.walletAddress)
-      const amounts = selectedEmployeeData.map((e) => {
-        const v = Number(e.salary || 0)
-        const base = Math.round(v * 1_000_000)
-        return BigInt(base)
-      })
+      const amounts = await Promise.all(
+        selectedEmployeeData.map((e) => toBaseUnits(e.salary || 0))
+      )
 
       const contract = getContract({
         client: thirdwebClient,
         address: organizationAddress,
-        chain: baseSepolia,
+        chain: activeChain,
       })
 
       const tx = prepareContractCall({
@@ -132,7 +136,7 @@ export function BatchPaymentCreationModal({
         params: [batchName, recipients, amounts],
       })
 
-      await sendAndConfirmTx(tx)
+      await send(tx)
 
       await recordBatchCreation({
         batchName,
@@ -403,7 +407,7 @@ export function BatchPaymentCreationModal({
                         FIRST NAME
                       </th>
                       <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">
-                        SALARY (cNGN)
+                        SALARY ({symbol})
                       </th>
                       <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">
                         USERNAME
@@ -442,7 +446,7 @@ export function BatchPaymentCreationModal({
                   </p>
                 </Card>
                 <Card className="p-4">
-                  <p className="text-gray-600 text-sm mb-1">Total Amount (cNGN)</p>
+                  <p className="text-gray-600 text-sm mb-1">Total Amount ({symbol})</p>
                   <p className="text-2xl font-bold text-gray-900">
                     {formatAmount(totalAmount)}
                   </p>

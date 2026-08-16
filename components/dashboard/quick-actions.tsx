@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button"
 import Image from "next/image"
 import { ScanQrCode } from "lucide-react"
+import { useToken } from "@/hooks/useToken"
 
 interface QuickActionsProps {
   onSendToCNGN: () => void
@@ -12,6 +13,7 @@ interface QuickActionsProps {
 }
 
 export function QuickActions({ onSendToCNGN, onSendToBank, onReceive, onScan }: Readonly<QuickActionsProps>) {
+  const { symbol } = useToken()
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
       <Button
@@ -19,8 +21,8 @@ export function QuickActions({ onSendToCNGN, onSendToBank, onReceive, onScan }: 
         className="h-24 flex flex-col items-center justify-center gap-2 bg-transparent"
         onClick={onSendToCNGN}
       >
-       <Image src={"/send-to-cngn.svg"} alt="Send cNGN" width={54} height={54} />
-        <span className="text-sm">To cNGN</span>
+       <Image src={"/send-to-cngn.svg"} alt={`Send ${symbol}`} width={54} height={54} />
+        <span className="text-sm">To {symbol}</span>
       </Button>
       <Button
         variant="outline"
