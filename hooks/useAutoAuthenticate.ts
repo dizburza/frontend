@@ -2,7 +2,12 @@
 
 import { useEffect, useCallback, useState, useRef } from "react";
 import { useActiveAccount } from "thirdweb/react";
-import { endSession, fetchSessionProfile, hasSessionFor } from "@/lib/session";
+import {
+  endSession,
+  fetchSessionProfile,
+  hasSessionFor,
+  readSessionHint,
+} from "@/lib/session";
 
 interface AuthState {
   isAuthenticated: boolean;
@@ -274,6 +279,61 @@ export function useAutoAuthenticate() {
 
     // No session for this wallet, so sign in
     performAuth(address);
+  }, [account?.address, performAuth]);
+
+  /**
+   * Sign in again when a session lapses under a wallet that stayed connected.
+   *
+   * The effect above keys on the address, and the address does not change when
+   * a session expires, so nothing re-ran and reloading the page was the only
+   * way back in. The hint cookie carries its own expiry, so this waits for that
+   * moment rather than polling, and re-checks on focus as well since a device
+   * that slept through the timer would otherwise never notice.
+   */
+  useEffect(() => {
+    const address = account?.address;
+    if (!address) return;
+
+    let timer: ReturnType<typeof globalThis.setTimeout> | undefined;
+
+    const schedule = () => {
+      globalThis.clearTimeout(timer);
+      const hint = readSessionHint();
+
+      // A second past the expiry, so the cookie has genuinely gone by the time
+      // this looks. setTimeout overflows past a 32 bit delay and fires at once.
+      const wait = hint
+        ? Math.min(Math.max(hint.expiresAt - Date.now() + 1000, 1000), 0x7fffffff)
+        : 60_000;
+
+      timer = globalThis.setTimeout(revalidate, wait);
+    };
+
+    const revalidate = () => {
+      // Never raise a signing prompt at a tab nobody is looking at. Becoming
+      // visible fires this again.
+      if (document.visibilityState !== "visible") return;
+      if (inProgressRef.current) return;
+
+      if (hasSessionFor(address)) {
+        schedule();
+        return;
+      }
+
+      // A failure from the previous session would otherwise refuse this one.
+      attemptedRef.current.delete(address);
+      void performAuth(address);
+    };
+
+    schedule();
+    globalThis.addEventListener("focus", revalidate);
+    document.addEventListener("visibilitychange", revalidate);
+
+    return () => {
+      globalThis.clearTimeout(timer);
+      globalThis.removeEventListener("focus", revalidate);
+      document.removeEventListener("visibilitychange", revalidate);
+    };
   }, [account?.address, performAuth]);
 
   return {
