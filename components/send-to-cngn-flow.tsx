@@ -1,5 +1,6 @@
 "use client"
 
+import { activeChain } from "@/constants/chain";
 import { useEffect, useState } from "react"
 import { TransactionModal } from "@/components/transaction-modal"
 import { SuccessModal } from "@/components/success-modal"
@@ -7,15 +8,14 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { useGlobalLoading } from "@/lib/global-loading"
 import { toast } from "sonner"
-import { useActiveAccount, useSendTransaction, useWalletBalance } from "thirdweb/react"
+import { useActiveAccount, useSendTransaction } from "thirdweb/react"
 import { getContract } from "thirdweb"
 import { prepareContractCall } from "thirdweb/transaction"
-import { baseSepolia } from "thirdweb/chains"
-import { eth_getTransactionReceipt, getRpcClient } from "thirdweb/rpc"
 import { thirdwebClient } from "@/app/client"
 import { parseUnits } from "viem"
 import ConnectWallet from "@/components/ConnectWallet"
-import { useChainSwitch } from "@/hooks/useChainSwitch"
+import { useBalance } from "@/hooks/useBalance"
+import { watchTransaction } from "@/lib/api/transactions"
 
 interface SendToCNGNFlowProps {
   isOpen: boolean
@@ -124,8 +124,6 @@ const resolveRecipientInput = async (params: {
   }
 }
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
-
 const getTxHashFromSendResult = (result: unknown): `0x${string}` | null => {
   if (!result) return null
   if (typeof result === "string" && isHexAddress(result)) return result
@@ -133,23 +131,6 @@ const getTxHashFromSendResult = (result: unknown): `0x${string}` | null => {
   const r = result as { transactionHash?: unknown; receipt?: { transactionHash?: unknown } }
   const hash = r?.transactionHash ?? r?.receipt?.transactionHash
   return typeof hash === "string" && isHexAddress(hash) ? (hash) : null
-}
-
-const waitForReceipt = async (hash: `0x${string}`) => {
-  const rpcRequest = getRpcClient({ client: thirdwebClient, chain: baseSepolia })
-
-  const startedAt = Date.now()
-  const timeoutMs = 90_000
-  let delayMs = 1_200
-
-  while (Date.now() - startedAt < timeoutMs) {
-    const receipt = await eth_getTransactionReceipt(rpcRequest, { hash })
-    if (receipt) return receipt
-    await sleep(delayMs)
-    delayMs = Math.min(4_000, Math.floor(delayMs * 1.25))
-  }
-
-  throw new Error("Timed out waiting for transaction confirmation")
 }
 
 export function SendToCNGNFlow({ isOpen, onClose, initialRecipient }: Readonly<SendToCNGNFlowProps>) {
@@ -162,30 +143,25 @@ export function SendToCNGNFlow({ isOpen, onClose, initialRecipient }: Readonly<S
   const { showLoading, hideLoading } = useGlobalLoading()
 
   const account = useActiveAccount()
-  const { ensureCorrectChain, isOnCorrectChain } = useChainSwitch()
   const { mutateAsync: sendTx } = useSendTransaction()
 
   const tokenAddress = (process.env.NEXT_PUBLIC_CNGN_ADDRESS || "").trim() as `0x${string}` | ""
   const contract = tokenAddress
-    ? getContract({ address: tokenAddress, chain: baseSepolia, client: thirdwebClient })
+    ? getContract({ address: tokenAddress, chain: activeChain, client: thirdwebClient })
     : null
 
-  const { data: balanceData } = useWalletBalance({
-    address: account?.address,
-    chain: baseSepolia,
-    client: thirdwebClient,
-    tokenAddress: tokenAddress || undefined,
-  })
+  // Cached backend balance rather than a per-mount RPC call, so opening this
+  // modal no longer shows "--" while a `balanceOf` round trip completes.
+  const { balance, decimals, applyPendingDebit } = useBalance(account?.address)
 
   const recipientLabel = computeRecipientLabel({ resolvedUsername, resolvedRecipient })
 
   let availableBalanceText = "--"
-  if (account?.address) {
-    if (!isOnCorrectChain) {
-      availableBalanceText = "Switch to Base Sepolia"
-    } else if (balanceData) {
-      availableBalanceText = `${balanceData.displayValue} cNGN`
-    }
+  if (account?.address && balance !== null) {
+    availableBalanceText = `${balance.toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })} cNGN`
   }
 
   useEffect(() => {
@@ -229,11 +205,6 @@ export function SendToCNGNFlow({ isOpen, onClose, initialRecipient }: Readonly<S
         return
       }
 
-      const okChain = await ensureCorrectChain()
-      if (!okChain) {
-        return
-      }
-
       if (!contract) {
         toast.error("Token contract not configured")
         return
@@ -250,46 +221,46 @@ export function SendToCNGNFlow({ isOpen, onClose, initialRecipient }: Readonly<S
         return
       }
 
-      const balanceNumber = balanceData?.displayValue ? Number.parseFloat(balanceData.displayValue) : null
-      if (balanceNumber !== null && Number.isFinite(balanceNumber) && parsedAmount > balanceNumber) {
+      if (balance !== null && Number.isFinite(balance) && parsedAmount > balance) {
         toast.error("Transfer amount exceeds balance")
         return
       }
 
-      setIsLoading(true)
-      showLoading("Confirming transfer...")
+      // Refuse rather than assume a precision. Guessing wrong here sends the
+      // wrong amount, and the transfer cannot be recalled.
+      if (decimals === null) {
+        toast.error("Still loading token details. Try again in a moment.")
+        return
+      }
 
-      const tokenDecimals = typeof balanceData?.decimals === "number" ? balanceData.decimals : 6
+      setIsLoading(true)
+
+      const value = parseUnits(amount, decimals)
 
       const tx = prepareContractCall({
         contract,
         method: "function transfer(address to, uint256 value)",
-        params: [resolvedRecipient, parseUnits(amount, tokenDecimals)],
+        params: [resolvedRecipient, value],
       })
 
+      // The only unavoidable wait: the wallet's own signing prompt.
       const result = await sendTx(tx)
       const txHash = getTxHashFromSendResult(result)
 
-      toast.success("Transfer submitted")
+      // Everything past this point is optimistic. The transaction is signed and
+      // broadcast, so show it as done and let the backend confirm it. The old
+      // flow held a full-screen overlay here for up to 90 seconds while the
+      // browser polled for a receipt.
+      applyPendingDebit(value)
+      if (txHash) void watchTransaction(txHash)
 
-      if (txHash) {
-        showLoading("Waiting for confirmation...")
-        const receipt = await waitForReceipt(txHash)
-        const statusRaw = (receipt as { status?: unknown } | null | undefined)?.status
-        const status = typeof statusRaw === "string" ? statusRaw : undefined
-        if (status?.toLowerCase() === "0x0") {
-          throw new Error("Transaction reverted")
-        }
-      }
-
-      globalThis.dispatchEvent(new Event("cngn:activity:refresh"))
       setStep("success")
+      toast.success("Transfer sent")
     } catch (error) {
       console.error(error)
       const e = error as { message?: string }
       toast.error(e?.message || "Could not send. Please try again.")
     } finally {
-      hideLoading()
       setIsLoading(false)
     }
   }
