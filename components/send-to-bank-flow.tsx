@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { activeChain } from "@/constants/chain"
 import { TransactionModal } from "@/components/transaction-modal"
 import { SuccessModal } from "@/components/success-modal"
 import { BankSelectionModal } from "@/components/bank-selection-modal"
@@ -79,11 +80,13 @@ export function SendToBankFlow({ isOpen, onClose }: Readonly<SendToBankFlowProps
           },
           {
             label: "Network",
-            value: "Base",
+            value: activeChain.name ?? "",
           },
+          // Sponsored, so there is nothing to charge. The figure that used to
+          // sit here was a literal, not a reading of anything.
           {
-            label: "Gas Fee",
-            value: "0.0000001 ETH",
+            label: "Fee",
+            value: "Free",
           },
         ]}
         onClose={onClose}

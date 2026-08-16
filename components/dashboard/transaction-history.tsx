@@ -11,7 +11,6 @@ import useOrgSlug from "@/hooks/useOrgSlug"
 import useAddressUsernames from "@/hooks/useAddressUsernames"
 import { useActiveAccount } from "thirdweb/react"
 import { useTransactionHistory } from "@/lib/api/organization"
-import { ethers } from "ethers"
 import { useToken } from "@/hooks/useToken"
 
 export function TransactionHistory({
@@ -83,15 +82,15 @@ export function TransactionHistory({
     return recent.map((tx, idx) => {
       const counterparty = tx.direction === "received" ? tx.fromAddress : tx.toAddress
       const amountAbs = Number.parseFloat(String(tx.displayAmount || "0").replaceAll(/[+-]/g, ""))
-      const gasFeeDisplay = (() => {
-        const fee = tx.fee
-        if (!fee) return "--"
-        try {
-          const eth = ethers.formatUnits(fee, 18)
-          return `${Number.parseFloat(eth).toFixed(6)} ETH`
-        } catch {
-          return "--"
-        }
+      // What the user was charged, not what the gas cost. Gas is sponsored, so
+      // it is never money that left their balance.
+      const feeDisplay = (() => {
+        const charged = Number.parseFloat(tx.chargedFeeFormatted || "0")
+        if (!Number.isFinite(charged) || charged <= 0) return "Free"
+        return `${charged.toLocaleString(undefined, {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })} ${symbol}`
       })()
 
       return (
@@ -118,7 +117,7 @@ export function TransactionHistory({
             maximumFractionDigits: 2,
           })}
         </td>
-        <td className="py-4 px-4">{gasFeeDisplay}</td>
+        <td className="py-4 px-4">{feeDisplay}</td>
         <td className="py-4 px-4">
           <div>
             <p>{tx.timestamp ? new Date(tx.timestamp).toLocaleDateString() : "--"}</p>
@@ -175,7 +174,7 @@ export function TransactionHistory({
               <th className="text-left py-3 px-4 font-semibold text-gray-600">OPERATION TYPE</th>
               <th className="text-left py-3 px-4 font-semibold text-gray-600">RECIPIENT</th>
               <th className="text-left py-3 px-4 font-semibold text-gray-600">AMOUNT ({symbol})</th>
-              <th className="text-left py-3 px-4 font-semibold text-gray-600">GAS FEE</th>
+              <th className="text-left py-3 px-4 font-semibold text-gray-600">FEE</th>
               <th className="text-left py-3 px-4 font-semibold text-gray-600">DATE</th>
               <th className="text-left py-3 px-4 font-semibold text-gray-600">STATUS</th>
               <th className="text-left py-3 px-4 font-semibold text-gray-600">TRANSACTION HASH</th>

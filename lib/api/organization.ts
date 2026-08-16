@@ -229,8 +229,12 @@ export interface ApiTransaction {
   toAddress: string;
   amount: string;
   currency?: string;
+  /** Gas, in wei. Sponsored, so this is what the paymaster spent, not the user. */
   fee?: string;
   gasUsed?: string;
+  /** What the user was actually charged, in token base units. */
+  chargedFee?: string;
+  chargedFeeFormatted?: string;
   description?: string;
   memo?: string;
   category?: string;

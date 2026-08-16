@@ -322,11 +322,13 @@ export function SendToCNGNFlow({ isOpen, onClose, initialRecipient }: Readonly<S
           },
           {
             label: "Network",
-            value: "Base Sepolia",
+            value: activeChain.name ?? "",
           },
+          // Sponsored, so there is nothing to charge. The figure that used to
+          // sit here was a literal, not a reading of anything.
           {
-            label: "Gas Fee",
-            value: "0.0000001 ETH",
+            label: "Fee",
+            value: "Free",
           },
         ]}
         onClose={onClose}
