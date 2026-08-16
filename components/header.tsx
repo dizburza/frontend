@@ -4,7 +4,7 @@ import ConnectWallet from "./ConnectWallet";
 
 export default function Header() {
   return (
-    <header className="flex h-20 items-center justify-between px-8 border-b border-gray-200">
+    <header className="flex h-20 items-center justify-between px-8">
       <div className="flex items-center gap-2">
         <Link href="/" className="inline-flex cursor-pointer">
           <Image src="/logo.svg" alt="Logo" width={150} height={40} />
