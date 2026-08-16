@@ -14,8 +14,33 @@ const config: Config = {
       fontFamily: {
         sans: ["var(--font-inter)", "sans-serif"],
         nohemi: ["var(--font-nohemi)", "sans-serif"],
+        lato: ["var(--font-lato)", "sans-serif"],
+        raleway: ["var(--font-raleway)", "sans-serif"],
       },
       colors: {
+        // The marketing palette, straight off the Figma file. Figma's dev mode
+        // names these as its nearest Tailwind match (bg-teal-100, text-indigo-800),
+        // which are approximations, so the hexes are the authority.
+        brand: {
+          indigo: {
+            DEFAULT: "#454ADE",
+            50: "#EAEBFF",
+            100: "#EAEBFF",
+            200: "#C7D2FE",
+            800: "#373791",
+            950: "#0D0F4A",
+          },
+          purple: "#792EC2",
+          green: "#297714",
+          gold: "#DEA045",
+          mint: {
+            DEFAULT: "#C7F9F4",
+            200: "#B5E2DE",
+          },
+          mist: "#F0FDE8",
+          lilac: "#FAF6FE",
+          canvas: "#F9F9FE",
+        },
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
         card: {
