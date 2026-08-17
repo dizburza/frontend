@@ -92,6 +92,17 @@ const config: Config = {
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
+      keyframes: {
+        // Half the track, so a strip built from two identical halves loops
+        // without a seam.
+        "marquee-x": {
+          from: { transform: "translateX(0)" },
+          to: { transform: "translateX(-50%)" },
+        },
+      },
+      animation: {
+        "marquee-x": "marquee-x 36s linear infinite",
+      },
     },
   },
   plugins: [require("tailwindcss-animate")],
