@@ -1,4 +1,5 @@
 import Header from "@/components/header";
+import { BuiltForEveryRole } from "@/components/landing/built-for-every-role";
 import { HeroSection } from "@/components/landing/hero-section";
 import { HowItWorks } from "@/components/landing/how-it-works";
 import { MoneyRulesBand } from "@/components/landing/money-rules-band";
@@ -17,6 +18,7 @@ export default function LandingPage() {
       <HowItWorks />
       <WhyDizburza />
       <MoneyRulesBand />
+      <BuiltForEveryRole />
     </div>
   );
 }
