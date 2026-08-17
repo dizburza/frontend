@@ -25,15 +25,26 @@ export function MoveMoneyCta() {
           </h2>
 
           {/* The buttons sit beside the paragraph rather than under it, and both
-              stand on the same baseline. */}
+              stand on the same baseline. The paragraph holds its width and the
+              buttons give way: left to shrink it drops to 332 where its own
+              first line needs 358, which costs a third line. */}
           <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:gap-4">
-            <p className="leading-[1.4] text-white text-[clamp(1rem,1.157vw,1.25rem)] lg:w-[50.053%]">
+            <p className="leading-[1.4] text-white text-[clamp(1rem,1.157vw,1.25rem)] lg:w-[50.053%] lg:shrink-0">
               Automate payments, approve transactions with your team, and stay in
               control of every dollar.
             </p>
 
-            <div className="flex flex-col gap-4 sm:flex-row sm:gap-6">
-              <BrandButton href="/account-type" className="w-full sm:w-48">
+            {/* Figma's 192 and 24 are 11.111vw and 1.389vw of the frame, and
+                they scale with it like everything else here. Held at 192 they
+                walk the pair into the shape on the right on any window narrower
+                than the design. */}
+            <div className="flex flex-col gap-4 sm:flex-row sm:gap-[clamp(1rem,1.389vw,1.5rem)]">
+              <BrandButton
+                href="/account-type"
+                // The variant's light ring is meant for the light sections. On
+                // this ground it reads as a white border around the button.
+                className="w-full outline-brand-indigo sm:w-[clamp(9rem,11.111vw,12rem)]"
+              >
                 Get Started
               </BrandButton>
               {/* The FAQ's support cards are the only place the product answers
@@ -41,7 +52,7 @@ export function MoveMoneyCta() {
               <BrandButton
                 href="#faq"
                 variant="secondary"
-                className="w-full sm:w-48"
+                className="w-full sm:w-[clamp(9rem,11.111vw,12rem)]"
               >
                 Book a Demo
               </BrandButton>
