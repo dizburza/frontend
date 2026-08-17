@@ -46,9 +46,11 @@ function StatsPanel() {
   )
 }
 
+// The pair widens with the cards it holds, so the gap between the two pairs,
+// which is where the devices sit, stays where it is.
 function StatPair({ children }: { children: React.ReactNode }) {
   return (
-    <div className="contents lg:flex lg:w-[38.261%] lg:items-center lg:justify-between">
+    <div className="contents lg:flex lg:w-[42.435%] lg:items-center lg:justify-between">
       {children}
     </div>
   )
@@ -65,7 +67,7 @@ function StatCard({
   lead?: boolean
 }) {
   return (
-    <div className="rounded-[10px] p-0.5 shadow-[0px_4px_7.6px_0px_rgba(29,30,73,0.12)] outline outline-1 outline-offset-[-1px] outline-brand-indigo max-lg:h-full lg:h-[min(7.639vw,132px)] lg:w-[43.636%]">
+    <div className="rounded-[10px] p-0.5 shadow-[0px_4px_7.6px_0px_rgba(29,30,73,0.12)] outline outline-1 outline-offset-[-1px] outline-brand-indigo max-lg:h-full lg:h-[min(7.639vw,132px)] lg:w-[45.902%]">
       {/* Padding scales with the frame like everything else. Held at 12px it
           wraps the longest label at lg, which makes the card taller and drops
           it into the circle. */}
