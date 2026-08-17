@@ -2,6 +2,7 @@ import Header from "@/components/header";
 import { HeroSection } from "@/components/landing/hero-section";
 import { HowItWorks } from "@/components/landing/how-it-works";
 import { StatsSection } from "@/components/landing/stats-section";
+import { WhyDizburza } from "@/components/landing/why-dizburza";
 
 export default function LandingPage() {
   return (
@@ -13,6 +14,7 @@ export default function LandingPage() {
       <HeroSection />
       <StatsSection />
       <HowItWorks />
+      <WhyDizburza />
     </div>
   );
 }
