@@ -4,6 +4,7 @@ import { FaqSection } from "@/components/landing/faq-section";
 import { HeroSection } from "@/components/landing/hero-section";
 import { HowItWorks } from "@/components/landing/how-it-works";
 import { MoneyRulesBand } from "@/components/landing/money-rules-band";
+import { MoveMoneyCta } from "@/components/landing/move-money-cta";
 import { StatsSection } from "@/components/landing/stats-section";
 import { WhyDizburza } from "@/components/landing/why-dizburza";
 
@@ -21,6 +22,7 @@ export default function LandingPage() {
       <MoneyRulesBand />
       <BuiltForEveryRole />
       <FaqSection />
+      <MoveMoneyCta />
     </div>
   );
 }

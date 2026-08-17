@@ -33,7 +33,7 @@ const QUESTIONS = [
 
 export function FaqSection() {
   return (
-    <section className="bg-brand-canvas">
+    <section id="faq" className="scroll-mt-24 bg-brand-canvas">
       <div className="mx-auto w-full max-w-[1728px] px-6 py-[clamp(3.5rem,5.15vw,5.5625rem)] md:px-10 lg:px-0">
         {/* `fr` on the Figma widths keeps the gap out of the ratio. */}
         <div className="mx-auto grid w-full gap-[clamp(2.5rem,5.556vw,6rem)] lg:w-[71.296%] lg:grid-cols-[497fr_635fr] lg:items-center">
