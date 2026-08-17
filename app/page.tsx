@@ -1,5 +1,6 @@
 import Header from "@/components/header";
 import { HeroSection } from "@/components/landing/hero-section";
+import { StatsSection } from "@/components/landing/stats-section";
 
 export default function LandingPage() {
   return (
@@ -9,6 +10,7 @@ export default function LandingPage() {
       </div>
 
       <HeroSection />
+      <StatsSection />
     </div>
   );
 }
