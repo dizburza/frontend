@@ -6,6 +6,22 @@ import { cn } from "@/lib/utils"
 // is a fraction of the viewport capped at the design size, so 1728 is exact and
 // narrower screens are proportional.
 
+// Figma stands both buttons exactly as tall as the copy beside them, 56 against
+// 56. The button's own padding is a fixed 16, so left alone it holds 56 while
+// the copy scales and the two stop agreeing below 1728. Dropping the padding and
+// letting the row stretch them takes the height off the paragraph itself, which
+// is right even where the copy runs to a third line and a computed two-line
+// height would not be.
+//
+// The side padding scales for the same reason: held at Figma's 24 it leaves 96
+// inside a button that has narrowed to 144, and "Book a Demo" wants 101, so the
+// label wrapped. nowrap keeps that from ever being decided silently, since the
+// height no longer comes from the label.
+const CTA_BUTTON = cn(
+  "w-full whitespace-nowrap sm:w-[clamp(9rem,11.111vw,12rem)]",
+  "lg:px-[clamp(0.75rem,1.389vw,1.5rem)] lg:py-0",
+)
+
 export function MoveMoneyCta() {
   return (
     <section className="relative isolate overflow-hidden bg-brand-indigo-950">
@@ -28,7 +44,7 @@ export function MoveMoneyCta() {
               stand on the same baseline. The paragraph holds its width and the
               buttons give way: left to shrink it drops to 332 where its own
               first line needs 358, which costs a third line. */}
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:gap-4">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-stretch lg:gap-4">
             <p className="leading-[1.4] text-white text-[clamp(1rem,1.157vw,1.25rem)] lg:w-[50.053%] lg:shrink-0">
               Automate payments, approve transactions with your team, and stay in
               control of every dollar.
@@ -39,12 +55,7 @@ export function MoveMoneyCta() {
                 walk the pair into the shape on the right on any window narrower
                 than the design. */}
             <div className="flex flex-col gap-4 sm:flex-row sm:gap-[clamp(1rem,1.389vw,1.5rem)]">
-              <BrandButton
-                href="/account-type"
-                // The variant's light ring is meant for the light sections. On
-                // this ground it reads as a white border around the button.
-                className="w-full outline-brand-indigo sm:w-[clamp(9rem,11.111vw,12rem)]"
-              >
+              <BrandButton href="/account-type" className={CTA_BUTTON}>
                 Get Started
               </BrandButton>
               {/* The FAQ's support cards are the only place the product answers
@@ -52,7 +63,7 @@ export function MoveMoneyCta() {
               <BrandButton
                 href="#faq"
                 variant="secondary"
-                className="w-full sm:w-[clamp(9rem,11.111vw,12rem)]"
+                className={CTA_BUTTON}
               >
                 Book a Demo
               </BrandButton>
