@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils"
 
 export function WhyDizburza() {
   return (
-    <section className="bg-brand-canvas">
+    <section id="features" className="scroll-mt-24 bg-brand-canvas">
       <div className="mx-auto w-full max-w-[1728px] px-6 pb-[clamp(3.5rem,7.928vw,8.5625rem)] pt-[clamp(3.5rem,5.498vw,5.9375rem)] md:px-10 lg:px-0">
         <div className="mx-auto flex w-full flex-col items-center gap-[clamp(2rem,2.778vw,3rem)] lg:w-[70.775%]">
           <header className="flex flex-col items-center gap-[clamp(1.5rem,1.852vw,2rem)]">

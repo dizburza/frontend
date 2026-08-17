@@ -15,7 +15,10 @@ import { cn } from "@/lib/utils"
 
 export function BuiltForEveryRole() {
   return (
-    <section className="relative isolate overflow-hidden bg-white">
+    <section
+      id="about"
+      className="relative isolate scroll-mt-24 overflow-hidden bg-white"
+    >
       <GridBackdrop />
 
       <div className="mx-auto w-full max-w-[1728px] px-6 pb-[clamp(3.5rem,4.745vw,5.125rem)] pt-[clamp(3.5rem,5.816vw,6.281rem)] md:px-10 lg:px-0">
