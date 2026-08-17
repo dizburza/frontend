@@ -28,11 +28,16 @@ const config: Config = {
             100: "#EAEBFF",
             200: "#C7D2FE",
             800: "#373791",
+            900: "#1D1E49",
             950: "#0D0F4A",
           },
           purple: "#792EC2",
           green: "#297714",
           gold: "#DEA045",
+          // Close enough to gold and green to look like a mistake, and it is
+          // not: these two are the display colours, only ever set on type.
+          lime: "#6FDE45",
+          amber: "#DEC045",
           mint: {
             DEFAULT: "#C7F9F4",
             200: "#B5E2DE",
