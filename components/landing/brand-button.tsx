@@ -41,7 +41,10 @@ export function BrandButton({
       href={href}
       className={cn(
         "inline-flex items-center justify-center gap-2 overflow-hidden rounded-sm px-6 py-4",
-        "text-base font-medium outline outline-2 transition-transform active:translate-y-px",
+        // The style is set as a property rather than with `outline`, which
+        // tailwind-merge reads as a v4 width and drops against `outline-2`. The
+        // ring then never paints: the colour still computes, so it looks set.
+        "text-base font-medium [outline-style:solid] outline-2 transition-transform active:translate-y-px",
         VARIANTS[variant],
         className,
       )}
