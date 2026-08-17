@@ -166,19 +166,27 @@ function SentToBankIcon() {
   )
 }
 
-// Vector 21, the arc sweeping behind the stats. Drawn rather than exported so
-// it stretches with the frame.
+// Vector 21, the arc sweeping behind the stats. The path is Figma's export
+// verbatim; the export pads the 843x359 layer by the 2px half-stroke, which is
+// the 847x361 viewBox and the 2px offset in the placement below.
+//
+// Both ends run off the bottom of the hero, which is why the box is taller than
+// the room left for it. The apex is a third of the way across, not halfway, so
+// the arc is still descending where the stats sit and the tightest clearance is
+// at their right edge, under the last of "Trusted by". Vertically it is pinned
+// between the two things it has to miss: low enough to clear the buttons, high
+// enough that both stats blocks sit inside the arc.
 function HeroCurve() {
   return (
     <svg
       aria-hidden
-      viewBox="0 0 843 384"
+      viewBox="0 0 847 361"
       preserveAspectRatio="none"
       fill="none"
-      className="pointer-events-none absolute left-[0.23%] top-[68%] hidden h-[38.06%] w-[48.78%] lg:block"
+      className="pointer-events-none absolute left-[0.116%] top-[68.4%] hidden h-[35.78%] w-[49.02%] lg:block"
     >
       <path
-        d="M0 384 C 40 292 140 32 270 8 C 398 4 470 76 568 108 C 640 130 692 124 746 106 C 782 94 802 128 814 188 C 827 264 836 337 843 384"
+        d="M1.99609 360.999C19.0707 -19.5507 312.121 -42.6655 408.129 43.0847C614.976 227.833 747.635 52.8358 781.576 126.248C829.141 229.129 817.107 272.156 844.996 360.999"
         stroke="#373791"
         strokeOpacity="0.25"
         strokeWidth="4"
