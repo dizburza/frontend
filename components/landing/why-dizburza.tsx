@@ -345,7 +345,7 @@ function BatchPaymentPreview() {
     <div
       className={cn(
         "absolute inset-x-0 top-0 flex flex-col gap-[2.4em] rounded-[1.2em] bg-white p-[2.8em] text-[3.125cqw]",
-        "outline outline-[0.03em] outline-offset-[-0.03em] outline-neutral-300",
+        "[outline-style:solid] outline-[0.03em] outline-offset-[-0.03em] outline-neutral-300",
         "shadow-[0px_0.2368em_4.618em_1.8354em_rgba(69,74,222,0.08)]",
       )}
     >
@@ -411,7 +411,7 @@ function BatchPaymentPreview() {
 
         <span
           className={cn(
-            "rounded-[0.2em] bg-brand-indigo px-[1.4em] py-[0.8em] outline outline-[0.118em] outline-brand-indigo-200",
+            "rounded-[0.2em] bg-brand-indigo px-[1.4em] py-[0.8em] [outline-style:solid] outline-[0.118em] outline-brand-indigo-200",
             MINI_BUTTON_SHADOW,
           )}
         >
@@ -432,7 +432,7 @@ function BatchField({
       <span className="text-neutral-500 text-[0.77em]">{label}</span>
       <div
         className={cn(
-          "flex items-center rounded-[0.4em] px-[1em] py-[0.8em] outline outline-[0.059em] outline-offset-[-0.059em] outline-neutral-300",
+          "flex items-center rounded-[0.4em] px-[1em] py-[0.8em] [outline-style:solid] outline-[0.059em] outline-offset-[-0.059em] outline-neutral-300",
           tinted && "bg-brand-canvas",
         )}
       >

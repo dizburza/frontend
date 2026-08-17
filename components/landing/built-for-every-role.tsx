@@ -103,7 +103,7 @@ function RoleCard({
   return (
     <article
       className={cn(
-        "flex flex-col gap-[clamp(1.25rem,1.852vw,2rem)] rounded-[clamp(1rem,1.389vw,1.5rem)] p-[clamp(1rem,1.389vw,1.5rem)] outline outline-[0.5px] -outline-offset-[0.5px] [container-type:inline-size]",
+        "flex flex-col gap-[clamp(1.25rem,1.852vw,2rem)] rounded-[clamp(1rem,1.389vw,1.5rem)] p-[clamp(1rem,1.389vw,1.5rem)] [outline-style:solid] outline-[0.5px] -outline-offset-[0.5px] [container-type:inline-size]",
         className,
       )}
     >
