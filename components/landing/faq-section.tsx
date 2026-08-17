@@ -162,10 +162,10 @@ function Chevron() {
       viewBox="0 0 24 24"
       fill="none"
       aria-hidden
-      className="w-6 shrink-0 rotate-180 stroke-gray-500 transition-transform group-open:rotate-0"
+      className="w-6 shrink-0 rotate-180 stroke-[#6A6A81] transition-transform group-open:rotate-0"
     >
       <path
-        d="M4.08 16.05 12 7.95l7.92 8.1"
+        d="M19.9181 15.0506L13.3981 8.53062C12.6281 7.76063 11.3681 7.76063 10.5981 8.53062L4.07812 15.0506"
         strokeWidth={1.5}
         strokeLinecap="round"
         strokeLinejoin="round"
