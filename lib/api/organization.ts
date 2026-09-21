@@ -513,6 +513,22 @@ export async function checkOrganizationIdentifiers(input: {
   return response.data || response;
 }
 
+/** Sends a 6-digit code to the business email typed on the registration step. */
+export async function sendOrganizationEmailVerification(email: string): Promise<void> {
+  await apiFetch(`/api/organizations/email-verification/send`, {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
+/** Confirms the code. The backend checks this again right before deployment. */
+export async function verifyOrganizationEmail(email: string, code: string): Promise<void> {
+  await apiFetch(`/api/organizations/email-verification/verify`, {
+    method: "POST",
+    body: JSON.stringify({ email, code }),
+  });
+}
+
 export async function createOrganizationRecord(payload: CreateOrganizationRequest): Promise<Organization> {
   try {
     const response = await apiFetchWithRetry(

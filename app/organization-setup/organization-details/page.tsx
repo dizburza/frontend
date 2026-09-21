@@ -1,285 +1,203 @@
-"use client";
+"use client"
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import StepIndicator from "@/components/step-indicator";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card } from "@/components/ui/card";
-import FileUploadArea from "@/components/file-upload-area";
-import { checkOrganizationIdentifiers } from "@/lib/api/organization";
-import { toast } from "sonner";
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
+import { toast } from "sonner"
+import { OnboardingShell } from "@/components/organization-setup/onboarding-shell"
+import { OnboardingSteps } from "@/components/organization-setup/onboarding-steps"
+import { OnboardingButton } from "@/components/organization-setup/onboarding-button"
+import { FieldInput } from "@/components/organization-setup/field-input"
+import { FieldSelect } from "@/components/organization-setup/field-select"
+import { FieldCounter } from "@/components/organization-setup/field-counter"
+import { FieldUpload } from "@/components/organization-setup/field-upload"
 
-type IdentifierState = {
-  registrationTaken: boolean;
-  tinTaken: boolean;
-};
+const INDUSTRIES = [
+  "Information Technology",
+  "Finance",
+  "Healthcare",
+  "Agriculture",
+  "Education",
+  "Media",
+  "Industrial Services",
+  "Transportation",
+  "Tourism",
+  "Legal Services",
+  "Life Sciences",
+  "Manufacturing",
+  "Entertainment",
+  "Hospitality",
+  "Social Impact",
+  "Logistics",
+]
+
+const COUNTRIES = ["Nigeria", "United States", "United Kingdom"]
+
+type OrgDetails = {
+  organizationName: string
+  country: string
+  industry: string
+  numberOfSigners: number
+  quorum: number
+}
+
+const emptyDetails: OrgDetails = {
+  organizationName: "",
+  country: "",
+  industry: "",
+  numberOfSigners: 0,
+  quorum: 0,
+}
 
 export default function OrganizationDetailsPage() {
-  const router = useRouter();
-  const [isLoading, setIsLoading] = useState(false);
-  const [formData, setFormData] = useState({
-    industry: "",
-    registrationType: "",
-    registrationNumber: "",
-    taxIdentificationNumber: "",
-    country: "",
-  });
-  const [identifiers, setIdentifiers] = useState<IdentifierState>({
-    registrationTaken: false,
-    tinTaken: false,
-  });
+  const router = useRouter()
+  const [details, setDetails] = useState<OrgDetails>(emptyDetails)
+  const [logoFile, setLogoFile] = useState<File | null>(null)
+  const [isNavigating, setIsNavigating] = useState(false)
 
-  const { registrationNumber, taxIdentificationNumber } = formData;
-
-  // Told here rather than at submit, because by then the organization contract
-  // has already been deployed and cannot be taken back.
   useEffect(() => {
-    if (!registrationNumber && !taxIdentificationNumber) {
-      setIdentifiers({ registrationTaken: false, tinTaken: false });
-      return;
-    }
-
-    let cancelled = false;
-    const timer = setTimeout(async () => {
-      try {
-        const result = await checkOrganizationIdentifiers({
-          registrationNumber,
-          taxIdentificationNumber,
-        });
-        if (cancelled) return;
-        setIdentifiers({
-          registrationTaken: !result.registrationNumberAvailable,
-          tinTaken: !result.taxIdentificationNumberAvailable,
-        });
-      } catch {
-        // A failed check must not block the form. The unique index and the
-        // recheck before deployment still catch a clash.
-      }
-    }, 400);
-
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [registrationNumber, taxIdentificationNumber]);
-
-  const steps = [
-    {
-      number: 1,
-      title: "Organization Details",
-      subtitle: "",
-      completed: false,
-      active: true,
-    },
-    {
-      number: 2,
-      title: "Organization Profile",
-      subtitle: "",
-      completed: false,
-      active: false,
-    },
-    {
-      number: 3,
-      title: "Add Signers",
-      subtitle: "",
-      completed: false,
-      active: false,
-    },
-  ];
-
-  const handleContinue = async () => {
-    if (isLoading) return;
-
-    if (identifiers.registrationTaken || identifiers.tinTaken) {
-      toast.error("Those company details are already registered on Dizburza");
-      return;
-    }
-
+    const raw = localStorage.getItem("orgDetails")
+    if (!raw) return
     try {
-      setIsLoading(true);
-      // Store organization details
-      localStorage.setItem("orgDetails", JSON.stringify(formData));
-      toast.success("Organization details saved");
-      // Navigate to organization profile
-      router.push("/organization-setup/organization-profile");
-    } catch (error) {
-      console.error(error);
-      toast.error("Could not save details. Please try again.");
-    } finally {
-      setIsLoading(false);
+      setDetails({ ...emptyDetails, ...JSON.parse(raw) })
+    } catch {
+      // ignore malformed cache
     }
-  };
+  }, [])
+
+  // Mirrors the checks below, so the button can say up front whether pressing
+  // it will do anything. The toasts stay: they name which field is wrong,
+  // which a disabled button cannot.
+  const isComplete =
+    Boolean(details.organizationName.trim()) &&
+    Boolean(details.country) &&
+    Boolean(details.industry) &&
+    details.numberOfSigners >= 1 &&
+    details.quorum >= 1 &&
+    details.quorum <= details.numberOfSigners
 
   const handleBack = () => {
-    router.push("/organization-setup");
-  };
+    localStorage.setItem("orgDetails", JSON.stringify(details))
+    router.push("/organization-setup/your-details")
+  }
+
+  const handleContinue = () => {
+    if (isNavigating) return
+
+    if (!details.organizationName.trim()) {
+      toast.error("Enter your organization name")
+      return
+    }
+    if (!details.country) {
+      toast.error("Select a country")
+      return
+    }
+    if (!details.industry) {
+      toast.error("Select an industry")
+      return
+    }
+    if (details.numberOfSigners < 1) {
+      toast.error("Number of signers must be at least 1")
+      return
+    }
+    if (details.quorum < 1 || details.quorum > details.numberOfSigners) {
+      toast.error("Quorum must be at least 1 and not more than the number of signers")
+      return
+    }
+
+    localStorage.setItem("orgDetails", JSON.stringify(details))
+    if (logoFile) {
+      // Held in memory only. Uploaded once a storage endpoint exists; nothing
+      // here reads the file back after this step.
+      localStorage.setItem("orgLogoName", logoFile.name)
+    }
+
+    // Never cleared: the next page replacing this one is what ends it. Turning
+    // it off after the push would show a ready button again while the route is
+    // still loading, which is the moment someone presses it twice.
+    setIsNavigating(true)
+    router.push("/organization-setup/organization-registration")
+  }
 
   return (
-    <div className="flex w-full min-h-[calc(100vh-80px)]">
-      {/* Left sidebar */}
-      <div className="w-1/2 bg-[#ECEDFC] p-12 flex flex-col justify-center">
-        <StepIndicator steps={steps} />
-      </div>
+    <OnboardingShell image="/images/organization-1-image.jpg">
+      <OnboardingSteps active={2} />
 
-      {/* Right content */}
-      <div className="w-1/2 flex items-center justify-center p-12 ">
-        <Card className="w-full max-w-lg relative right-1/3 rounded-[40px] ">
-          <div className="p-8">
-            <h2 className="text-2xl font-bold text-center text-[#1D1F5D] mb-2">
-              Organization Details
-            </h2>
-            <p className="text-gray-600 text-center text-sm mb-8">
-              Let&apos;s start with your organization&apos;s basic details.
-            </p>
+      <div className="self-stretch flex flex-col items-center gap-4">
+        <div className="flex flex-col items-center gap-2">
+          <div className="text-center text-blue-950 text-3xl font-normal font-nohemi">Organization Details</div>
+          <div className="w-96 text-center text-neutral-500 text-sm font-semibold font-inter">
+            Let&rsquo;s start with your organization&rsquo;s basic details.
+          </div>
+        </div>
 
-            <div className="space-y-2 px-8">
-              <div>
-                <label htmlFor="industry" className="block text-sm font-medium text-[#69696C] mb-2">
-                  Industry
-                </label>
-                <select
-                  id="industry"
-                  value={formData.industry}
-                  onChange={(e) =>
-                    setFormData({ ...formData, industry: e.target.value })
-                  }
-                  className="w-full text-sm px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Select industry</option>
-                  <option value="Information Technology">Information Technology</option>
-                  <option value="Finance">Finance</option>
-                  <option value="Healthcare">Healthcare</option>
-                  <option value="Agriculture">Agriculture</option>
-                  <option value="Education">Education</option>
-                  <option value="Media">Media</option>
-                  <option value="Industrial Services">Industrial Services</option>
-                  <option value="Transportation">Transportation</option>
-                  <option value="Tourism">Tourism</option>
-                  <option value="Legal Services">Legal Services</option>
-                  <option value="Life Sciences">Life Sciences</option>
-                  <option value="Manufacturing">Manufacturing</option>
-                  <option value="Entertainment">Entertainment</option>
-                  <option value="Hospitality">Hospitality</option>
-                  <option value="Social Impact">Social Impact</option>
-                  <option value="Logistics">Logistics</option>
-                </select>
-              </div>
+        <div className="px-10 py-5 rounded-[20px] outline outline-1 outline-offset-[-1px] outline-indigo-50">
+          <div className="w-96 flex flex-col items-center gap-6">
+            <div className="self-stretch flex flex-col items-start gap-3">
+              <FieldInput
+                label="Organization Name"
+                placeholder="Enter organization name"
+                icon="people"
+                value={details.organizationName}
+                onChange={(v) => setDetails((d) => ({ ...d, organizationName: v }))}
+              />
 
-              <div>
-                <label htmlFor="registrationType" className="block text-sm font-medium text-[#69696C] mb-2">
-                  Registration Type
-                </label>
-                <select
-                  id="registrationType"
-                  value={formData.registrationType}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      registrationType: e.target.value,
-                    })
-                  }
-                  className="w-full text-sm px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Select business type</option>
-                  <option value="Sole Proprietorship">Sole Proprietorship</option>
-                  <option value="Partnership">Partnership</option>
-                  <option value="Limited Liability Company (Ltd)">Limited Liability Company (Ltd)</option>
-                  <option value="Public Limited Company (PLC)">Public Limited Company (PLC)</option>
-                  <option value="Nonprofit / NGO">Nonprofit / NGO</option>
-                  <option value="Cooperative">Cooperative</option>
-                  <option value="Government Owned">Government Owned</option>
-                  <option value="Business Name">Business Name</option>
-                </select>
-              </div>
+              <FieldSelect
+                label="Country"
+                placeholder="Select country"
+                icon="global"
+                value={details.country}
+                options={COUNTRIES}
+                onChange={(v) => setDetails((d) => ({ ...d, country: v }))}
+              />
 
-              <div>
-                <label htmlFor="registrationNumber" className="block text-sm font-medium text-[#69696C] mb-2">
-                  Registration Number
-                </label>
-                <Input
-                  id="registrationNumber"
-                  type="text"
-                  placeholder="e.g RC1234567"
-                  value={formData.registrationNumber}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      registrationNumber: e.target.value,
-                    })
-                  }
+              <FieldSelect
+                label="Industry"
+                placeholder="Select industry"
+                icon="briefcase"
+                value={details.industry}
+                options={INDUSTRIES}
+                onChange={(v) => setDetails((d) => ({ ...d, industry: v }))}
+              />
+
+              <div className="self-stretch flex justify-between items-start gap-4">
+                <FieldCounter
+                  label="Number of signers"
+                  value={details.numberOfSigners}
+                  min={1}
+                  onChange={(v) => setDetails((d) => ({ ...d, numberOfSigners: v }))}
                 />
-                {identifiers.registrationTaken && (
-                  <p className="mt-1 text-xs text-red-600">
-                    This registration number already belongs to an organization on Dizburza.
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label
-                  htmlFor="taxIdentificationNumber"
-                  className="block text-sm font-medium text-[#69696C] mb-2"
-                >
-                  Tax Identification Number
-                </label>
-                <Input
-                  id="taxIdentificationNumber"
-                  type="text"
-                  placeholder="e.g 12345678-0001"
-                  value={formData.taxIdentificationNumber}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      taxIdentificationNumber: e.target.value,
-                    })
-                  }
+                <FieldCounter
+                  label="Set Quorum"
+                  value={details.quorum}
+                  min={0}
+                  hint="How many signers must approve before payroll can execute"
+                  onChange={(v) => setDetails((d) => ({ ...d, quorum: v }))}
                 />
-                {identifiers.tinTaken && (
-                  <p className="mt-1 text-xs text-red-600">
-                    This TIN already belongs to an organization on Dizburza.
-                  </p>
-                )}
               </div>
 
-              <div>
-                <label htmlFor="country" className="block text-sm font-medium text-[#69696C] mb-2">
-                  Country
-                </label>
-                <select
-                  id="country"
-                  value={formData.country}
-                  onChange={(e) =>
-                    setFormData({ ...formData, country: e.target.value })
-                  }
-                  className="w-full px-4 text-sm py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Select country</option>
-                  <option value="ng">Nigeria</option>
-                  <option value="us">United States</option>
-                  <option value="uk">United Kingdom</option>
-                </select>
-              </div>
+              <FieldUpload label="Upload Company Logo" onFileSelect={setLogoFile} />
+            </div>
 
-              <div>
-                <label htmlFor="certificateUpload" className="block text-sm font-medium text-[#69696C] mb-2">
-                  Upload Certificate
-                </label>
-                <FileUploadArea inputId="certificateUpload" accept="image/png,image/jpeg,application/pdf" />
-              </div>
-
-              <div className="flex gap-4 pt-4">
-                <Button variant="outline" onClick={handleBack} className="flex-1 bg-transparent">
-                  Back
-                </Button>
-                <Button disabled={isLoading} onClick={handleContinue} className="flex-1 bg-blue-600 hover:bg-blue-700">
-                  {isLoading ? "Continuing..." : "Continue"}
-                </Button>
-              </div>
+            <div className="self-stretch flex items-start gap-4">
+              <OnboardingButton
+                variant="secondary"
+                className="flex-1"
+                onClick={handleBack}
+                disabled={isNavigating}
+              >
+                Back
+              </OnboardingButton>
+              <OnboardingButton
+                className="flex-1"
+                onClick={handleContinue}
+                disabled={!isComplete || isNavigating}
+              >
+                {isNavigating ? "Please wait..." : "Continue"}
+              </OnboardingButton>
             </div>
           </div>
-        </Card>
+        </div>
       </div>
-    </div>
-  );
+    </OnboardingShell>
+  )
 }
