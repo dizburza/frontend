@@ -65,6 +65,11 @@ export const endSession = async (): Promise<void> => {
 export type SessionProfile = {
   username?: string;
   fullName?: string;
+  /** Null until onboarding collects them. Signing in only knows an address. */
+  surname?: string | null;
+  firstname?: string | null;
+  email?: string | null;
+  phoneNumber?: string | null;
   avatar?: string;
   role?: string;
   organizationSlug?: string | null;
