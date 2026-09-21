@@ -2,15 +2,22 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Account } from "thirdweb/wallets";
 import { getBasename } from "@superdevfavour/basename";
 import type { useRouter } from "next/navigation";
-import { fetchSessionProfile, isWalletRegistered } from "@/lib/session";
+import { fetchSessionProfile, hasSessionFor, isWalletRegistered } from "@/lib/session";
 import { useAuthCompleted } from "@/hooks/useAutoAuthenticate";
 
 type AppRouter = ReturnType<typeof useRouter>;
 
+/** Bumped when a new field decides routing, to retire entries written without it. */
+export const PROFILE_CACHE_VERSION = 1;
+
 type CachedAuthCheck = {
   isRegistered: boolean;
+  profileVersion?: number;
   username?: string;
   fullName?: string;
+  /** Empty until onboarding collects them, which is what gates everything else. */
+  surname?: string;
+  firstname?: string;
   avatar?: string;
   role?: "user" | "employee" | "signer" | "admin";
   organizationSlug?: string;
@@ -18,19 +25,45 @@ type CachedAuthCheck = {
   savedAt: number;
 };
 
-const getRedirectPathForRole = (
-  role: CachedAuthCheck["role"] = "user",
-  organizationSlug?: string
-) => {
+/**
+ * Membership decides the landing page, not the account alone. A signer runs an
+ * organization, an employee was invited into one, and `user` means neither: no
+ * membership row exists, so the only thing to do here is create an
+ * organization.
+ *
+ * Who they are comes first. Signing in makes an account out of a wallet address
+ * and nothing else, so anyone without a name goes to the step that asks for it
+ * before any of the rest applies.
+ */
+const getRedirectPathForRole = (profile: {
+  role?: CachedAuthCheck["role"];
+  organizationSlug?: string;
+  surname?: string;
+  firstname?: string;
+}) => {
+  const { role = "user", organizationSlug, surname, firstname } = profile;
+
+  if (!surname?.trim() || !firstname?.trim()) {
+    return {
+      path: "/organization-setup/your-details",
+      accountType: "organization" as const,
+    };
+  }
+
+  const setUpOrganization = {
+    path: "/organization-setup/organization-details",
+    accountType: "organization" as const,
+  };
+
   if (role === "admin" || role === "signer") {
     const slug = (organizationSlug || "").trim();
-    if (!slug) return null;
+    if (!slug) return setUpOrganization;
     return { path: `/org/${slug}`, accountType: "organization" as const };
   }
-  if (role === "employee" || role === "user") {
+  if (role === "employee") {
     return { path: "/personal/wallet", accountType: "personal" as const };
   }
-  return null;
+  return setUpOrganization;
 };
 
 const tryRedirectFromCache = (params: {
@@ -47,8 +80,12 @@ const tryRedirectFromCache = (params: {
     const isFresh = Date.now() - cached.savedAt < 5 * 60 * 1000;
     if (!isFresh || !cached.isRegistered) return false;
 
-    const redirect = getRedirectPathForRole(cached.role, cached.organizationSlug);
-    if (!redirect) return false;
+    // Written before the profile fields were cached, so it cannot answer
+    // whether onboarding is done. Absent is not the same as empty, and reading
+    // it as empty sends someone with a complete profile back to fill it in.
+    if (cached.profileVersion !== PROFILE_CACHE_VERSION) return false;
+
+    const redirect = getRedirectPathForRole(cached);
 
     localStorage.setItem("accountType", redirect.accountType);
     router.push(redirect.path);
@@ -105,8 +142,11 @@ const fetchAuthCheck = async (params: {
       status: "profile",
       profile: {
         isRegistered: true,
+        profileVersion: PROFILE_CACHE_VERSION,
         username: profile.username,
         fullName: profile.fullName,
+        surname: profile.surname ?? undefined,
+        firstname: profile.firstname ?? undefined,
         avatar: profile.avatar,
         role: (profile.role ?? "user") as CachedAuthCheck["role"],
         organizationSlug: profile.organizationSlug ?? undefined,
@@ -124,8 +164,12 @@ const fetchAuthCheck = async (params: {
   // hardest to attribute.
   if (registered === null) return { status: "pending" };
 
+  // A wallet with no account is here to set up an organization: that is the
+  // only thing this product onboards into right now. Employees and signers
+  // arrive later through an invite link tied to an organization that exists.
+  // It starts at the details step, since nothing is known but the address.
   if (!registered) {
-    router.push("/setup-profile");
+    router.push("/organization-setup/your-details");
     return { status: "redirected" };
   }
 
@@ -136,6 +180,19 @@ const fetchAuthCheck = async (params: {
 
 const isHexPrefixedAddress = (address: string): address is `0x${string}` => {
   return address.startsWith("0x");
+};
+
+/**
+ * Set by the invitation page before it sends someone to sign in. Session
+ * storage rather than local: an invitation belongs to the tab it was opened in
+ * and should not outlive the browser.
+ */
+const readPendingInvite = (): string | null => {
+  try {
+    return sessionStorage.getItem("pendingInvite");
+  } catch {
+    return null;
+  }
 };
 
 export const useMounted = () => {
@@ -239,6 +296,27 @@ export const useRedirectOnFirstConnect = (params: {
     let live = true;
 
     void (async () => {
+      // Someone who opened an invitation link and was sent here to sign in.
+      // Checked before the usual routing, which would otherwise send them to a
+      // dashboard and leave the invitation unclaimed.
+      //
+      // Straight to their details rather than back to the invitation: the link
+      // told them what this is, and returning them to a page whose only control
+      // accepts it again is how the accept button becomes a retry button.
+      // Submitting the form is what claims it.
+      //
+      // Only once the session exists. That page is guarded, so sending them
+      // before sign-in completes gets them bounced back here, and this runs
+      // again on the fresh mount: the two pages then push each other forever.
+      const pendingInvite = readPendingInvite();
+      if (pendingInvite) {
+        if (!hasSessionFor(address)) return;
+
+        settledFor.current = address;
+        router.push("/organization-setup/your-details");
+        return;
+      }
+
       const cacheKey = `authCheck:${address}`;
       if (tryRedirectFromCache({ cacheKey, router })) {
         settledFor.current = address;
@@ -260,11 +338,7 @@ export const useRedirectOnFirstConnect = (params: {
         // ignore quota errors
       }
 
-      const redirect = getRedirectPathForRole(profile.role, profile.organizationSlug);
-      if (!redirect) {
-        router.push("/setup-profile");
-        return;
-      }
+      const redirect = getRedirectPathForRole(profile);
 
       localStorage.setItem("accountType", redirect.accountType);
       router.push(redirect.path);

@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { thirdwebClient, wallets } from "@/app/client";
 import { activeChain } from "@/constants/chain";
-import { useConnect } from "thirdweb/react";
+import { useActiveAccount, useConnect } from "thirdweb/react";
 import { preAuthenticate } from "thirdweb/wallets/in-app";
 
 type Step = "options" | "email-otp";
@@ -86,10 +86,30 @@ export default function SignInCard() {
       })
     );
 
-  const busy = isConnecting || sendingCode;
+  // Connecting is followed by signing in and a redirect, none of which this
+  // card sees. Releasing on `isConnecting` alone would unlock it for that gap,
+  // which is the part that looks unresponsive and invites a second click.
+  const account = useActiveAccount();
+  const busy = isConnecting || sendingCode || Boolean(account?.address);
 
   return (
-    <div className="w-full max-w-[532px] rounded-[40px] p-6 shadow-[0px_4px_78px_31px_rgba(69,74,222,0.08)] outline outline-[0.5px] outline-offset-[-0.5px] outline-brand-indigo-50 sm:p-10">
+    <div
+      aria-busy={busy}
+      className={`relative w-full max-w-[532px] rounded-[40px] p-6 shadow-[0px_4px_78px_31px_rgba(69,74,222,0.08)] outline outline-[0.5px] outline-offset-[-0.5px] outline-brand-indigo-50 sm:p-10 ${
+        busy ? "cursor-wait [&_*]:pointer-events-none" : ""
+      }`}
+    >
+      {busy ? (
+        <div className="absolute inset-0 z-10 flex items-center justify-center rounded-[40px] bg-white/70 backdrop-blur-[1px]">
+          <div className="flex flex-col items-center gap-3">
+            <span className="size-8 animate-spin rounded-full border-2 border-brand-indigo-100 border-t-brand-indigo" />
+            <span className="font-inter text-sm text-gray-600">
+              {account?.address ? "Signing you in..." : "Connecting..."}
+            </span>
+          </div>
+        </div>
+      ) : null}
+
       <div className="flex flex-col items-center gap-8">
         <div className="flex w-full items-center justify-between">
           <span className="font-nohemi text-3xl text-zinc-800">Sign In</span>

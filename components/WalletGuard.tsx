@@ -2,7 +2,10 @@
 
 import type React from "react";
 
-import { useActiveAccount } from "thirdweb/react";
+import {
+  useActiveAccount,
+  useActiveWalletConnectionStatus,
+} from "thirdweb/react";
 
 import ConnectWallet from "@/components/ConnectWallet";
 
@@ -16,6 +19,14 @@ export default function WalletGuard({
   description?: string;
 }>) {
   const account = useActiveAccount();
+  const status = useActiveWalletConnectionStatus();
+
+  // Restoring a stored wallet takes a render or two, and during it there is no
+  // account. Treating that as "not connected" is what made a refresh on a
+  // dashboard page offer to connect a wallet that was already connected.
+  if (status === "connecting" || status === "unknown") {
+    return null;
+  }
 
   if (!account?.address) {
     return (
