@@ -29,7 +29,7 @@ export function BuiltForEveryRole() {
             </h2>
 
             <BrandButton
-              href="/account-type"
+              href="/sign-in"
               className="w-full sm:w-[clamp(11rem,18.519vw,20rem)]"
             >
               Get Started

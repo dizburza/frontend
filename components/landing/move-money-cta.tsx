@@ -55,7 +55,7 @@ export function MoveMoneyCta() {
                 walk the pair into the shape on the right on any window narrower
                 than the design. */}
             <div className="flex flex-col gap-4 sm:flex-row sm:gap-[clamp(1rem,1.389vw,1.5rem)]">
-              <BrandButton href="/account-type" className={CTA_BUTTON}>
+              <BrandButton href="/sign-in" className={CTA_BUTTON}>
                 Get Started
               </BrandButton>
               {/* The FAQ's support cards are the only place the product answers

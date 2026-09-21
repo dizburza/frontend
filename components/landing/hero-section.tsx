@@ -32,7 +32,7 @@ export function HeroSection() {
 
           <div className="mt-10 flex flex-col gap-4 sm:flex-row sm:gap-6">
             <BrandButton
-              href="/account-type"
+              href="/sign-in"
               className="sm:w-[clamp(11rem,18.52vw,20rem)]"
             >
               Get Started
