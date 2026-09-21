@@ -16,6 +16,7 @@ import {
   removeOrganizationEmployee 
 } from "@/lib/api/organization"
 import useOrgSlug from "@/hooks/useOrgSlug"
+import { InviteLinkButton } from "@/components/dashboard/invite-link-button"
 import { useToken } from "@/hooks/useToken"
 
 // Helper component for copyable wallet address
@@ -503,6 +504,7 @@ export default function EmployeesPage() {
           >
             + Add Employees
           </Button>
+          <InviteLinkButton organizationId={organization?.id} />
           <Button variant="outline" className="gap-2 bg-transparent">
             Export
             <ArrowUpDown size={16} />
