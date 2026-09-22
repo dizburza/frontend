@@ -8,6 +8,7 @@ import { thirdwebClient, wallets } from "@/app/client";
 import { activeChain } from "@/constants/chain";
 import { useActiveAccount, useConnect } from "thirdweb/react";
 import { preAuthenticate } from "thirdweb/wallets/in-app";
+import { retryAutoAuthenticate, useSharedAuthState } from "@/hooks/useAutoAuthenticate";
 
 type Step = "options" | "email-otp";
 
@@ -91,27 +92,46 @@ export default function SignInCard() {
   // which is the part that looks unresponsive and invites a second click.
   const account = useActiveAccount();
 
-  // The redirect is what normally ends this, so anything that stops it leaves
-  // the card locked with nothing to press. Waiting is right, waiting forever is
-  // not: after this the overlay lifts and says so, which at least leaves a way
-  // to try again.
-  const [stalled, setStalled] = useState(false);
+  // The one AutoAuthenticate instance mounted at the root runs the actual
+  // sign-in and publishes its state here, since a second useAutoAuthenticate
+  // call in this card would double-prompt the wallet.
+  const auth = useSharedAuthState();
+
+  // The redirect that normally ends this only fires once AutoAuthenticate
+  // reports success, so a failed attempt it already gave up on is the concrete
+  // case to detect, not a timer guessing at one. `stuck.address` compares
+  // against the connected account rather than trusting `error` alone: an error
+  // that belongs to a wallet already disconnected must not lock this card for
+  // the next one.
+  const stuck =
+    Boolean(account?.address) && !auth.isLoading && !auth.isAuthenticated && Boolean(auth.error);
+
+  // A stall with no error is still possible, such as a request that never
+  // resolves, so this is a backstop rather than the primary signal.
+  const [timedOut, setTimedOut] = useState(false);
 
   useEffect(() => {
-    if (!account?.address) {
-      setStalled(false);
+    if (!account?.address || auth.isAuthenticated) {
+      setTimedOut(false);
       return;
     }
 
-    const timer = setTimeout(() => {
-      setStalled(true);
-      toast.error("Sign-in is taking longer than expected. Please try again.");
-    }, 15_000);
-
+    const timer = setTimeout(() => setTimedOut(true), 15_000);
     return () => clearTimeout(timer);
-  }, [account?.address]);
+  }, [account?.address, auth.isAuthenticated]);
 
-  const busy = isConnecting || sendingCode || (Boolean(account?.address) && !stalled);
+  useEffect(() => {
+    if (stuck) toast.error(auth.error || "Could not sign you in. Please try again.");
+    else if (timedOut) toast.error("Sign-in is taking longer than expected. Please try again.");
+  }, [stuck, timedOut, auth.error]);
+
+  const canRetry = stuck || timedOut;
+  const busy = isConnecting || sendingCode || (Boolean(account?.address) && !canRetry);
+
+  const handleRetry = () => {
+    setTimedOut(false);
+    retryAutoAuthenticate();
+  };
 
   return (
     <div
@@ -127,6 +147,23 @@ export default function SignInCard() {
             <span className="font-inter text-sm text-gray-600">
               {account?.address ? "Signing you in..." : "Connecting..."}
             </span>
+          </div>
+        </div>
+      ) : null}
+
+      {canRetry && account?.address ? (
+        <div className="absolute inset-0 z-10 flex items-center justify-center rounded-[40px] bg-white/90 backdrop-blur-[1px]">
+          <div className="flex flex-col items-center gap-3 px-6 text-center">
+            <span className="font-inter text-sm text-gray-600">
+              {auth.error || "Sign-in did not go through."}
+            </span>
+            <button
+              type="button"
+              onClick={handleRetry}
+              className="rounded-full bg-brand-indigo px-6 py-2 font-inter text-sm font-medium text-white transition-colors hover:opacity-90"
+            >
+              Try again
+            </button>
           </div>
         </div>
       ) : null}

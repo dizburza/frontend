@@ -30,6 +30,25 @@ interface LoginResponse {
 // Global event name for auth completion
 const AUTH_COMPLETED_EVENT = "auth:completed";
 
+// Providers mounts exactly one AutoAuthenticate, deliberately: two instances
+// would each hold their own in-progress flag and both prompt the wallet to
+// sign. Anything else that needs to know whether sign-in is stuck, such as
+// the sign-in card, cannot call the hook a second time to find out, so the
+// one instance publishes its state here instead.
+const AUTH_STATE_EVENT = "auth:state";
+let sharedAuthState: AuthState = {
+  isAuthenticated: false,
+  isLoading: false,
+  error: null,
+};
+let sharedRetry: (() => void) | null = null;
+
+const publishAuthState = (state: AuthState, retry: () => void) => {
+  sharedAuthState = state;
+  sharedRetry = retry;
+  globalThis.dispatchEvent(new CustomEvent(AUTH_STATE_EVENT));
+};
+
 export function clearAuthStorage() {
   // Clears the session cookie server-side; nothing sensitive is held locally.
   void endSession();
@@ -107,20 +126,26 @@ export function useAutoAuthenticate() {
    */
   const signMessage = useCallback(async (message: string): Promise<string | null> => {
     if (!account) return null;
-    
+
     try {
       // Use thirdweb's signMessage method
       const signature = await account.signMessage({ message });
       return signature;
     } catch (error) {
       console.error("[useAutoAuthenticate] Failed to sign message:", error);
-      // User rejected the signature
-      if (error instanceof Error && error.message?.includes("rejected")) {
-        setAuthState(prev => ({
-          ...prev,
-          error: "Signature rejected. Please sign the message to continue.",
-        }));
-      }
+
+      // A declined signature is a choice, not a fault, and asking the wallet
+      // again immediately is the wrong response to it. Anything else, a
+      // network hiccup or the wallet not being ready, is worth saying plainly:
+      // it used to fail silently here, which left the caller with no signature
+      // and no explanation, so a retry had nothing to go on.
+      const rejected = error instanceof Error && error.message?.includes("rejected");
+      setAuthState((prev) => ({
+        ...prev,
+        error: rejected
+          ? "Signature rejected. Please sign the message to continue."
+          : "Could not get a signature from your wallet. Please try again.",
+      }));
       return null;
     }
   }, [account]);
@@ -336,10 +361,44 @@ export function useAutoAuthenticate() {
     };
   }, [account?.address, performAuth]);
 
+  // Published on every change so a component that is not this hook's single
+  // instance, such as the sign-in card, can see whether it is genuinely stuck
+  // and offer a real retry rather than a spinner with nothing behind it.
+  useEffect(() => {
+    publishAuthState(authState, retry);
+  }, [authState, retry]);
+
   return {
     ...authState,
     retry,
   };
+}
+
+/**
+ * Read-only view of the single AutoAuthenticate instance's state, for
+ * anywhere that needs to know whether sign-in is stuck without mounting a
+ * second copy of the hook and double-prompting the wallet.
+ */
+export function useSharedAuthState() {
+  const [state, setState] = useState(sharedAuthState);
+
+  useEffect(() => {
+    const onUpdate = () => setState(sharedAuthState);
+    onUpdate();
+    globalThis.addEventListener(AUTH_STATE_EVENT, onUpdate);
+    return () => globalThis.removeEventListener(AUTH_STATE_EVENT, onUpdate);
+  }, []);
+
+  return state;
+}
+
+/**
+ * Retries the one AutoAuthenticate instance's flow for whichever address it
+ * is currently watching. A no-op before that instance has mounted or once the
+ * wallet has disconnected, both of which mean there is nothing to retry.
+ */
+export function retryAutoAuthenticate() {
+  sharedRetry?.();
 }
 
 /**
