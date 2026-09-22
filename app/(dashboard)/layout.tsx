@@ -15,9 +15,9 @@ export default function DashboardLayout({
   return (
     <WalletGuard>
       <RealtimeProvider />
-      <div className="min-h-screen bg-[#F9F9FE] px-4 sm:px-6 lg:px-16">
+      <div className="min-h-screen bg-surface-canvas px-4 pb-10 pt-5 sm:px-6 lg:px-5">
         <DashboardHeader />
-        <main className="pt-16 sm:pt-20">{children}</main>
+        <main>{children}</main>
       </div>
     </WalletGuard>
   )
