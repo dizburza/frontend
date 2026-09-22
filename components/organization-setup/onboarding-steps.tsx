@@ -10,8 +10,8 @@ interface OnboardingStepsProps {
 
 function Dot({ filled }: Readonly<{ filled: boolean }>) {
   return (
-    <div className={`size-6 shrink-0 rounded-full flex items-center justify-center ${filled ? "bg-indigo-100" : "bg-zinc-200"}`}>
-      <div className={`size-3.5 rounded-full ${filled ? "bg-indigo-400" : "bg-gray-300"}`} />
+    <div className={`size-5 shrink-0 rounded-full flex items-center justify-center ${filled ? "bg-indigo-100" : "bg-zinc-200"}`}>
+      <div className={`size-3 rounded-full ${filled ? "bg-indigo-400" : "bg-gray-300"}`} />
     </div>
   )
 }
@@ -28,11 +28,11 @@ function Label({
   position,
 }: Readonly<{ number: number; title: string; dim: boolean; position: number }>) {
   const alignment =
-    position === 0 ? "left-3 -translate-x-1/2" : position === 1 ? "right-3 translate-x-1/2" : ""
+    position === 0 ? "left-2.5 -translate-x-1/2" : position === 1 ? "right-2.5 translate-x-1/2" : ""
 
   return (
     <div
-      className={`absolute top-full mt-2 flex flex-col items-center gap-1 ${alignment}`}
+      className={`absolute top-full flex flex-col items-center gap-0.5 ${alignment}`}
       style={alignment ? undefined : { left: `${position * 100}%`, transform: "translateX(-50%)" }}
     >
       <div className={`text-xs font-nohemi ${dim ? "font-normal text-gray-600" : "font-medium text-blue-950"}`}>
@@ -47,7 +47,7 @@ function Label({
 
 export function OnboardingSteps({ active }: Readonly<OnboardingStepsProps>) {
   return (
-    <div className="relative w-[440px] max-w-full h-16 mb-6">
+    <div className="relative mb-6 h-14 w-[440px] max-w-full">
       {/* The rail is a row of its own so it runs dot to dot. Laid out beside
           the labels it would stop at their edges, which are far wider. */}
       <div className="flex items-center">
