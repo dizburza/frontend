@@ -7,9 +7,17 @@ import { OnboardingShell } from "@/components/organization-setup/onboarding-shel
 import { OnboardingSteps } from "@/components/organization-setup/onboarding-steps"
 import { OnboardingButton } from "@/components/organization-setup/onboarding-button"
 import { FieldInput } from "@/components/organization-setup/field-input"
+import { FieldSwitch } from "@/components/organization-setup/field-switch"
 import { fetchSessionProfile } from "@/lib/session"
 import { checkUsernameAvailable, updateOwnProfile } from "@/lib/api/profile"
 import { ClaimError, claimInvite, fetchInvite } from "@/lib/api/invite"
+import { useToken } from "@/hooks/useToken"
+import {
+  CREATOR_EMPLOYMENT_KEY,
+  emptyCreatorEmployment,
+  readCreatorEmployment,
+  type CreatorEmployment,
+} from "@/lib/creator-employment"
 
 type Details = {
   surname: string
@@ -38,8 +46,10 @@ const usernameMessage = (state: "idle" | "checking" | "available" | "taken" | "i
 
 export default function YourDetailsPage() {
   const router = useRouter()
+  const { symbol } = useToken()
 
   const [details, setDetails] = useState<Details>(empty)
+  const [employment, setEmployment] = useState<CreatorEmployment>(emptyCreatorEmployment)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   // What was on the profile when the page loaded, so an untouched username is
@@ -109,6 +119,9 @@ export default function YourDetailsPage() {
       setIsLoading(false)
     })
 
+    const saved = readCreatorEmployment()
+    if (saved) setEmployment(saved)
+
     return () => {
       live = false
     }
@@ -145,6 +158,14 @@ export default function YourDetailsPage() {
     }
   }, [details.username, initialUsername])
 
+  // Decided by the token, not the name, so the layout never changes shape once
+  // the name arrives. Until it does, the copy reads without one.
+  const isJoining = Boolean(inviteToken)
+
+  const employmentComplete =
+    !employment.addToPayroll ||
+    (Boolean(employment.jobRole.trim()) && Number.parseFloat(employment.salary) > 0)
+
   const isComplete =
     Boolean(details.surname.trim()) &&
     Boolean(details.firstname.trim()) &&
@@ -152,7 +173,8 @@ export default function YourDetailsPage() {
     Boolean(details.phoneNumber.trim()) &&
     USERNAME_PATTERN.test(details.username.trim()) &&
     usernameState !== "taken" &&
-    usernameState !== "checking"
+    usernameState !== "checking" &&
+    (isJoining || employmentComplete)
 
   /**
    * Claims the invitation the details were just filled in for.
@@ -240,6 +262,18 @@ export default function YourDetailsPage() {
       return
     }
 
+    // Only asked of a creator, and only when they said they are on the payroll.
+    if (!isJoining && employment.addToPayroll) {
+      if (!employment.jobRole.trim()) {
+        toast.error("Enter your job role")
+        return
+      }
+      if (!(Number.parseFloat(employment.salary) > 0)) {
+        toast.error("Enter your salary")
+        return
+      }
+    }
+
     const usernameChanged = username.toLowerCase() !== initialUsername.toLowerCase()
 
     try {
@@ -253,6 +287,22 @@ export default function YourDetailsPage() {
         // since it excludes the caller from the collision check.
         ...(usernameChanged ? { username } : {}),
       })
+
+      if (!isJoining) {
+        try {
+          localStorage.setItem(
+            CREATOR_EMPLOYMENT_KEY,
+            JSON.stringify({
+              addToPayroll: employment.addToPayroll,
+              jobRole: employment.jobRole.trim(),
+              salary: employment.salary.trim(),
+            })
+          )
+        } catch {
+          // Without this the creator simply is not added to payroll, which the
+          // Employees page can fix afterwards. Not worth failing the step for.
+        }
+      }
 
       let pendingInvite: string | null = null
       try {
@@ -280,14 +330,11 @@ export default function YourDetailsPage() {
     }
   }
 
-  // Decided by the token, not the name, so the layout never changes shape once
-  // the name arrives. Until it does, the copy reads without one.
-  const isJoining = Boolean(inviteToken)
   const joiningWhom = invitedTo ?? "your organization"
 
   return (
     <OnboardingShell
-      image="/images/organization-1-image.jpg"
+      image="/images/your-details-image.jpg"
       headline={isJoining ? (invitedTo ? `Join ${invitedTo}` : "Join your team") : undefined}
       blurb={
         isJoining ? (
@@ -369,6 +416,42 @@ export default function YourDetailsPage() {
                   </p>
                 ) : null}
               </div>
+
+              {/* Never shown to an invitee: their terms were set by whoever
+                  added them, and letting them type their own salary here is
+                  exactly what the claim path refuses to allow. */}
+              {isJoining ? null : (
+                <div className="flex w-full flex-col gap-3 rounded-lg border border-indigo-100 bg-slate-50/60 p-4">
+                  <FieldSwitch
+                    label="Add me to the employee list"
+                    hint="Counts you on payroll so you can be paid like anyone else."
+                    checked={employment.addToPayroll}
+                    onChange={(checked) =>
+                      setEmployment((e) => ({ ...e, addToPayroll: checked }))
+                    }
+                  />
+
+                  {employment.addToPayroll ? (
+                    <>
+                      <FieldInput
+                        label="Job Role"
+                        placeholder="e.g HR Manager"
+                        icon="briefcase"
+                        value={employment.jobRole}
+                        onChange={(v) => setEmployment((e) => ({ ...e, jobRole: v }))}
+                      />
+                      <FieldInput
+                        label={`Salary${symbol ? ` (${symbol})` : ""}`}
+                        placeholder="e.g 500000"
+                        icon="briefcase"
+                        type="number"
+                        value={employment.salary}
+                        onChange={(v) => setEmployment((e) => ({ ...e, salary: v }))}
+                      />
+                    </>
+                  ) : null}
+                </div>
+              )}
             </div>
 
             <OnboardingButton

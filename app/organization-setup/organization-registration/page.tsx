@@ -19,6 +19,7 @@ import {
   verifyOrganizationEmail,
 } from "@/lib/api/organization"
 import { useCreateOrganization } from "@/hooks/useCreateOrganization"
+import { CREATOR_EMPLOYMENT_KEY, readCreatorEmployment } from "@/lib/creator-employment"
 import { fetchSessionProfile, hasSessionFor } from "@/lib/session"
 import { getTokenConfig } from "@/lib/token"
 
@@ -122,6 +123,7 @@ export default function OrganizationRegistrationPage() {
 
       // Their own name, collected in step 1. This is what the signers list
       // shows, so a literal here would label the owner "Creator" forever.
+      const creatorEmployment = readCreatorEmployment()
       const profile = await fetchSessionProfile()
       const creatorSigner = {
         address: account.address,
@@ -161,6 +163,9 @@ export default function OrganizationRegistrationPage() {
           registrationType: registration.registrationType || undefined,
         },
         signers: [creatorSigner],
+        creatorEmployment: creatorEmployment?.addToPayroll
+          ? { jobRole: creatorEmployment.jobRole, salary: creatorEmployment.salary }
+          : undefined,
         quorum: orgDetails.quorum,
         metadata: { industry: orgDetails.industry },
         settings: {
@@ -174,6 +179,7 @@ export default function OrganizationRegistrationPage() {
         localStorage.removeItem("orgDetails")
         localStorage.removeItem("orgRegistration")
         localStorage.removeItem("orgLogoName")
+        localStorage.removeItem(CREATOR_EMPLOYMENT_KEY)
         // This says the caller has no organization, which was true a moment
         // ago. Left in place, the guard on /org/[slug] reads it and sends them
         // straight back here.
