@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -90,7 +90,28 @@ export default function SignInCard() {
   // card sees. Releasing on `isConnecting` alone would unlock it for that gap,
   // which is the part that looks unresponsive and invites a second click.
   const account = useActiveAccount();
-  const busy = isConnecting || sendingCode || Boolean(account?.address);
+
+  // The redirect is what normally ends this, so anything that stops it leaves
+  // the card locked with nothing to press. Waiting is right, waiting forever is
+  // not: after this the overlay lifts and says so, which at least leaves a way
+  // to try again.
+  const [stalled, setStalled] = useState(false);
+
+  useEffect(() => {
+    if (!account?.address) {
+      setStalled(false);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setStalled(true);
+      toast.error("Sign-in is taking longer than expected. Please try again.");
+    }, 15_000);
+
+    return () => clearTimeout(timer);
+  }, [account?.address]);
+
+  const busy = isConnecting || sendingCode || (Boolean(account?.address) && !stalled);
 
   return (
     <div
