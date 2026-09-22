@@ -16,6 +16,7 @@ const config: Config = {
         nohemi: ["var(--font-nohemi)", "sans-serif"],
         lato: ["var(--font-lato)", "sans-serif"],
         raleway: ["var(--font-raleway)", "sans-serif"],
+        bricolage: ["var(--font-bricolage)", "sans-serif"],
       },
       colors: {
         // The marketing palette, straight off the Figma file. Figma's dev mode
@@ -45,6 +46,16 @@ const config: Config = {
           mist: "#F0FDE8",
           lilac: "#FAF6FE",
           canvas: "#F9F9FE",
+        },
+        // The dashboard chrome. Figma reads these as slate-50/indigo-100 and
+        // similar, which are near misses, so the hexes win.
+        surface: {
+          canvas: "#F9F9FE",
+          card: "#FFFFFF",
+          sunken: "#F8F9FC",
+          header: "#F1F2F9",
+          line: "#E9EAF5",
+          hairline: "#F0F0F5",
         },
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",

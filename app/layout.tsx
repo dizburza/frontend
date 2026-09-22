@@ -1,7 +1,7 @@
 import type React from "react"
 import type { Metadata } from "next"
 import "./globals.css"
-import { Inter, Lato, Raleway } from "next/font/google"
+import { Bricolage_Grotesque, Inter, Lato, Raleway } from "next/font/google"
 import localFont from "next/font/local"
 import Providers from "./providers"
 import { ThirdwebProvider } from "thirdweb/react"
@@ -29,6 +29,12 @@ const raleway = Raleway({
   variable: "--font-raleway",
 })
 
+// Dashboard stat figures are set in Bricolage.
+const bricolage = Bricolage_Grotesque({
+  subsets: ["latin"],
+  variable: "--font-bricolage",
+})
+
 // Local font (Nohemi)
 const nohemi = localFont({
   src: [
@@ -54,7 +60,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${nohemi.variable} ${lato.variable} ${raleway.variable}`}
+      className={`${inter.variable} ${nohemi.variable} ${lato.variable} ${raleway.variable} ${bricolage.variable}`}
     >
       <body className="bg-white text-black font-inter antialiased">
         <script
