@@ -130,6 +130,8 @@ async function apiFetchWithRetry<T>(
 // Types from backend
 export interface ApiEmployee {
   _id: string;
+  /** The organization_members row, which is what employee actions address. */
+  membershipId?: string;
   username: string;
   displayUsername?: string;
   surname: string;
@@ -137,6 +139,9 @@ export interface ApiEmployee {
   fullName: string;
   walletAddress: string;
   email?: string;
+  phoneNumber?: string;
+  /** "invited" until the person claims their row and connects a wallet. */
+  status?: "invited" | "joined";
   avatar?: string;
   role: string;
   isSigner?: boolean;
@@ -229,8 +234,10 @@ export interface ApiTransaction {
   toAddress: string;
   amount: string;
   currency?: string;
-  /** Gas, in wei. Sponsored, so this is what the paymaster spent, not the user. */
+  /** Gas paid on this transfer, in token base units. */
   fee?: string;
+  /** `fee` scaled by the token's decimals, so the browser never needs them. */
+  feeFormatted?: string;
   gasUsed?: string;
   /** What the user was actually charged, in token base units. */
   chargedFee?: string;
@@ -301,6 +308,12 @@ export interface CreateOrganizationRequest {
     payrollCurrency?: string;
     defaultPaymentDay?: number;
     timeZone?: string;
+  };
+  /** Set when the creator said they are on their own payroll. */
+  creatorEmployment?: {
+    jobRole: string;
+    /** The human figure; the backend scales it by the token's decimals. */
+    salary: string;
   };
 }
 
@@ -568,11 +581,98 @@ export async function removeOrganizationEmployee(
   organizationId: string,
   username: string
 ) {
-  return apiFetch(`/api/organizations/${organizationId}/employees/${encodeURIComponent(username)}`,
-    {
-      method: "DELETE",
-    }
+  const endpoint = `/api/organizations/${organizationId}/employees/${encodeURIComponent(username)}`;
+  try {
+    return await apiFetchWithRetry(() => apiFetch(endpoint, { method: "DELETE" }), {
+      attempts: 5,
+      baseDelayMs: 500,
+    });
+  } catch (e) {
+    enqueueBackendSyncJob({ endpoint, body: { method: "DELETE" } });
+    throw e;
+  }
+}
+
+/** Re-sends the organization's live invite link to one person still waiting on it. */
+export async function remindEmployee(organizationId: string, membershipId: string) {
+  return apiFetch(
+    `/api/organizations/${organizationId}/employees/${encodeURIComponent(membershipId)}/remind`,
+    { method: "POST" }
   );
+}
+
+export interface ApiSignerChangeProposal {
+  id: string;
+  organizationId: string;
+  organizationAddress: string;
+  proposalId: string;
+  subjectAddress: string;
+  subjectName: string;
+  isRemoval: boolean;
+  signerEpoch: number;
+  createdByAddress: string;
+  quorumRequired: number;
+  status: "pending" | "approved" | "executed" | "expired";
+  submittedAt: string;
+  expiresAt: string;
+  executedAt?: string;
+  executedBy?: string;
+  txHash?: string;
+  approvals: { signerAddress: string; signerName: string; approvedAt: string }[];
+  approvalCount: number;
+}
+
+/** Records a proposeSignerChange() call already made on chain. */
+export async function recordSignerChangeProposal(
+  organizationId: string,
+  payload: {
+    proposalId: string;
+    organizationAddress: string;
+    subjectAddress: string;
+    subjectName: string;
+    isRemoval: boolean;
+    signerEpoch: number;
+    createdByName: string;
+  }
+): Promise<ApiSignerChangeProposal> {
+  const response = await apiFetch(`/api/organizations/${organizationId}/signer-changes`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  return response.data || response;
+}
+
+/** Records an approveSignerChange() call already made on chain. */
+export async function recordSignerChangeApproval(
+  organizationId: string,
+  proposalId: string,
+  payload: { signerName: string }
+): Promise<ApiSignerChangeProposal> {
+  const response = await apiFetch(
+    `/api/organizations/${organizationId}/signer-changes/${proposalId}/approve`,
+    { method: "POST", body: JSON.stringify(payload) }
+  );
+  return response.data || response;
+}
+
+/** Records an executeSignerChange() call already made on chain. */
+export async function recordSignerChangeExecution(
+  organizationId: string,
+  proposalId: string,
+  payload: { txHash: string }
+): Promise<ApiSignerChangeProposal> {
+  const response = await apiFetch(
+    `/api/organizations/${organizationId}/signer-changes/${proposalId}/execute`,
+    { method: "POST", body: JSON.stringify(payload) }
+  );
+  return response.data || response;
+}
+
+export async function fetchSignerChangeProposals(
+  organizationId: string
+): Promise<{ proposals: ApiSignerChangeProposal[] }> {
+  const response = await apiFetch(`/api/organizations/${organizationId}/signer-changes`);
+  return response.data || response;
 }
 
 // React Hooks
@@ -859,11 +959,15 @@ export function useOrganizationBySlug(slug: string | null) {
 // Helper to convert API employee to frontend Employee type
 export function mapApiEmployeeToEmployee(apiEmployee: ApiEmployee): {
   id: string;
+  membershipId?: string;
   surname: string;
   firstName: string;
   username: string;
   displayUsername?: string;
   walletAddress: string;
+  email?: string;
+  phoneNumber?: string;
+  hasJoined: boolean;
   role: string;
   isSigner: boolean;
   salary: number;
@@ -883,11 +987,17 @@ export function mapApiEmployeeToEmployee(apiEmployee: ApiEmployee): {
   
   return {
     id: apiEmployee._id,
+    membershipId: apiEmployee.membershipId,
     surname: apiEmployee.surname,
     firstName: apiEmployee.firstname,
     username: apiEmployee.username,
     displayUsername: apiEmployee.displayUsername,
     walletAddress: apiEmployee.walletAddress,
+    email: apiEmployee.email,
+    phoneNumber: apiEmployee.phoneNumber,
+    // Older responses predate the field, and everything they carry came from
+    // someone who had already joined.
+    hasJoined: (apiEmployee.status ?? "joined") === "joined",
     role: apiEmployee.jobDetails?.jobRole || apiEmployee.role || "Employee",
     isSigner: apiEmployee.isSigner || false,
     salary: displaySalary,

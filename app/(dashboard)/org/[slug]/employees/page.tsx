@@ -1,89 +1,70 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import Link from "next/link"
 import { toast } from "sonner"
-import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Search, Filter, ArrowUpDown, Loader2, ChevronDown, Copy, Check, X, Pencil, Trash2 } from "lucide-react"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Search, ArrowUpDown, Loader2, ChevronDown, Filter, X } from "lucide-react"
 import { AddEmployeeModal } from "@/components/employees/add-employee-modal"
-import { 
-  useOrganizationBySlug, 
-  useOrganizationEmployees,
+import { ConfirmModal } from "@/components/employees/confirm-modal"
+import { EmployeeActions } from "@/components/employees/employee-actions"
+import { PillButton } from "@/components/ui/pill-button"
+import { SectionCard } from "@/components/dashboard/section-card"
+import {
   mapApiEmployeeToEmployee,
+  recordSignerChangeProposal,
+  remindEmployee,
+  removeOrganizationEmployee,
   updateOrganizationEmployee,
-  removeOrganizationEmployee 
+  useOrganizationBySlug,
+  useOrganizationEmployees,
 } from "@/lib/api/organization"
 import useOrgSlug from "@/hooks/useOrgSlug"
-import { InviteLinkButton } from "@/components/dashboard/invite-link-button"
+import { useSignerManagement } from "@/hooks/useSignerManagement"
+import useGetOrgTreasuryBalance from "@/hooks/ERC20/useGetOrgTreasuryBalance"
 import { useToken } from "@/hooks/useToken"
+import { useActiveAccount } from "thirdweb/react"
 
-// Helper component for copyable wallet address
-function WalletAddress({ address }: Readonly<{ address: string }>) {
-  const [copied, setCopied] = useState(false)
-  
-  const shortenAddress = (addr: string) => {
-    if (!addr || addr.length < 12) return addr
-    return `${addr.slice(0, 6)}...${addr.slice(-4)}`
-  }
-  
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(address)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    } catch (err) {
-      console.error("Failed to copy:", err)
-    }
-  }
-  
-  return (
-    <div className="flex items-center gap-2">
-      <span className="font-mono text-sm">{shortenAddress(address)}</span>
-      <button
-        onClick={handleCopy}
-        className="p-1 hover:bg-gray-100 rounded transition-colors"
-        title="Copy full address"
-      >
-        {copied ? <Check size={14} className="text-green-600" /> : <Copy size={14} className="text-gray-400" />}
-      </button>
-    </div>
-  )
-}
+type Employee = ReturnType<typeof mapApiEmployeeToEmployee>
 
 const HIGH_SALARY_THRESHOLD = 500_000
 
+const shortAddress = (value: string) =>
+  value && value.length >= 12 ? `${value.slice(0, 6)}...${value.slice(-4)}` : value
+
 export default function EmployeesPage() {
   const { symbol } = useToken()
+  const account = useActiveAccount()
+
   const [searchTerm, setSearchTerm] = useState("")
-  const [filterBy, setFilterBy] = useState<"all" | "new" | "high-salary">("all")
+  const [filterBy, setFilterBy] = useState<"all" | "joined" | "pending" | "high-salary">("all")
   const [sortBy, setSortBy] = useState<"name" | "salary" | "date">("name")
   const [page, setPage] = useState(1)
   const [limit, setLimit] = useState(10)
+
   const [showAddEmployeeModal, setShowAddEmployeeModal] = useState(false)
-  const [pendingDeleteUsername, setPendingDeleteUsername] = useState<string | null>(null)
-  const [editingEmployee, setEditingEmployee] = useState<null | {
-    id: string
-    username: string
-    displayUsername?: string
-    jobRole: string
-    salary: string
-    department?: string
-    employeeId?: string
-    isSigner: boolean
-  }>(null)
-  const [isSavingEdit, setIsSavingEdit] = useState(false)
-  const [isDeleting, setIsDeleting] = useState(false)
   const [showFilterDropdown, setShowFilterDropdown] = useState(false)
   const [showSortDropdown, setShowSortDropdown] = useState(false)
+
+  const [editing, setEditing] = useState<Employee | null>(null)
+  const [editDraft, setEditDraft] = useState({
+    jobRole: "",
+    salary: "",
+    department: "",
+    employeeId: "",
+  })
+  const [isSavingEdit, setIsSavingEdit] = useState(false)
+
+  const [pendingSuspend, setPendingSuspend] = useState<Employee | null>(null)
+  const [pendingSigner, setPendingSigner] = useState<Employee | null>(null)
+  const [pendingReminder, setPendingReminder] = useState<Employee | null>(null)
+  const [isWorking, setIsWorking] = useState(false)
 
   const filterRef = useRef<HTMLDivElement>(null)
   const sortRef = useRef<HTMLDivElement>(null)
 
-  // Close dropdowns when clicking outside
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    const onPointerDown = (event: MouseEvent) => {
       if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
         setShowFilterDropdown(false)
       }
@@ -92,94 +73,63 @@ export default function EmployeesPage() {
       }
     }
 
-    document.addEventListener("mousedown", handleClickOutside)
-    return () => document.removeEventListener("mousedown", handleClickOutside)
+    document.addEventListener("mousedown", onPointerDown)
+    return () => document.removeEventListener("mousedown", onPointerDown)
   }, [])
 
   const orgSlug = useOrgSlug()
-  const { data: organization, loading: orgLoading } = useOrganizationBySlug(orgSlug)
-  const { data: employeesData, loading: employeesLoading, error, refresh } = useOrganizationEmployees(organization?.id || null)
+  const base = orgSlug ? `/org/${orgSlug}` : "/"
+  const { data: organization, loading: orgLoading, refresh: refreshOrg } =
+    useOrganizationBySlug(orgSlug)
+  const {
+    data: employeesData,
+    loading: employeesLoading,
+    error,
+    refresh,
+  } = useOrganizationEmployees(organization?.id || null)
 
-  const employees = employeesData?.employees?.map(mapApiEmployeeToEmployee) || []
-  const totalEmployees = employeesData?.totalEmployees || 0
+  const treasuryBalance = useGetOrgTreasuryBalance()
+  const signerManagement = useSignerManagement(organization?.contractAddress)
 
-  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null)
-  useEffect(() => {
-    if (!employeesLoading && employeesData) {
-      setLastUpdatedAt(new Date())
-    }
-  }, [employeesLoading, employeesData])
+  const employees = useMemo(
+    () => (employeesData?.employees ?? []).map(mapApiEmployeeToEmployee),
+    [employeesData]
+  )
 
-  let lastUpdatedText = "-"
-  if (employeesLoading) {
-    lastUpdatedText = "updating ..."
-  } else if (lastUpdatedAt) {
-    lastUpdatedText = lastUpdatedAt.toLocaleString()
-  }
+  const totalEmployees = employeesData?.totalEmployees ?? 0
+  const joinedCount = employees.filter((e) => e.hasJoined).length
+  const pendingCount = employees.length - joinedCount
 
-  // Calculate stats from real data
-  const totalSalaryPayout = employees.reduce((sum, emp) => sum + emp.salary, 0)
-  const newEmployeesCount = employees.filter(emp => {
-    if (!emp.joinedAt) return false
-    const joinedDate = new Date(emp.joinedAt)
-    const oneMonthAgo = new Date()
-    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1)
-    return joinedDate > oneMonthAgo
-  }).length
+  /** The name this signer is recorded under when they approve something. */
+  const currentSignerName = useMemo(() => {
+    const me = (organization?.signers ?? []).find(
+      (s) => s.address.toLowerCase() === account?.address?.toLowerCase()
+    )
+    return me?.name || account?.address || "Signer"
+  }, [organization?.signers, account?.address])
 
-  const stats = [
-    { 
-      label: `Total Salary Payout (${symbol})`,
-      value: totalSalaryPayout.toLocaleString(),
-      lastUpdated: lastUpdatedText,
-    },
-    { 
-      label: "Total Employees", 
-      value: totalEmployees.toString(), 
-    },
-    { 
-      label: "New Employees", 
-      value: newEmployeesCount.toString(), 
-      lastUpdated: "" 
-    },
-    { 
-      label: "Proposal Contributors", 
-      value: "0", 
-    },
-  ]
-
-  // Filter employees based on selected filter
-  const getFilteredEmployees = () => {
-    let filtered = employees.filter(
-      (emp) =>
-        emp.surname.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        emp.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        emp.username.toLowerCase().includes(searchTerm.toLowerCase()),
+  const filtered = useMemo(() => {
+    const term = searchTerm.toLowerCase()
+    let rows = employees.filter(
+      (e) =>
+        e.surname.toLowerCase().includes(term) ||
+        e.firstName.toLowerCase().includes(term) ||
+        e.username.toLowerCase().includes(term) ||
+        (e.email ?? "").toLowerCase().includes(term)
     )
 
-    // Apply filter
-    if (filterBy === "new") {
-      const oneMonthAgo = new Date()
-      oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1)
-      filtered = filtered.filter(emp => {
-        if (!emp.joinedAt) return false
-        return new Date(emp.joinedAt) > oneMonthAgo
-      })
-    } else if (filterBy === "high-salary") {
-      // emp.salary is the human figure the backend formatted, so the threshold
-      // is the amount the label promises. It used to be 500, left over from a
-      // scaling step that no longer exists, so the filter fired a thousand
-      // times too low.
-      filtered = filtered.filter(emp => emp.salary >= HIGH_SALARY_THRESHOLD)
+    if (filterBy === "joined") rows = rows.filter((e) => e.hasJoined)
+    else if (filterBy === "pending") rows = rows.filter((e) => !e.hasJoined)
+    else if (filterBy === "high-salary") {
+      // The backend already formatted this into the human figure, so the
+      // threshold is the amount the label promises.
+      rows = rows.filter((e) => e.salary >= HIGH_SALARY_THRESHOLD)
     }
 
-    // Apply sort
-    const sorted = [...filtered]
-    if (sortBy === "name") {
-      sorted.sort((a, b) => a.surname.localeCompare(b.surname))
-    } else if (sortBy === "salary") {
-      sorted.sort((a, b) => b.salary - a.salary)
-    } else if (sortBy === "date") {
+    const sorted = [...rows]
+    if (sortBy === "name") sorted.sort((a, b) => a.surname.localeCompare(b.surname))
+    else if (sortBy === "salary") sorted.sort((a, b) => b.salary - a.salary)
+    else {
       sorted.sort((a, b) => {
         if (!a.joinedAt) return 1
         if (!b.joinedAt) return -1
@@ -188,594 +138,633 @@ export default function EmployeesPage() {
     }
 
     return sorted
-  }
-
-  const filteredEmployees = getFilteredEmployees()
+  }, [employees, searchTerm, filterBy, sortBy])
 
   useEffect(() => {
     setPage(1)
   }, [organization?.id, searchTerm, filterBy, sortBy, limit])
 
-  const totalPages = Math.max(1, Math.ceil(filteredEmployees.length / limit))
+  const totalPages = Math.max(1, Math.ceil(filtered.length / limit))
   const safePage = Math.min(Math.max(1, page), totalPages)
   const startIndex = (safePage - 1) * limit
-  const paginatedEmployees = filteredEmployees.slice(startIndex, startIndex + limit)
+  const paginated = filtered.slice(startIndex, startIndex + limit)
 
-  const getPageItems = (currentPage: number, total: number) => {
-    const safeTotalPages = Math.max(1, total)
-    const safeCurrent = Math.min(Math.max(1, currentPage), safeTotalPages)
-    if (safeTotalPages <= 7) {
-      return Array.from({ length: safeTotalPages }, (_, i) => i + 1)
-    }
-
-    const items: Array<number | "..."> = [1]
-    const start = Math.max(2, safeCurrent - 1)
-    const end = Math.min(safeTotalPages - 1, safeCurrent + 1)
-
-    if (start > 2) items.push("...")
-    for (let p = start; p <= end; p++) items.push(p)
-    if (end < safeTotalPages - 1) items.push("...")
-    items.push(safeTotalPages)
-
-    return items
-  }
-
-  const pageItems = getPageItems(safePage, totalPages)
-
-  const renderLastUpdatedBy = (employee: { lastAudit?: { performedByUsername?: string; performedByWalletAddress?: string; createdAt?: string } | null }) => {
-    if (employee.lastAudit?.performedByUsername) {
-      return (
-        <div className="text-sm">
-          <div className="font-medium text-gray-900">@{employee.lastAudit.performedByUsername}</div>
-          {employee.lastAudit.createdAt ? (
-            <div className="text-xs text-gray-500">{new Date(employee.lastAudit.createdAt).toLocaleString()}</div>
-          ) : null}
-        </div>
-      )
-    }
-
-    if (employee.lastAudit?.performedByWalletAddress) {
-      return (
-        <div className="text-sm">
-          <div className="font-medium text-gray-900 font-mono">{employee.lastAudit.performedByWalletAddress.slice(0, 6)}...{employee.lastAudit.performedByWalletAddress.slice(-4)}</div>
-          {employee.lastAudit.createdAt ? (
-            <div className="text-xs text-gray-500">{new Date(employee.lastAudit.createdAt).toLocaleString()}</div>
-          ) : null}
-        </div>
-      )
-    }
-
-    return <span className="text-gray-400">-</span>
-  }
-
-  const filterOptions = [
-    { value: "all", label: "All Employees" },
-    { value: "new", label: "New Employees (Last 30 days)" },
-    { value: "high-salary", label: `High Salary (≥500k ${symbol})` },
-  ]
-
-  const sortOptions = [
-    { value: "name", label: "Name (A-Z)" },
-    { value: "salary", label: "Salary (High to Low)" },
-    { value: "date", label: "Join Date (Newest)" },
-  ]
-
-  const getFilterLabel = () => filterOptions.find(opt => opt.value === filterBy)?.label || "All Employees"
-  const getSortLabel = () => sortOptions.find(opt => opt.value === sortBy)?.label || "Name"
-
-
-  const handleEmployeeAdded = () => {
-    refresh()
-    setShowAddEmployeeModal(false)
+  const openEdit = (employee: Employee) => {
+    setEditing(employee)
+    setEditDraft({
+      jobRole: employee.role || "",
+      salary: String(employee.salary || ""),
+      department: employee.department || "",
+      employeeId: employee.employeeId || "",
+    })
   }
 
   const handleSaveEdit = async () => {
-    if (!editingEmployee || !organization?.id) return
-    if (editingEmployee.isSigner) return
+    if (!editing || !organization?.id) return
 
     setIsSavingEdit(true)
     try {
-      await updateOrganizationEmployee(organization.id, editingEmployee.username, {
-        jobRole: editingEmployee.jobRole,
+      await updateOrganizationEmployee(organization.id, editing.username, {
+        jobRole: editDraft.jobRole,
         // Sent as the human figure. The backend scales it by the token's
         // decimals, which is the only place that knows the precision.
-        salary: editingEmployee.salary.trim() || undefined,
-        department: editingEmployee.department,
-        employeeId: editingEmployee.employeeId,
+        salary: editDraft.salary.trim() || undefined,
+        department: editDraft.department,
+        employeeId: editDraft.employeeId,
       })
-      setEditingEmployee(null)
+      setEditing(null)
       refresh()
       toast.success("Employee updated")
     } catch (err) {
-      console.error("Failed to update employee:", err)
       toast.error(err instanceof Error ? err.message : "Failed to update employee")
     } finally {
       setIsSavingEdit(false)
     }
   }
 
-  const handleDeleteEmployee = async (username: string) => {
-    if (!organization?.id) return
+  const handleSuspend = async () => {
+    if (!pendingSuspend || !organization?.id) return
 
-    setIsDeleting(true)
+    setIsWorking(true)
     try {
-      await removeOrganizationEmployee(organization.id, username)
+      await removeOrganizationEmployee(organization.id, pendingSuspend.username)
+      setPendingSuspend(null)
       refresh()
-      toast.success("Employee removed")
+      toast.success("Employee suspended")
     } catch (err) {
-      console.error("Failed to remove employee:", err)
-      toast.error(err instanceof Error ? err.message : "Failed to remove employee")
+      toast.error(err instanceof Error ? err.message : "Failed to suspend employee")
     } finally {
-      setIsDeleting(false)
+      setIsWorking(false)
     }
   }
+
+  const handleSendReminder = async () => {
+    if (!pendingReminder || !organization?.id) return
+
+    const membershipId = pendingReminder.membershipId
+    if (!membershipId) {
+      toast.error("This employee record cannot be reminded yet")
+      return
+    }
+
+    setIsWorking(true)
+    try {
+      await remindEmployee(organization.id, membershipId)
+      setPendingReminder(null)
+      toast.success("Reminder sent")
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not send the reminder")
+    } finally {
+      setIsWorking(false)
+    }
+  }
+
+  /**
+   * Promotion is one call while the organization is still filling its declared
+   * signer seats, and a quorum-gated proposal once it is constituted. The
+   * contract enforces that either way; this only picks the call that will not
+   * revert, and records the proposal so other signers can see it waiting.
+   */
+  const handleAddAsSigner = async () => {
+    if (!pendingSigner || !organization?.id || !organization.contractAddress) return
+
+    const subject = pendingSigner.walletAddress
+    if (!subject) {
+      toast.error("This employee has no wallet address yet")
+      return
+    }
+
+    setIsWorking(true)
+    try {
+      const constituted = await signerManagement.isConstituted()
+
+      if (constituted) {
+        const { proposalId, signerEpoch } = await signerManagement.proposeSignerChange(
+          subject,
+          false
+        )
+
+        await recordSignerChangeProposal(organization.id, {
+          proposalId,
+          organizationAddress: organization.contractAddress,
+          subjectAddress: subject,
+          subjectName: `${pendingSigner.firstName} ${pendingSigner.surname}`.trim(),
+          isRemoval: false,
+          signerEpoch,
+          createdByName: currentSignerName,
+        })
+
+        toast.success("Signer change proposed. It needs quorum approval to take effect.")
+      } else {
+        await signerManagement.addSigner(subject)
+        toast.success("Signer added")
+      }
+
+      setPendingSigner(null)
+      refresh()
+      refreshOrg()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not add this signer")
+    } finally {
+      setIsWorking(false)
+    }
+  }
+
+  const filterOptions = [
+    { value: "all", label: "All Employees" },
+    { value: "joined", label: "Joined" },
+    { value: "pending", label: "Pending Invitations" },
+    { value: "high-salary", label: `High Salary (>=500k ${symbol})` },
+  ]
+
+  const sortOptions = [
+    { value: "name", label: "Alphabet" },
+    { value: "salary", label: "Salary (High to Low)" },
+    { value: "date", label: "Join Date (Newest)" },
+  ]
 
   const loading = orgLoading || employeesLoading
 
   if (loading) {
     return (
-      <div className="py-4 sm:py-6 lg:py-8 px-4 sm:px-6 lg:px-8 flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      <div className="flex min-h-[400px] items-center justify-center px-1 lg:px-10">
+        <Loader2 className="size-8 animate-spin text-[#4F51D9]" />
       </div>
     )
   }
 
   if (error) {
     return (
-      <div className="py-4 sm:py-6 lg:py-8 px-4 sm:px-6 lg:px-8">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+      <div className="px-1 lg:px-10">
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4">
           <p className="text-red-600">Failed to load employees: {error}</p>
-          <Button onClick={refresh} className="mt-2" variant="outline">Try Again</Button>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="py-4 sm:py-6 lg:py-8 px-4 sm:px-6 lg:px-8 space-y-8">
-      {editingEmployee && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg w-full max-w-lg overflow-hidden">
-            <div className="flex items-center justify-between p-6 border-b border-gray-200">
-              <h2 className="text-xl font-semibold text-gray-900">Edit Employee</h2>
-              <button onClick={() => setEditingEmployee(null)} className="text-gray-400 hover:text-gray-600">
-                <X size={24} />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-4">
-              <div>
-                <label htmlFor="edit-employee-username" className="block text-sm font-medium text-gray-700 mb-1">Username</label>
-                <Input id="edit-employee-username" value={editingEmployee.displayUsername || editingEmployee.username} disabled className="w-full" />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="edit-employee-jobRole" className="block text-sm font-medium text-gray-700 mb-1">Job Role</label>
-                  <Input
-                    id="edit-employee-jobRole"
-                    value={editingEmployee.jobRole}
-                    onChange={(e) =>
-                      setEditingEmployee((prev) =>
-                        prev
-                          ? {
-                              ...prev,
-                              jobRole: e.target.value,
-                            }
-                          : prev
-                      )
-                    }
-                    className="w-full"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="edit-employee-department" className="block text-sm font-medium text-gray-700 mb-1">Department</label>
-                  <Input
-                    id="edit-employee-department"
-                    value={editingEmployee.department || ""}
-                    onChange={(e) =>
-                      setEditingEmployee((prev) =>
-                        prev
-                          ? {
-                              ...prev,
-                              department: e.target.value,
-                            }
-                          : prev
-                      )
-                    }
-                    className="w-full"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="edit-employee-salary" className="block text-sm font-medium text-gray-700 mb-1">Salary ({symbol})</label>
-                  <Input
-                    id="edit-employee-salary"
-                    type="number"
-                    value={editingEmployee.salary}
-                    onChange={(e) =>
-                      setEditingEmployee((prev) =>
-                        prev
-                          ? {
-                              ...prev,
-                              salary: e.target.value,
-                            }
-                          : prev
-                      )
-                    }
-                    className="w-full"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="edit-employee-employeeId" className="block text-sm font-medium text-gray-700 mb-1">Employee ID</label>
-                  <Input
-                    id="edit-employee-employeeId"
-                    value={editingEmployee.employeeId || ""}
-                    onChange={(e) =>
-                      setEditingEmployee((prev) =>
-                        prev
-                          ? {
-                              ...prev,
-                              employeeId: e.target.value,
-                            }
-                          : prev
-                      )
-                    }
-                    className="w-full"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="p-6 border-t border-gray-200">
-              <Button
-                onClick={handleSaveEdit}
-                disabled={isSavingEdit || editingEmployee.isSigner}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-              >
-                {isSavingEdit ? (
-                  <span className="inline-flex items-center"><Loader2 size={16} className="animate-spin mr-2" />Saving...</span>
-                ) : (
-                  "Save Changes"
-                )}
-              </Button>
-            </div>
-          </div>
+    <div className="flex flex-col gap-3 px-1 lg:px-10">
+      <div className="flex flex-col items-start justify-between gap-4 lg:flex-row lg:items-center">
+        <div className="flex flex-col gap-1">
+          <p className="text-xs text-gray-500">
+            <Link href={base} className="hover:underline">
+              Dashboard
+            </Link>{" "}
+            &rsaquo; Employees
+          </p>
+          <h1 className="font-nohemi text-3xl text-gray-600 lg:text-4xl">Employees</h1>
         </div>
-      )}
 
-      {pendingDeleteUsername && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg w-full max-w-md overflow-hidden">
-            <div className="flex items-center justify-between p-6 border-b border-gray-200">
-              <h2 className="text-xl font-semibold text-gray-900">Remove Employee</h2>
-              <button onClick={() => setPendingDeleteUsername(null)} className="text-gray-400 hover:text-gray-600">
-                <X size={24} />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-2">
-              <p className="text-sm text-gray-700">Are you sure you want to remove this employee from the organization?</p>
-              <p className="text-sm text-gray-900 font-medium">@{pendingDeleteUsername}</p>
-            </div>
-
-            <div className="p-6 border-t border-gray-200 flex gap-3 justify-end">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setPendingDeleteUsername(null)}
-                disabled={isDeleting}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                onClick={async () => {
-                  const username = pendingDeleteUsername
-                  setPendingDeleteUsername(null)
-                  await handleDeleteEmployee(username)
-                }}
-                disabled={isDeleting}
-                className="bg-red-600 hover:bg-red-700 text-white"
-              >
-                {isDeleting ? (
-                  <span className="inline-flex items-center"><Loader2 size={16} className="animate-spin mr-2" />Removing...</span>
-                ) : (
-                  "Remove"
-                )}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <p className="text-sm text-gray-500 mb-2">Dashboard › Employees</p>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Employees</h1>
-        </div>
-        <div className="flex items-center gap-3">
-          <Button
-            onClick={() => setShowAddEmployeeModal(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white gap-2"
-          >
-            + Add Employees
-          </Button>
-          <InviteLinkButton organizationId={organization?.id} />
-          <Button variant="outline" className="gap-2 bg-transparent">
-            Export
-            <ArrowUpDown size={16} />
-          </Button>
+        <div className="flex flex-wrap items-center gap-4">
+          <PillButton asChild tone="soft" className="h-11">
+            <Link href={`${base}/payments`}>Create Batch Payment</Link>
+          </PillButton>
+          <PillButton tone="primary" className="h-11" onClick={() => setShowAddEmployeeModal(true)}>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M4 8h8M8 4v8" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+            Add Employees
+          </PillButton>
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((stat) => (
-          <Card key={stat.label} className="p-6">
-            <p className="text-sm text-gray-600 mb-2">{stat.label}</p>
-            <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
-            {stat.lastUpdated && <p className="text-xs text-gray-500 mt-2">Last updated: {stat.lastUpdated}</p>}
-          </Card>
-        ))}
+      <div className="flex flex-wrap items-center gap-x-8 gap-y-3 rounded-lg bg-white px-5 py-4 outline outline-[0.5px] -outline-offset-[0.5px] outline-zinc-100">
+        <Stat label="Total Employees" value={String(totalEmployees)} />
+        <Divider />
+        <Stat label="Joined" value={String(joinedCount)} />
+        <Divider />
+        <Stat label="Pending Invitations" value={String(pendingCount)} />
+        <div className="ml-auto flex items-center gap-2">
+          <span className="text-sm text-neutral-500">Available Balance ({symbol || "--"}):</span>
+          <span className="font-nohemi text-base font-semibold text-[#1D1E49]">
+            {treasuryBalance === null
+              ? "--"
+              : treasuryBalance.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+          </span>
+        </div>
       </div>
 
-      {/* Employees List */}
-      <Card className="p-4 sm:p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-semibold text-gray-900">Employee&apos;s List</h3>
-        </div>
-
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 mb-6">
-          <div className="flex-1 relative">
-            <Search size={18} className="absolute left-3 top-3 text-gray-400" />
+      <SectionCard title="Employee's List">
+        <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
+          <div className="relative flex-1">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <Input
-              placeholder="Search for Employee"
-              className="pl-10"
+              placeholder="Search employees by name, username..."
+              className="pl-9"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <div className="flex gap-2 relative">
-            {/* Filter Dropdown */}
-            <div className="relative" ref={filterRef}>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="gap-2 bg-transparent"
-                onClick={() => setShowFilterDropdown(!showFilterDropdown)}
-              >
-                <Filter size={16} />
-                {getFilterLabel()}
-                <ChevronDown size={14} />
-              </Button>
-              {showFilterDropdown && (
-                <div className="absolute top-full left-0 mt-1 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-20 py-1">
-                  {filterOptions.map((option) => (
-                    <button
-                      key={option.value}
-                      onClick={() => {
-                        setFilterBy(option.value as typeof filterBy)
-                        setShowFilterDropdown(false)
-                      }}
-                      className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 ${
-                        filterBy === option.value ? "bg-blue-50 text-blue-600" : "text-gray-700"
-                      }`}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
 
-            {/* Sort Dropdown */}
-            <div className="relative" ref={sortRef}>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="gap-2 bg-transparent"
-                onClick={() => setShowSortDropdown(!showSortDropdown)}
-              >
-                <ArrowUpDown size={16} />
-                {getSortLabel()}
-                <ChevronDown size={14} />
-              </Button>
-              {showSortDropdown && (
-                <div className="absolute top-full left-0 mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-20 py-1">
-                  {sortOptions.map((option) => (
-                    <button
-                      key={option.value}
-                      onClick={() => {
-                        setSortBy(option.value as typeof sortBy)
-                        setShowSortDropdown(false)
-                      }}
-                      className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 ${
-                        sortBy === option.value ? "bg-blue-50 text-blue-600" : "text-gray-700"
-                      }`}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+          <div className="flex gap-2">
+            <Dropdown
+              ref={filterRef}
+              icon={<Filter size={14} />}
+              prefix="Filters :"
+              label={filterOptions.find((o) => o.value === filterBy)?.label ?? "All"}
+              open={showFilterDropdown}
+              onToggle={() => setShowFilterDropdown((v) => !v)}
+              options={filterOptions}
+              value={filterBy}
+              onSelect={(v) => {
+                setFilterBy(v as typeof filterBy)
+                setShowFilterDropdown(false)
+              }}
+            />
+            <Dropdown
+              ref={sortRef}
+              icon={<ArrowUpDown size={14} />}
+              prefix="Sort :"
+              label={sortOptions.find((o) => o.value === sortBy)?.label ?? "Alphabet"}
+              open={showSortDropdown}
+              onToggle={() => setShowSortDropdown((v) => !v)}
+              options={sortOptions}
+              value={sortBy}
+              onSelect={(v) => {
+                setSortBy(v as typeof sortBy)
+                setShowSortDropdown(false)
+              }}
+            />
           </div>
         </div>
 
         <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-12">#</TableHead>
-                <TableHead>SURNAME</TableHead>
-                <TableHead>FIRST NAME</TableHead>
-                <TableHead>USERNAME</TableHead>
-                <TableHead>WALLET ADDRESS</TableHead>
-                <TableHead>ROLE</TableHead>
-                <TableHead>SALARY ({symbol})</TableHead>
-                <TableHead>LAST UPDATED BY</TableHead>
-                <TableHead className="w-12">ACTION</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredEmployees.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={9} className="py-8 text-center text-gray-500">
+          <table className="w-full min-w-[1080px] table-fixed text-left">
+            <colgroup>
+              <col className="w-10" />
+              <col className="w-[11%]" />
+              <col className="w-[11%]" />
+              <col className="w-[16%]" />
+              <col className="w-[11%]" />
+              <col className="w-[13%]" />
+              <col className="w-[11%]" />
+              <col className="w-[12%]" />
+              <col className="w-[13%]" />
+              <col className="w-12" />
+            </colgroup>
+            <thead>
+              <tr className="border-y border-gray-100 bg-neutral-100">
+                <Th>#</Th>
+                <Th>SURNAME</Th>
+                <Th>FIRST NAME</Th>
+                <Th>EMAIL</Th>
+                <Th>PHONE</Th>
+                <Th>ROLE</Th>
+                <Th className="text-right">SALARY ({symbol || "--"})</Th>
+                <Th>USERNAME</Th>
+                <Th>WALLET ADDRESS</Th>
+                <Th className="text-right">ACTION</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {paginated.length === 0 ? (
+                <tr>
+                  <td colSpan={10} className="py-10 text-center text-sm text-gray-500">
                     No employees found. Add your first employee to get started.
-                  </TableCell>
-                </TableRow>
+                  </td>
+                </tr>
               ) : (
-                paginatedEmployees.map((employee, index) => (
-                  <TableRow key={employee.id}>
-                    <TableCell className="font-medium text-gray-900">{startIndex + index + 1}</TableCell>
-                    <TableCell className="text-gray-700">{employee.surname}</TableCell>
-                    <TableCell className="text-gray-700">{employee.firstName}</TableCell>
-                    <TableCell className="text-gray-700">{employee.displayUsername || employee.username}</TableCell>
-                    <TableCell className="text-gray-700">
-                      <WalletAddress address={employee.walletAddress} />
-                    </TableCell>
-                    <TableCell className="text-gray-700">
+                paginated.map((employee, index) => (
+                  <tr
+                    key={employee.id}
+                    className="border-b border-gray-100 transition-colors hover:bg-surface-canvas"
+                  >
+                    <Td className="text-gray-500">{startIndex + index + 1}</Td>
+                    <Td className="truncate font-medium text-neutral-800">{employee.surname || "--"}</Td>
+                    <Td className="truncate text-neutral-700">{employee.firstName || "--"}</Td>
+                    <Td className="truncate text-indigo-600">{employee.email || "--"}</Td>
+                    <Td className="truncate text-neutral-600">{employee.phoneNumber || "--"}</Td>
+                    <Td className="truncate text-neutral-700">
                       {employee.isSigner ? (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
+                        <span className="inline-flex items-center rounded-full bg-purple-100 px-2 py-1 text-xs font-medium text-purple-700">
                           Signer
                         </span>
                       ) : (
-                        <span className="text-gray-600">{employee.role}</span>
+                        employee.role
                       )}
-                    </TableCell>
-                    <TableCell className="text-gray-900 font-medium">{employee.salary.toLocaleString()}</TableCell>
-                    <TableCell className="text-gray-700">
-                      {renderLastUpdatedBy(employee)}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          type="button"
-                          className="p-1 hover:bg-gray-100 rounded transition-colors disabled:opacity-50"
-                          title={employee.isSigner ? "Signers cannot be edited" : "Edit"}
-                          onClick={() => {
-                            setEditingEmployee({
-                              id: employee.id,
-                              username: employee.username,
-                              displayUsername: employee.displayUsername,
-                              jobRole: employee.role,
-                              salary: String(employee.salary || ""),
-                              department: employee.department,
-                              employeeId: employee.employeeId,
-                              isSigner: employee.isSigner,
-                            })
-                          }}
-                          disabled={employee.isSigner}
-                        >
-                          <Pencil size={16} className="text-gray-600" />
-                        </button>
-                        <button
-                          type="button"
-                          className="p-1 hover:bg-gray-100 rounded transition-colors disabled:opacity-50"
-                          title={employee.isSigner ? "Signers cannot be removed" : "Remove"}
-                          onClick={() => setPendingDeleteUsername(employee.username)}
-                          disabled={employee.isSigner || isDeleting}
-                        >
-                          <Trash2 size={16} className={employee.isSigner ? "text-gray-400" : "text-red-600"} />
-                        </button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
+                    </Td>
+                    <Td className="text-right font-semibold text-neutral-800">
+                      {employee.salary.toLocaleString()}
+                    </Td>
+                    <Td className="truncate text-neutral-600">
+                      {employee.hasJoined ? (
+                        employee.displayUsername || employee.username || "--"
+                      ) : (
+                        <Badge>Not Joined</Badge>
+                      )}
+                    </Td>
+                    <Td className="truncate font-mono text-neutral-600">
+                      {employee.walletAddress ? (
+                        shortAddress(employee.walletAddress)
+                      ) : (
+                        <Badge>Not Connected</Badge>
+                      )}
+                    </Td>
+                    <Td>
+                      <EmployeeActions
+                        hasJoined={employee.hasJoined}
+                        isSigner={employee.isSigner}
+                        onEdit={() => openEdit(employee)}
+                        onAddAsSigner={() => setPendingSigner(employee)}
+                        onSendReminder={() => setPendingReminder(employee)}
+                        onSuspend={() => setPendingSuspend(employee)}
+                      />
+                    </Td>
+                  </tr>
                 ))
               )}
-            </TableBody>
-          </Table>
+            </tbody>
+          </table>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-6">
+        <div className="flex flex-col items-center justify-between gap-3 sm:flex-row">
           <div className="flex items-center gap-3 text-sm text-gray-600">
             <span>
               Page {safePage} of {totalPages}
             </span>
-            <div className="flex items-center gap-2">
-              <span>Rows:</span>
+            <span className="flex items-center gap-2">
+              Rows:
               <select
                 value={limit}
                 onChange={(e) => setLimit(Number(e.target.value))}
-                disabled={loading}
-                className="h-9 rounded border border-gray-200 bg-white px-2 text-sm text-gray-700 disabled:opacity-50"
+                className="h-9 rounded border border-gray-200 bg-white px-2 text-sm text-gray-700"
               >
                 <option value={10}>10</option>
                 <option value={25}>25</option>
                 <option value={50}>50</option>
               </select>
-            </div>
+            </span>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-center gap-3">
-            <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={safePage <= 1}
+              className="rounded border border-gray-200 px-3 py-2 text-sm text-gray-700 disabled:opacity-50"
+            >
+              Prev
+            </button>
+            <button
+              type="button"
+              onClick={() => setPage((p) => p + 1)}
+              disabled={safePage >= totalPages}
+              className="rounded border border-gray-200 px-3 py-2 text-sm text-gray-700 disabled:opacity-50"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      </SectionCard>
+
+      {showAddEmployeeModal ? (
+        <AddEmployeeModal
+          organizationId={organization?.id}
+          onClose={() => setShowAddEmployeeModal(false)}
+          onEmployeeAdded={() => {
+            setShowAddEmployeeModal(false)
+            refresh()
+          }}
+        />
+      ) : null}
+
+      {editing ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-lg overflow-hidden rounded-lg bg-white">
+            <div className="flex items-center justify-between border-b border-gray-200 p-6">
+              <h2 className="font-nohemi text-xl text-[#1D1E49]">Edit Employee</h2>
               <button
                 type="button"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={safePage <= 1 || loading}
-                className="px-3 py-2 rounded border border-gray-200 text-sm text-gray-700 disabled:opacity-50"
+                onClick={() => setEditing(null)}
+                aria-label="Close"
+                className="text-gray-400 hover:text-gray-600"
               >
-                Prev
+                <X size={20} />
               </button>
+            </div>
 
-              <div className="flex items-center gap-1">
-                {(() => {
-                  let ellipsisCount = 0
-                  return pageItems.map((item) => {
-                    if (item === "...") {
-                      ellipsisCount += 1
-                      const side = ellipsisCount === 1 ? "left" : "right"
-                      return (
-                        <span key={`ellipsis-${side}`} className="px-2 text-gray-500">
-                          ...
-                        </span>
-                      )
-                    }
+            <div className="space-y-4 p-6">
+              <Field label="Username">
+                <Input value={editing.displayUsername || editing.username || "--"} disabled />
+              </Field>
 
-                    const isActive = item === safePage
-                    return (
-                      <button
-                        key={item}
-                        type="button"
-                        onClick={() => setPage(item)}
-                        disabled={loading}
-                        className={`h-9 min-w-9 rounded border text-sm disabled:opacity-50 ${
-                          isActive
-                            ? "border-gray-900 bg-gray-900 text-white"
-                            : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
-                        }`}
-                      >
-                        {item}
-                      </button>
-                    )
-                  })
-                })()}
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Job Role">
+                  <Input
+                    value={editDraft.jobRole}
+                    onChange={(e) => setEditDraft((d) => ({ ...d, jobRole: e.target.value }))}
+                  />
+                </Field>
+                <Field label="Department">
+                  <Input
+                    value={editDraft.department}
+                    onChange={(e) => setEditDraft((d) => ({ ...d, department: e.target.value }))}
+                  />
+                </Field>
               </div>
 
-              <button
-                type="button"
-                onClick={() => setPage((p) => p + 1)}
-                disabled={safePage >= totalPages || loading}
-                className="px-3 py-2 rounded border border-gray-200 text-sm text-gray-700 disabled:opacity-50"
+              <div className="grid grid-cols-2 gap-4">
+                <Field label={`Salary (${symbol || "--"})`}>
+                  <Input
+                    type="number"
+                    value={editDraft.salary}
+                    onChange={(e) => setEditDraft((d) => ({ ...d, salary: e.target.value }))}
+                  />
+                </Field>
+                <Field label="Employee ID">
+                  <Input
+                    value={editDraft.employeeId}
+                    onChange={(e) => setEditDraft((d) => ({ ...d, employeeId: e.target.value }))}
+                  />
+                </Field>
+              </div>
+            </div>
+
+            <div className="border-t border-gray-200 p-6">
+              <PillButton
+                tone="primary"
+                className="w-full"
+                onClick={handleSaveEdit}
+                disabled={isSavingEdit}
               >
-                Next
-              </button>
+                {isSavingEdit ? <Loader2 className="size-4 animate-spin" /> : null}
+                Save Changes
+              </PillButton>
             </div>
           </div>
         </div>
-      </Card>
+      ) : null}
 
-      {showAddEmployeeModal && (
-        <AddEmployeeModal 
-          organizationId={organization?.id}
-          onClose={() => setShowAddEmployeeModal(false)} 
-          onEmployeeAdded={handleEmployeeAdded}
+      {pendingSuspend ? (
+        <ConfirmModal
+          icon={<SuspendIcon />}
+          title="Suspend employee?"
+          body={
+            <>
+              {pendingSuspend.firstName || "This employee"} will no longer be eligible to receive
+              payments from the organization while suspended.
+            </>
+          }
+          confirmLabel="Yes, Suspend employee"
+          tone="danger"
+          busy={isWorking}
+          onCancel={() => setPendingSuspend(null)}
+          onConfirm={handleSuspend}
         />
-      )}
+      ) : null}
+
+      {pendingSigner ? (
+        <ConfirmModal
+          icon={<SignerIcon />}
+          title="Add as signer"
+          body={
+            <>
+              Are you sure you want to add {pendingSigner.firstName || "this employee"} as an
+              authorized signer for this organization?
+            </>
+          }
+          confirmLabel="Yes, Add Signer"
+          busy={isWorking}
+          onCancel={() => setPendingSigner(null)}
+          onConfirm={handleAddAsSigner}
+        />
+      ) : null}
+
+      {pendingReminder ? (
+        <ConfirmModal
+          icon={<span className="text-4xl">🔔</span>}
+          title="Send reminder?"
+          body={
+            <>
+              A new invitation link will be sent to{" "}
+              <span className="font-semibold text-neutral-800">{pendingReminder.email}</span>
+            </>
+          }
+          confirmLabel="Yes, Send Reminder"
+          busy={isWorking}
+          onCancel={() => setPendingReminder(null)}
+          onConfirm={handleSendReminder}
+        />
+      ) : null}
     </div>
   )
 }
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <span className="flex items-center gap-2">
+      <span className="text-sm text-neutral-500">{label} :</span>
+      <span className="font-nohemi text-base font-semibold text-[#1D1E49]">{value}</span>
+    </span>
+  )
+}
+
+function Divider() {
+  return <span className="hidden h-6 w-px bg-neutral-200 sm:block" />
+}
+
+function Badge({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="inline-flex items-center rounded-md bg-neutral-100 px-2 py-1 text-[11px] font-medium text-neutral-500">
+      {children}
+    </span>
+  )
+}
+
+function Th({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return (
+    <th className={`px-2 py-3 text-xs font-normal tracking-wide text-neutral-600 ${className}`}>
+      {children}
+    </th>
+  )
+}
+
+function Td({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return <td className={`px-2 py-3 text-xs ${className}`}>{children}</td>
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="block">
+      <span className="mb-1 block text-sm font-medium text-gray-700">{label}</span>
+      {children}
+    </label>
+  )
+}
+
+function SuspendIcon() {
+  return (
+    <svg width="48" height="48" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+      <circle cx="20" cy="15" r="7" fill="#1D1E49" />
+      <path d="M8 40c0-6.6 5.4-12 12-12s12 5.4 12 12" fill="#1D1E49" />
+      <rect x="34" y="10" width="4" height="14" rx="1.5" fill="#F97316" />
+      <rect x="40" y="10" width="4" height="14" rx="1.5" fill="#F97316" />
+    </svg>
+  )
+}
+
+function SignerIcon() {
+  return (
+    <svg width="48" height="48" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+      <circle cx="20" cy="15" r="7" fill="#1D1E49" />
+      <path d="M8 40c0-6.6 5.4-12 12-12s12 5.4 12 12" fill="#1D1E49" />
+      <path
+        d="M41.5 12.5 34 20l-1 4 4-1 7.5-7.5a1.8 1.8 0 0 0 0-2.5l-.5-.5a1.8 1.8 0 0 0-2.5 0Z"
+        fill="#4F51D9"
+      />
+    </svg>
+  )
+}
+
+type DropdownProps = {
+  icon: React.ReactNode
+  prefix: string
+  label: string
+  open: boolean
+  onToggle: () => void
+  options: { value: string; label: string }[]
+  value: string
+  onSelect: (value: string) => void
+}
+
+const Dropdown = ({
+  ref,
+  icon,
+  prefix,
+  label,
+  open,
+  onToggle,
+  options,
+  value,
+  onSelect,
+}: DropdownProps & { ref: React.RefObject<HTMLDivElement | null> }) => (
+  <div className="relative" ref={ref}>
+    <button
+      type="button"
+      onClick={onToggle}
+      className="flex items-center gap-2 rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-700 transition-colors hover:bg-neutral-50"
+    >
+      {icon}
+      <span className="text-neutral-500">{prefix}</span>
+      {label}
+      <ChevronDown size={14} />
+    </button>
+    {open ? (
+      <div className="absolute right-0 top-full z-30 mt-1 w-56 overflow-hidden rounded-lg border border-neutral-200 bg-white py-1 shadow-lg">
+        {options.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            onClick={() => onSelect(option.value)}
+            className={`block w-full px-4 py-2 text-left text-sm transition-colors hover:bg-[#EEF0FC] ${
+              value === option.value ? "bg-[#EEF0FC] text-[#4F51D9]" : "text-neutral-700"
+            }`}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+    ) : null}
+  </div>
+)
