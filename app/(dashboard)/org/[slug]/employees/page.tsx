@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Search, ArrowUpDown, Loader2, ChevronDown, Filter, X } from "lucide-react"
 import { AddEmployeesDrawer } from "@/components/employees/add-employees-drawer"
 import { ConfirmModal } from "@/components/employees/confirm-modal"
+import { InviteLinkBar } from "@/components/employees/invite-link-bar"
 import { EmployeeActions } from "@/components/employees/employee-actions"
 import { PillButton } from "@/components/ui/pill-button"
 import { SectionCard } from "@/components/dashboard/section-card"
@@ -393,6 +394,8 @@ export default function EmployeesPage() {
         </div>
       </div>
 
+      {organization?.id ? <InviteLinkBar organizationId={organization.id} /> : null}
+
       <SectionCard title="Employee's List">
         <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
           <div className="relative flex-1">
@@ -682,8 +685,10 @@ export default function EmployeesPage() {
           title="Send reminder?"
           body={
             <>
-              A new invitation link will be sent to{" "}
-              <span className="font-semibold text-neutral-800">{pendingReminder.email}</span>
+              We will try to email{" "}
+              <span className="font-semibold text-neutral-800">{pendingReminder.email}</span>.
+              Delivery is limited at the moment, so copy the invitation link above the list and
+              send it yourself if it does not arrive.
             </>
           }
           confirmLabel="Yes, Send Reminder"

@@ -188,7 +188,7 @@ export function AddEmployeesDrawer({
             <Actions
               onCancel={onClose}
               onConfirm={handleSubmit}
-              confirmLabel="Add & Send Invite"
+              confirmLabel="Add Employees"
               busy={busy}
               disabled={!manualReady}
             />
@@ -198,7 +198,7 @@ export function AddEmployeesDrawer({
             <Actions
               onCancel={onClose}
               onConfirm={handleSubmit}
-              confirmLabel="Add & Send Invite"
+              confirmLabel="Add Employees"
               busy={busy}
               disabled={review.added === 0}
             />
@@ -362,7 +362,7 @@ function ManualForm({
       <div className="flex flex-col gap-1">
         <h3 className="font-inter text-sm font-medium text-zinc-800">Add Employees Manually</h3>
         <p className="font-inter text-xs text-neutral-500">
-          Enter the employee&rsquo;s details. An invitation will be sent to their email address.
+          Enter the employee&rsquo;s details, then share the invitation link with them.
         </p>
       </div>
 
@@ -583,15 +583,12 @@ function Done({ results }: Readonly<{ results: SeedResults }>) {
 
       <div className="w-full rounded-lg bg-[#F7F8FE] p-4 text-left">
         <div className="mb-2 flex items-center gap-2">
-          <Image src="/icons/sms.svg" alt="" width={16} height={16} />
-          <span className="font-inter text-xs font-medium text-zinc-800">
-            {results.invitesSent ? "Invitation Sent" : "Invitation not sent"}
-          </span>
+          <Image src="/icons/linear_copy.svg" alt="" width={16} height={16} />
+          <span className="font-inter text-xs font-medium text-zinc-800">Share the join link</span>
         </div>
         <p className="font-inter text-[11px] leading-4 text-neutral-500">
-          {results.invitesSent
-            ? "An invitation has been sent to each employee's email address."
-            : "The records were saved, but the emails could not be sent. Use Send Reminder on each row to try again."}
+          Copy the invitation link above the employee list and send it to them yourself. Email
+          delivery is limited at the moment, so the link is the reliable way in.
         </p>
         <p className="mt-2 font-inter text-[11px] leading-4 text-neutral-500">
           Employees will appear as Pending until they join the organization and complete their
