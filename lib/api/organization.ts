@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useAuthCompleted } from "@/hooks/useAutoAuthenticate";
 import { useCachedResource } from "@/hooks/useCachedResource";
 import { enqueueBackendSyncJob } from "@/lib/backend-sync-queue";
+import { TRANSACTION_HISTORY_ENABLED } from "@/lib/features";
 
 // Types
 export interface Organization {
@@ -814,7 +815,10 @@ export function useTransactionSummary(
     .map((v) => v ?? "")
     .join("|");
 
-  const key = normalized ? `summary:${normalized}:${filterKey}` : null;
+  const key =
+    normalized && TRANSACTION_HISTORY_ENABLED
+      ? `summary:${normalized}:${filterKey}`
+      : null;
 
   const fetcher = useCallback(
     () =>
@@ -873,7 +877,10 @@ export function useTransactionHistory(
     .map((v) => v ?? "")
     .join("|");
 
-  const key = normalized ? `history:${normalized}:${filterKey}` : null;
+  const key =
+    normalized && TRANSACTION_HISTORY_ENABLED
+      ? `history:${normalized}:${filterKey}`
+      : null;
 
   const fetcher = useCallback(
     () =>

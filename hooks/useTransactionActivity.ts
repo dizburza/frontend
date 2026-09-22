@@ -3,6 +3,7 @@
 import { useCallback, useMemo } from "react";
 import { useActiveAccount } from "thirdweb/react";
 import { useCachedResource } from "@/hooks/useCachedResource";
+import { TRANSACTION_HISTORY_ENABLED } from "@/lib/features";
 import {
   ChartBucket,
   TransactionChart,
@@ -44,8 +45,9 @@ export default function useTransactionActivity(params?: {
   const bucket = params?.bucket ?? "month";
   const staleTimeMs = params?.staleTimeMs ?? 60_000;
 
-  const summaryKey = walletAddress ? `summary:${walletAddress}:${range}` : null;
-  const chartKey = walletAddress ? `chart:${walletAddress}:${range}:${bucket}` : null;
+  const active = walletAddress && TRANSACTION_HISTORY_ENABLED;
+  const summaryKey = active ? `summary:${walletAddress}:${range}` : null;
+  const chartKey = active ? `chart:${walletAddress}:${range}:${bucket}` : null;
 
   const summaryFetcher = useCallback(
     () => fetchTransactionSummary(walletAddress, range),
