@@ -601,6 +601,63 @@ export async function remindEmployee(organizationId: string, membershipId: strin
   );
 }
 
+export interface EmployeeSeed {
+  surname: string;
+  firstname: string;
+  email: string;
+  phone?: string;
+  jobRole: string;
+  salary: string;
+}
+
+export interface SeedOutcome extends EmployeeSeed {
+  row: number;
+  phone: string;
+  status: "added" | "skipped" | "error";
+  message?: string;
+}
+
+export interface SeedResults {
+  added: number;
+  skipped: number;
+  failed: number;
+  invitesSent: boolean;
+  details: SeedOutcome[];
+}
+
+type SeedPayload = { employees: EmployeeSeed[] } | { csvData: string };
+
+/** What a batch would do, before anything is written or any invitation sent. */
+export async function reviewEmployees(
+  organizationId: string,
+  payload: SeedPayload
+): Promise<SeedResults> {
+  const response = await apiFetch(`/api/organizations/${organizationId}/employees/review`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+  return response.data as SeedResults;
+}
+
+/**
+ * Seeds the memberships and mails the join link.
+ *
+ * Not queued for background retry like the other writes here: it sends email,
+ * so replaying it would invite everyone twice.
+ */
+export async function addEmployees(
+  organizationId: string,
+  payload: SeedPayload
+): Promise<SeedResults> {
+  const response = await apiFetch(`/api/organizations/${organizationId}/employees/batch`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+  return response.data as SeedResults;
+}
+
 export interface ApiSignerChangeProposal {
   id: string;
   organizationId: string;

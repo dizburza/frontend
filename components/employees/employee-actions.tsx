@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { MoreVertical } from "lucide-react";
+import Image from "next/image";
 
 type EmployeeActionsProps = {
   /** Only a joined employee has a wallet address, so only they can be a signer. */
@@ -57,7 +57,7 @@ export function EmployeeActions({
         aria-label="Employee actions"
         className="rounded p-1 text-gray-500 transition-colors hover:bg-gray-100"
       >
-        <MoreVertical size={16} />
+        <Image src="/icons/mingcute_more-2-fill.svg" alt="" width={16} height={16} className="size-4" />
       </button>
 
       {open ? (

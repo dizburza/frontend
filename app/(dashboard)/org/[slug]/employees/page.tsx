@@ -2,10 +2,11 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
+import Image from "next/image"
 import { toast } from "sonner"
 import { Input } from "@/components/ui/input"
 import { Search, ArrowUpDown, Loader2, ChevronDown, Filter, X } from "lucide-react"
-import { AddEmployeeModal } from "@/components/employees/add-employee-modal"
+import { AddEmployeesDrawer } from "@/components/employees/add-employees-drawer"
 import { ConfirmModal } from "@/components/employees/confirm-modal"
 import { EmployeeActions } from "@/components/employees/employee-actions"
 import { PillButton } from "@/components/ui/pill-button"
@@ -225,6 +226,46 @@ export default function EmployeesPage() {
    * contract enforces that either way; this only picks the call that will not
    * revert, and records the proposal so other signers can see it waiting.
    */
+  /**
+   * Exports what the filters are currently showing rather than the whole
+   * roster, since the figure on screen is the one someone means to take away.
+   */
+  const handleExport = () => {
+    if (filtered.length === 0) {
+      toast.message("There is nothing to export")
+      return
+    }
+
+    const quote = (value: string | number | null | undefined) => {
+      const text = String(value ?? "")
+      return /[",\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text
+    }
+
+    const rows = [
+      ["Surname", "First Name", "Email", "Phone", "Role", `Salary (${symbol || ""})`, "Username", "Wallet Address", "Status"],
+      ...filtered.map((e) => [
+        e.surname,
+        e.firstName,
+        e.email ?? "",
+        e.phoneNumber ?? "",
+        e.role ?? "",
+        e.salary,
+        e.username,
+        e.walletAddress ?? "",
+        e.hasJoined ? "Joined" : "Not Joined",
+      ]),
+    ]
+      .map((row) => row.map(quote).join(","))
+      .join("\n")
+
+    const url = URL.createObjectURL(new Blob([rows], { type: "text/csv" }))
+    const link = document.createElement("a")
+    link.href = url
+    link.download = `${organization?.slug ?? "employees"}-employees.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
   const handleAddAsSigner = async () => {
     if (!pendingSigner || !organization?.id || !organization.contractAddress) return
 
@@ -317,31 +358,38 @@ export default function EmployeesPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-4">
-          <PillButton asChild tone="soft" className="h-11">
-            <Link href={`${base}/payments`}>Create Batch Payment</Link>
-          </PillButton>
           <PillButton tone="primary" className="h-11" onClick={() => setShowAddEmployeeModal(true)}>
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
               <path d="M4 8h8M8 4v8" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
             </svg>
             Add Employees
           </PillButton>
+          <PillButton asChild tone="soft" className="h-11">
+            <Link href={`${base}/payments`}>Create Batch Payment</Link>
+          </PillButton>
+          <PillButton tone="soft" className="h-11" onClick={handleExport}>
+            Export
+            <Image src="/icons/export.svg" alt="" width={16} height={16} className="size-4" />
+          </PillButton>
         </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-x-8 gap-y-3 rounded-lg bg-white px-5 py-4 outline outline-[0.5px] -outline-offset-[0.5px] outline-zinc-100">
-        <Stat label="Total Employees" value={String(totalEmployees)} />
+        <Stat label="Total Employees" value={String(totalEmployees)} icon="/icons/people.svg" />
         <Divider />
-        <Stat label="Joined" value={String(joinedCount)} />
+        <Stat label="Joined" value={String(joinedCount)} icon="/icons/briefcase.svg" />
         <Divider />
-        <Stat label="Pending Invitations" value={String(pendingCount)} />
-        <div className="ml-auto flex items-center gap-2">
-          <span className="text-sm text-neutral-500">Available Balance ({symbol || "--"}):</span>
-          <span className="font-nohemi text-base font-semibold text-[#1D1E49]">
-            {treasuryBalance === null
-              ? "--"
-              : treasuryBalance.toLocaleString(undefined, { maximumFractionDigits: 2 })}
-          </span>
+        <Stat label="Pending Invitations" value={String(pendingCount)} icon="/icons/note-2.svg" />
+        <div className="ml-auto">
+          <Stat
+            label={`Available Balance (${symbol || "--"})`}
+            value={
+              treasuryBalance === null
+                ? "--"
+                : treasuryBalance.toLocaleString(undefined, { maximumFractionDigits: 2 })
+            }
+            icon="/icons/bank.svg"
+          />
         </div>
       </div>
 
@@ -518,14 +566,11 @@ export default function EmployeesPage() {
         </div>
       </SectionCard>
 
-      {showAddEmployeeModal ? (
-        <AddEmployeeModal
-          organizationId={organization?.id}
+      {showAddEmployeeModal && organization?.id ? (
+        <AddEmployeesDrawer
+          organizationId={organization.id}
           onClose={() => setShowAddEmployeeModal(false)}
-          onEmployeeAdded={() => {
-            setShowAddEmployeeModal(false)
-            refresh()
-          }}
+          onAdded={refresh}
         />
       ) : null}
 
@@ -598,7 +643,7 @@ export default function EmployeesPage() {
 
       {pendingSuspend ? (
         <ConfirmModal
-          icon={<SuspendIcon />}
+          icon={<Image src="/icons/glyphs-poly_user-comment.svg" alt="" width={56} height={56} />}
           title="Suspend employee?"
           body={
             <>
@@ -616,7 +661,7 @@ export default function EmployeesPage() {
 
       {pendingSigner ? (
         <ConfirmModal
-          icon={<SignerIcon />}
+          icon={<Image src="/icons/fa6-solid_user-pen.svg" alt="" width={56} height={56} />}
           title="Add as signer"
           body={
             <>
@@ -633,7 +678,7 @@ export default function EmployeesPage() {
 
       {pendingReminder ? (
         <ConfirmModal
-          icon={<span className="text-4xl">🔔</span>}
+          icon={<Image src="/icons/emojione-v1_bell.svg" alt="" width={56} height={56} />}
           title="Send reminder?"
           body={
             <>
@@ -651,11 +696,16 @@ export default function EmployeesPage() {
   )
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value, icon }: { label: string; value: string; icon: string }) {
   return (
-    <span className="flex items-center gap-2">
-      <span className="text-sm text-neutral-500">{label} :</span>
-      <span className="font-nohemi text-base font-semibold text-[#1D1E49]">{value}</span>
+    <span className="flex items-start gap-2">
+      <span className="flex size-6 shrink-0 items-center justify-center bg-white outline outline-[0.75px] -outline-offset-[0.75px] outline-indigo-50">
+        <Image src={icon} alt="" width={14} height={14} className="size-3.5" />
+      </span>
+      <span className="flex items-center gap-1">
+        <span className="font-nohemi text-[10px] text-gray-500">{label} :</span>
+        <span className="font-bricolage text-xl font-bold text-[#1D1E49]">{value}</span>
+      </span>
     </span>
   )
 }
@@ -690,30 +740,6 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       <span className="mb-1 block text-sm font-medium text-gray-700">{label}</span>
       {children}
     </label>
-  )
-}
-
-function SuspendIcon() {
-  return (
-    <svg width="48" height="48" viewBox="0 0 48 48" fill="none" aria-hidden="true">
-      <circle cx="20" cy="15" r="7" fill="#1D1E49" />
-      <path d="M8 40c0-6.6 5.4-12 12-12s12 5.4 12 12" fill="#1D1E49" />
-      <rect x="34" y="10" width="4" height="14" rx="1.5" fill="#F97316" />
-      <rect x="40" y="10" width="4" height="14" rx="1.5" fill="#F97316" />
-    </svg>
-  )
-}
-
-function SignerIcon() {
-  return (
-    <svg width="48" height="48" viewBox="0 0 48 48" fill="none" aria-hidden="true">
-      <circle cx="20" cy="15" r="7" fill="#1D1E49" />
-      <path d="M8 40c0-6.6 5.4-12 12-12s12 5.4 12 12" fill="#1D1E49" />
-      <path
-        d="M41.5 12.5 34 20l-1 4 4-1 7.5-7.5a1.8 1.8 0 0 0 0-2.5l-.5-.5a1.8 1.8 0 0 0-2.5 0Z"
-        fill="#4F51D9"
-      />
-    </svg>
   )
 }
 
