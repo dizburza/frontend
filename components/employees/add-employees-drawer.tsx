@@ -129,7 +129,15 @@ export function AddEmployeesDrawer({
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/40">
-      <aside className="flex h-full w-full max-w-[560px] flex-col bg-white shadow-2xl">
+      {/* The review is a table of eight columns and the rest is a single column
+          of fields, so it gets the room it needs and the form steps stay at a
+          readable measure rather than stretching a stack of inputs across the
+          screen. */}
+      <aside
+        className={`flex h-full w-full flex-col bg-white shadow-2xl transition-[max-width] duration-200 ${
+          stage === "review" ? "max-w-[1100px]" : "max-w-[560px]"
+        }`}
+      >
         <header className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
           <div className="flex items-center gap-3">
             {stage !== "choose" && stage !== "done" ? (
@@ -480,8 +488,8 @@ function ReviewList({ results, symbol }: Readonly<{ results: SeedResults; symbol
         </p>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full text-left">
+      <div className="-mx-6 overflow-x-auto px-6">
+        <table className="min-w-full text-left">
           <thead>
             <tr className="border-b border-gray-100">
               <Th>#</Th>
@@ -543,9 +551,12 @@ function StatusPill({
 
 type SeedOutcomeStatus = SeedResults["details"][number]["status"]
 
+// Every cell holds one value, so none of them wrap: a role broken across two
+// lines reads as two roles. The table scrolls sideways instead when a file
+// carries names or addresses longer than the panel.
 function Th({ children, className = "" }: Readonly<{ children: React.ReactNode; className?: string }>) {
   return (
-    <th className={`px-2 py-2 font-inter text-[10px] font-normal uppercase tracking-wide text-neutral-600 ${className}`}>
+    <th className={`whitespace-nowrap px-3 py-2 font-inter text-[10px] font-normal uppercase tracking-wide text-neutral-600 ${className}`}>
       {children}
     </th>
   )
@@ -553,7 +564,7 @@ function Th({ children, className = "" }: Readonly<{ children: React.ReactNode; 
 
 function Td({ children, className = "" }: Readonly<{ children: React.ReactNode; className?: string }>) {
   return (
-    <td className={`px-2 py-3 font-inter text-[11px] font-medium text-neutral-600 ${className}`}>
+    <td className={`whitespace-nowrap px-3 py-3 font-inter text-[11px] font-medium text-neutral-600 ${className}`}>
       {children}
     </td>
   )
