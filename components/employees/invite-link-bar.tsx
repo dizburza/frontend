@@ -1,10 +1,11 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import Image from "next/image"
 import { Check, Loader2, RefreshCw } from "lucide-react"
 import { toast } from "sonner"
 import { createOrganizationInvite, fetchOrganizationInvite } from "@/lib/api/invite"
+import { useCachedResource } from "@/hooks/useCachedResource"
 
 interface InviteLinkBarProps {
   organizationId: string
@@ -23,31 +24,22 @@ interface InviteLinkBarProps {
  * was not already on the staff list.
  */
 export function InviteLinkBar({ organizationId }: Readonly<InviteLinkBarProps>) {
-  const [token, setToken] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [issued, setIssued] = useState<string | null>(null)
   const [working, setWorking] = useState(false)
   const [copied, setCopied] = useState(false)
 
-  useEffect(() => {
-    let live = true
+  // A missing link is the normal empty state rather than a failure, so it
+  // resolves to null and the button below offers to create one.
+  const cached = useCachedResource<string | null>(
+    organizationId ? `organization:invite:${organizationId}` : null,
+    () => fetchOrganizationInvite(organizationId).catch(() => null),
+    { staleTimeMs: 300_000 }
+  )
 
-    void fetchOrganizationInvite(organizationId)
-      .then((value) => {
-        if (live) setToken(value)
-      })
-      .catch(() => {
-        // A missing link is the normal empty state, and the button below
-        // creates one, so there is nothing here worth interrupting anyone for.
-        if (live) setToken(null)
-      })
-      .finally(() => {
-        if (live) setLoading(false)
-      })
-
-    return () => {
-      live = false
-    }
-  }, [organizationId])
+  // What this component issued wins over the cached read, which is a moment
+  // behind after a replace.
+  const token = issued ?? cached.data
+  const loading = cached.isLoading
 
   const url = token ? `${globalThis.location?.origin ?? ""}/join/${token}` : ""
 
@@ -67,7 +59,7 @@ export function InviteLinkBar({ organizationId }: Readonly<InviteLinkBarProps>) 
     setWorking(true)
 
     try {
-      setToken(await createOrganizationInvite(organizationId))
+      setIssued(await createOrganizationInvite(organizationId))
       toast.success(replacing ? "New link created. The old one no longer works." : "Invitation link created")
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not create the link")

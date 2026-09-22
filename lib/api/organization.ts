@@ -967,50 +967,29 @@ export function useOrganizationBatches(organizationId: string | null) {
   return { data, loading, error, refresh };
 }
 
-// Hook for fetching organization by slug
+/**
+ * The organization behind a slug.
+ *
+ * Cached and deduplicated, because every card on the dashboard asks for this
+ * and each one used to open its own request: one page produced five identical
+ * round trips, and against a database this far away that is seconds of waiting
+ * for an answer already on screen.
+ */
 export function useOrganizationBySlug(slug: string | null) {
-  const [data, setData] = useState<Organization | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
-  
-  const refresh = () => setRefreshKey(k => k + 1);
+  const resource = useCachedResource<Organization>(
+    slug ? `organization:slug:${slug}` : null,
+    () => fetchOrganizationBySlug(slug!),
+    { staleTimeMs: 120_000 }
+  );
 
-  useEffect(() => {
-    if (!slug) {
-      setLoading(false);
-      return;
-    }
-
-    let cancelled = false;
-
-    async function loadOrganization() {
-      try {
-        setLoading(true);
-        setError(null);
-        const result = await fetchOrganizationBySlug(slug!);
-        if (!cancelled) {
-          setData(result);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Failed to load organization");
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    }
-
-    loadOrganization();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [slug, refreshKey]);
-  
-  return { data, loading, error, refresh };
+  return {
+    data: resource.data,
+    // Only while there is nothing to show: a revalidation behind cached data
+    // must not blank the page that is already rendered.
+    loading: resource.isLoading,
+    error: resource.error?.message ?? null,
+    refresh: resource.refresh,
+  };
 }
 
 // Helper to convert API employee to frontend Employee type

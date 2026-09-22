@@ -102,7 +102,12 @@ export function DashboardHeader() {
       return (u.slice(0, 2).toUpperCase() || "?");
     };
 
-    const roleLabel = (role: string = "user") => {
+    // The job title someone was given is more use here than the governance
+    // role, which the tabs on either side already imply.
+    const roleLabel = (role: string = "user", jobRole?: string | null) => {
+      const title = (jobRole || "").trim();
+      if (title) return title;
+
       const normalized = role.trim() || "user";
       return normalized.charAt(0).toUpperCase() + normalized.slice(1);
     };
@@ -117,6 +122,7 @@ export function DashboardHeader() {
           fullName?: string;
           avatar?: string;
           role?: string;
+          jobRole?: string | null;
           organizationSlug?: string;
         };
 
@@ -127,7 +133,7 @@ export function DashboardHeader() {
         setProfile({
           initials: computeInitials({ fullName: cached.fullName, username }),
           username,
-          role: roleLabel(role),
+          role: roleLabel(role, cached.jobRole),
           avatar: cached.avatar,
         });
 
@@ -151,7 +157,7 @@ export function DashboardHeader() {
         setProfile({
           initials: computeInitials({ fullName: user.fullName, username: user.username }),
           username: user.username,
-          role: roleLabel(user.role),
+          role: roleLabel(user.role, user.jobRole),
           avatar: user.avatar,
         });
 
