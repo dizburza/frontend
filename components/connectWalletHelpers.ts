@@ -336,7 +336,7 @@ export const useRedirectOnFirstConnect = (params: {
         if (!hasSessionFor(address)) return;
 
         settledFor.current = address;
-        router.push("/organization-setup/your-details");
+        router.push(`/join/${pendingInvite}/details`);
         return;
       }
 

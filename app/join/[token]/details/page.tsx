@@ -1,22 +1,18 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { OnboardingShell } from "@/components/organization-setup/onboarding-shell"
-import { OnboardingSteps } from "@/components/organization-setup/onboarding-steps"
 import { OnboardingButton } from "@/components/organization-setup/onboarding-button"
+import {
+  NotFoundInvitationModal,
+  type InvitationProblem,
+} from "@/components/organization-setup/not-found-invitation-modal"
 import { FieldInput } from "@/components/organization-setup/field-input"
-import { FieldSwitch } from "@/components/organization-setup/field-switch"
 import { fetchSessionProfile } from "@/lib/session"
 import { checkUsernameAvailable, updateOwnProfile } from "@/lib/api/profile"
-import { useToken } from "@/hooks/useToken"
-import {
-  CREATOR_EMPLOYMENT_KEY,
-  emptyCreatorEmployment,
-  readCreatorEmployment,
-  type CreatorEmployment,
-} from "@/lib/creator-employment"
+import { ClaimError, claimInvite, fetchInvite } from "@/lib/api/invite"
 
 type Details = {
   surname: string
@@ -44,24 +40,46 @@ const usernameMessage = (state: "idle" | "checking" | "available" | "taken" | "i
 }
 
 /**
- * Step one of creating an organization. Joining by invite link has its own
- * details form at /join/[token]/details, so this page no longer branches on
- * whether someone is here to join: it is the creator's flow only.
+ * The details form for someone joining by invite link, kept separate from
+ * the organization-creation onboarding it started as a branch of. The token
+ * lives in the URL rather than sessionStorage, so this page never has a path
+ * back into the creator's flow: there is nothing here to redirect to.
  */
-export default function YourDetailsPage() {
+export default function JoinDetailsPage() {
   const router = useRouter()
-  const { symbol } = useToken()
+  const params = useParams<{ token: string }>()
+  const token = params.token
 
   const [details, setDetails] = useState<Details>(empty)
-  const [employment, setEmployment] = useState<CreatorEmployment>(emptyCreatorEmployment)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [invitationProblem, setInvitationProblem] = useState<InvitationProblem | null>(null)
   // What was on the profile when the page loaded, so an untouched username is
   // not resubmitted as a change.
   const [initialUsername, setInitialUsername] = useState("")
   const [usernameState, setUsernameState] = useState<
     "idle" | "checking" | "available" | "taken" | "invalid"
   >("idle")
+
+  // Only the name is fetched. The page is already in its joining shape, so
+  // this fills a gap rather than changing the layout.
+  const [invitedTo, setInvitedTo] = useState<string | null>(null)
+
+  useEffect(() => {
+    let live = true
+    void fetchInvite(token)
+      .then((invite) => {
+        if (live) setInvitedTo(invite.organizationName)
+      })
+      .catch(() => {
+        // The link is dead, which the claim on submit will report properly.
+        // Nothing to say here beyond leaving the name out.
+      })
+
+    return () => {
+      live = false
+    }
+  }, [token])
 
   // Signing in already made the account, so anything it knows is prefilled and
   // someone coming back to edit sees what they entered rather than blanks.
@@ -82,9 +100,6 @@ export default function YourDetailsPage() {
       }
       setIsLoading(false)
     })
-
-    const saved = readCreatorEmployment()
-    if (saved) setEmployment(saved)
 
     return () => {
       live = false
@@ -122,10 +137,6 @@ export default function YourDetailsPage() {
     }
   }, [details.username, initialUsername])
 
-  const employmentComplete =
-    !employment.addToPayroll ||
-    (Boolean(employment.jobRole.trim()) && Number.parseFloat(employment.salary) > 0)
-
   const isComplete =
     Boolean(details.surname.trim()) &&
     Boolean(details.firstname.trim()) &&
@@ -133,8 +144,46 @@ export default function YourDetailsPage() {
     Boolean(details.phoneNumber.trim()) &&
     USERNAME_PATTERN.test(details.username.trim()) &&
     usernameState !== "taken" &&
-    usernameState !== "checking" &&
-    employmentComplete
+    usernameState !== "checking"
+
+  /**
+   * Claims the invitation the details were just filled in for.
+   *
+   * Every outcome lands somewhere final. Neither dead end here is a retryable
+   * error: they stay true regardless of how many times the same request is
+   * sent, so both go to a page that says so rather than back to a button.
+   */
+  const finishInvitation = async () => {
+    try {
+      await claimInvite(token)
+      toast.success("You have joined the organization")
+      router.push("/personal/wallet")
+      return
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not accept this invitation"
+
+      // Not on the staff list, which their employer has to fix.
+      if (error instanceof ClaimError && error.isNotInvited) {
+        const invite = await fetchInvite(token).catch(() => null)
+        setInvitationProblem({ reason: "not-invited", organization: invite?.organizationName ?? null })
+        setIsSubmitting(false)
+        return
+      }
+
+      // Someone else already completed this same row, which will not change
+      // by trying again with the same email either.
+      if (error instanceof ClaimError && error.isAlreadyClaimed) {
+        setInvitationProblem({ reason: "already-claimed" })
+        setIsSubmitting(false)
+        return
+      }
+
+      // Anything else may succeed later, so the details are saved and they
+      // stay here with the reason.
+      toast.error(message)
+      setIsSubmitting(false)
+    }
+  }
 
   const handleContinue = async () => {
     if (isSubmitting) return
@@ -175,17 +224,6 @@ export default function YourDetailsPage() {
       return
     }
 
-    if (employment.addToPayroll) {
-      if (!employment.jobRole.trim()) {
-        toast.error("Enter your job role")
-        return
-      }
-      if (!(Number.parseFloat(employment.salary) > 0)) {
-        toast.error("Enter your salary")
-        return
-      }
-    }
-
     const usernameChanged = username.toLowerCase() !== initialUsername.toLowerCase()
 
     try {
@@ -200,21 +238,10 @@ export default function YourDetailsPage() {
         ...(usernameChanged ? { username } : {}),
       })
 
-      try {
-        localStorage.setItem(
-          CREATOR_EMPLOYMENT_KEY,
-          JSON.stringify({
-            addToPayroll: employment.addToPayroll,
-            jobRole: employment.jobRole.trim(),
-            salary: employment.salary.trim(),
-          })
-        )
-      } catch {
-        // Without this the creator simply is not added to payroll, which the
-        // Employees page can fix afterwards. Not worth failing the step for.
-      }
-
-      router.push("/organization-setup/organization-details")
+      // Left busy on purpose. The next page replacing this one ends it, and
+      // clearing it here would show a ready button while the route is still
+      // loading, which reads as a failed press.
+      await finishInvitation()
     } catch (error) {
       const message = error instanceof Error ? error.message : "Could not save your details"
       // The index refused it between the check and the save, so the field is
@@ -225,15 +252,25 @@ export default function YourDetailsPage() {
     }
   }
 
-  return (
-    <OnboardingShell image="/images/your-details-image.jpg">
-      <OnboardingSteps active={1} />
+  const joiningWhom = invitedTo ?? "your organization"
 
+  return (
+    <OnboardingShell
+      image="/images/your-details-image.jpg"
+      headline={invitedTo ? `Join ${invitedTo}` : "Join your team"}
+      blurb={
+        <>
+          You have been invited to {joiningWhom} on Dizburza.
+          <br />
+          Tell us who you are and we will add you to their team.
+        </>
+      }
+    >
       <div className="self-stretch flex flex-col items-center gap-4">
         <div className="flex flex-col items-center gap-2">
           <div className="text-center text-blue-950 text-3xl font-normal font-nohemi">Your Details</div>
           <div className="w-96 text-center text-neutral-500 text-sm font-semibold font-inter">
-            Tell us who you are before we set up your organization.
+            Confirm your details to finish joining {joiningWhom}.
           </div>
         </div>
 
@@ -293,37 +330,6 @@ export default function YourDetailsPage() {
                   </p>
                 ) : null}
               </div>
-
-              <div className="flex w-full flex-col gap-3 rounded-lg border border-indigo-100 bg-slate-50/60 p-4">
-                <FieldSwitch
-                  label="Add me to the employee list"
-                  hint="Counts you on payroll so you can be paid like anyone else."
-                  checked={employment.addToPayroll}
-                  onChange={(checked) =>
-                    setEmployment((e) => ({ ...e, addToPayroll: checked }))
-                  }
-                />
-
-                {employment.addToPayroll ? (
-                  <>
-                    <FieldInput
-                      label="Job Role"
-                      placeholder="e.g HR Manager"
-                      icon="briefcase"
-                      value={employment.jobRole}
-                      onChange={(v) => setEmployment((e) => ({ ...e, jobRole: v }))}
-                    />
-                    <FieldInput
-                      label={`Salary${symbol ? ` (${symbol})` : ""}`}
-                      placeholder="e.g 500000"
-                      icon="briefcase"
-                      type="number"
-                      value={employment.salary}
-                      onChange={(v) => setEmployment((e) => ({ ...e, salary: v }))}
-                    />
-                  </>
-                ) : null}
-              </div>
             </div>
 
             <OnboardingButton
@@ -331,11 +337,18 @@ export default function YourDetailsPage() {
               onClick={handleContinue}
               disabled={isSubmitting || isLoading || !isComplete}
             >
-              {isSubmitting ? "Saving..." : "Continue"}
+              {(() => {
+                if (isSubmitting) return "Joining..."
+                return invitedTo ? `Join ${invitedTo}` : "Join"
+              })()}
             </OnboardingButton>
           </div>
         </div>
       </div>
+
+      {invitationProblem ? (
+        <NotFoundInvitationModal problem={invitationProblem} onClose={() => setInvitationProblem(null)} />
+      ) : null}
     </OnboardingShell>
   )
 }

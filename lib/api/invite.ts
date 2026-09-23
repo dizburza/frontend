@@ -44,6 +44,15 @@ export class ClaimError extends Error {
   get isNotInvited() {
     return this.status === 404
   }
+
+  /**
+   * The row this email matches was already claimed by a different account.
+   * Distinguished from the employment-cap 409 by message, since both are
+   * conflicts but only this one is about the invitation itself.
+   */
+  get isAlreadyClaimed() {
+    return this.status === 409 && /already completed registration/i.test(this.message)
+  }
 }
 
 export async function claimInvite(token: string): Promise<{ organizationSlug?: string }> {
