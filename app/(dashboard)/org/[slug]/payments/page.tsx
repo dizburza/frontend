@@ -180,7 +180,7 @@ export default function PaymentsPage() {
       setActionLoadingBatch(batchName)
 
       if (!account?.address) {
-        toast.error("Connect your wallet to continue")
+        toast.error("Still getting your account ready, try again in a moment")
         return
       }
 
@@ -230,7 +230,7 @@ export default function PaymentsPage() {
       setActionLoadingBatch(batchName)
 
       if (!account?.address) {
-        toast.error("Connect your wallet to continue")
+        toast.error("Still getting your account ready, try again in a moment")
         return
       }
 
@@ -280,7 +280,7 @@ export default function PaymentsPage() {
       setActionLoadingBatch(batchName)
 
       if (!account?.address) {
-        toast.error("Connect your wallet to continue")
+        toast.error("Still getting your account ready, try again in a moment")
         return
       }
 
@@ -329,7 +329,7 @@ export default function PaymentsPage() {
       setActionLoadingBatch(batchName)
 
       if (!account?.address) {
-        toast.error("Connect your wallet to continue")
+        toast.error("Still getting your account ready, try again in a moment")
         return
       }
 

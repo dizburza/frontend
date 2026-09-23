@@ -41,5 +41,9 @@ export function useSponsoredTransaction() {
     [account, sendTx]
   );
 
-  return { send, sponsored: true };
+  // A dashboard renders from the session before the smart account has finished
+  // restoring, so a write can be reached while there is still nothing to sign
+  // with. Callers disable their action on this rather than letting the click
+  // fail.
+  return { send, sponsored: true, canSign: Boolean(account) };
 }
