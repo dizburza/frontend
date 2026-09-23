@@ -17,6 +17,7 @@ import {
   recordSignerChangeProposal,
   remindEmployee,
   removeOrganizationEmployee,
+  reactivateOrganizationEmployee,
   updateOrganizationEmployee,
   useOrganizationBySlug,
   useOrganizationEmployees,
@@ -39,7 +40,9 @@ export default function EmployeesPage() {
   const { address } = useSessionIdentity()
 
   const [searchTerm, setSearchTerm] = useState("")
-  const [filterBy, setFilterBy] = useState<"all" | "joined" | "pending" | "high-salary">("all")
+  const [filterBy, setFilterBy] = useState<
+    "all" | "joined" | "pending" | "high-salary" | "suspended"
+  >("all")
   const [sortBy, setSortBy] = useState<"name" | "salary" | "date">("name")
   const [page, setPage] = useState(1)
   const [limit, setLimit] = useState(10)
@@ -99,8 +102,9 @@ export default function EmployeesPage() {
   )
 
   const totalEmployees = employeesData?.totalEmployees ?? 0
-  const joinedCount = employees.filter((e) => e.hasJoined).length
-  const pendingCount = employees.length - joinedCount
+  const activeEmployees = useMemo(() => employees.filter((e) => e.isActive), [employees])
+  const joinedCount = activeEmployees.filter((e) => e.hasJoined).length
+  const pendingCount = activeEmployees.length - joinedCount
 
   /** The name this signer is recorded under when they approve something. */
   const currentSignerName = useMemo(() => {
@@ -120,12 +124,20 @@ export default function EmployeesPage() {
         (e.email ?? "").toLowerCase().includes(term)
     )
 
-    if (filterBy === "joined") rows = rows.filter((e) => e.hasJoined)
-    else if (filterBy === "pending") rows = rows.filter((e) => !e.hasJoined)
-    else if (filterBy === "high-salary") {
-      // The backend already formatted this into the human figure, so the
-      // threshold is the amount the label promises.
-      rows = rows.filter((e) => e.salary >= HIGH_SALARY_THRESHOLD)
+    // Suspended rows only surface when asked for. A signer who removed
+    // someone should not see them reappear in the ordinary roster, but they
+    // have to be findable somehow to be reactivated.
+    if (filterBy === "suspended") rows = rows.filter((e) => !e.isActive)
+    else {
+      rows = rows.filter((e) => e.isActive)
+
+      if (filterBy === "joined") rows = rows.filter((e) => e.hasJoined)
+      else if (filterBy === "pending") rows = rows.filter((e) => !e.hasJoined)
+      else if (filterBy === "high-salary") {
+        // The backend already formatted this into the human figure, so the
+        // threshold is the amount the label promises.
+        rows = rows.filter((e) => e.salary >= HIGH_SALARY_THRESHOLD)
+      }
     }
 
     const sorted = [...rows]
@@ -195,6 +207,24 @@ export default function EmployeesPage() {
       toast.success("Employee suspended")
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to suspend employee")
+    } finally {
+      setIsWorking(false)
+    }
+  }
+
+  // No confirmation: undone by the same action, unlike a suspension, which
+  // has consequences (payroll exclusion) that make a confirm step worth the
+  // extra click.
+  const handleReactivate = async (employee: Employee) => {
+    if (!organization?.id) return
+
+    setIsWorking(true)
+    try {
+      await reactivateOrganizationEmployee(organization.id, employee.username)
+      refresh()
+      toast.success("Employee reactivated")
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to reactivate employee")
     } finally {
       setIsWorking(false)
     }
@@ -317,6 +347,7 @@ export default function EmployeesPage() {
     { value: "joined", label: "Joined" },
     { value: "pending", label: "Pending Invitations" },
     { value: "high-salary", label: `High Salary (>=500k ${symbol})` },
+    { value: "suspended", label: "Suspended" },
   ]
 
   const sortOptions = [
@@ -547,10 +578,12 @@ export default function EmployeesPage() {
                       <EmployeeActions
                         hasJoined={employee.hasJoined}
                         isSigner={employee.isSigner}
+                        isActive={employee.isActive}
                         onEdit={() => openEdit(employee)}
                         onAddAsSigner={() => setPendingSigner(employee)}
                         onSendReminder={() => setPendingReminder(employee)}
                         onSuspend={() => setPendingSuspend(employee)}
+                        onReactivate={() => handleReactivate(employee)}
                       />
                     </Td>
                   </tr>

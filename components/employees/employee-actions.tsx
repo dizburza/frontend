@@ -7,19 +7,23 @@ type EmployeeActionsProps = {
   /** Only a joined employee has a wallet address, so only they can be a signer. */
   hasJoined: boolean;
   isSigner: boolean;
+  isActive: boolean;
   onEdit: () => void;
   onAddAsSigner: () => void;
   onSendReminder: () => void;
   onSuspend: () => void;
+  onReactivate: () => void;
 };
 
 export function EmployeeActions({
   hasJoined,
   isSigner,
+  isActive,
   onEdit,
   onAddAsSigner,
   onSendReminder,
   onSuspend,
+  onReactivate,
 }: EmployeeActionsProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -65,19 +69,25 @@ export function EmployeeActions({
           role="menu"
           className="absolute right-0 top-full z-30 mt-1 w-44 overflow-hidden rounded-lg border border-neutral-200 bg-white py-1 shadow-lg"
         >
-          {/* Promotion needs a wallet address, which only exists once they
-              have claimed their invitation. */}
-          {hasJoined && !isSigner ? (
-            <MenuItem onClick={() => run(onAddAsSigner)}>Add as signer</MenuItem>
-          ) : null}
+          {isActive ? (
+            <>
+              {/* Promotion needs a wallet address, which only exists once they
+                  have claimed their invitation. */}
+              {hasJoined && !isSigner ? (
+                <MenuItem onClick={() => run(onAddAsSigner)}>Add as signer</MenuItem>
+              ) : null}
 
-          <MenuItem onClick={() => run(onEdit)}>Edit Details</MenuItem>
+              <MenuItem onClick={() => run(onEdit)}>Edit Details</MenuItem>
 
-          {hasJoined ? null : (
-            <MenuItem onClick={() => run(onSendReminder)}>Send Reminder</MenuItem>
+              {hasJoined ? null : (
+                <MenuItem onClick={() => run(onSendReminder)}>Send Reminder</MenuItem>
+              )}
+
+              <MenuItem onClick={() => run(onSuspend)}>Suspend Employee</MenuItem>
+            </>
+          ) : (
+            <MenuItem onClick={() => run(onReactivate)}>Reactivate</MenuItem>
           )}
-
-          <MenuItem onClick={() => run(onSuspend)}>Suspend Employee</MenuItem>
         </div>
       ) : null}
     </div>

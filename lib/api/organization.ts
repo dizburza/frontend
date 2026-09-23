@@ -146,6 +146,8 @@ export interface ApiEmployee {
   avatar?: string;
   role: string;
   isSigner?: boolean;
+  /** False once suspended. Older responses predate the field and are active. */
+  isActive?: boolean;
   lastAudit?: {
     action?: "ADD" | "UPDATE" | "REMOVE";
     createdAt?: string;
@@ -594,6 +596,23 @@ export async function removeOrganizationEmployee(
   }
 }
 
+/** Undo a suspension. Safe to retry: reactivating twice is a no-op the second time. */
+export async function reactivateOrganizationEmployee(
+  organizationId: string,
+  username: string
+) {
+  const endpoint = `/api/organizations/${organizationId}/employees/${encodeURIComponent(username)}/reactivate`;
+  try {
+    return await apiFetchWithRetry(() => apiFetch(endpoint, { method: "PATCH" }), {
+      attempts: 5,
+      baseDelayMs: 500,
+    });
+  } catch (e) {
+    enqueueBackendSyncJob({ endpoint, body: { method: "PATCH" } });
+    throw e;
+  }
+}
+
 /** Re-sends the organization's live invite link to one person still waiting on it. */
 export async function remindEmployee(organizationId: string, membershipId: string) {
   return apiFetch(
@@ -1013,6 +1032,7 @@ export function mapApiEmployeeToEmployee(apiEmployee: ApiEmployee): {
   hasJoined: boolean;
   role: string;
   isSigner: boolean;
+  isActive: boolean;
   salary: number;
   department?: string;
   employeeId?: string;
@@ -1043,6 +1063,7 @@ export function mapApiEmployeeToEmployee(apiEmployee: ApiEmployee): {
     hasJoined: (apiEmployee.status ?? "joined") === "joined",
     role: apiEmployee.jobDetails?.jobRole || apiEmployee.role || "Employee",
     isSigner: apiEmployee.isSigner || false,
+    isActive: apiEmployee.isActive ?? true,
     salary: displaySalary,
     department: apiEmployee.jobDetails?.department,
     employeeId: apiEmployee.jobDetails?.employeeId,
