@@ -2,6 +2,9 @@
 
 import type React from "react"
 import { Toaster } from "sonner"
+import { AutoConnect } from "thirdweb/react"
+import { thirdwebClient, wallets } from "@/app/client"
+import { activeChain } from "@/constants/chain"
 import { GlobalLoadingProvider } from "@/lib/global-loading"
 import BackendSyncQueueFlusher from "@/components/BackendSyncQueueFlusher"
 import WalletServiceNotice from "@/components/WalletServiceNotice"
@@ -26,6 +29,19 @@ function AutoAuthenticate() {
 export default function Providers({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <GlobalLoadingProvider>
+      {/* ThirdwebProvider does not restore a stored wallet by itself. Without
+          this, connection status never leaves "connecting" on a reload and
+          every guarded page waits on a wallet that is never re-attached.
+
+          Restoring a smart account runs close to the 15s default, and being
+          cancelled drops the user at "connect your wallet" with a session they
+          already hold, so the budget is raised well past it. */}
+      <AutoConnect
+        client={thirdwebClient}
+        wallets={wallets}
+        chain={activeChain}
+        timeout={60_000}
+      />
       <WalletServiceNotice />
       <AutoAuthenticate />
       {children}

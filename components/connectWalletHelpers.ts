@@ -195,6 +195,27 @@ const readPendingInvite = (): string | null => {
   }
 };
 
+/**
+ * Where to return after signing in, from the guard's `?next=`.
+ *
+ * Only same-site paths are accepted. A `next` that names a host is an open
+ * redirect, and this one arrives in a URL anyone can hand someone else.
+ */
+const readNextPath = (): string | null => {
+  try {
+    const raw = new URLSearchParams(globalThis.location.search).get("next");
+    if (!raw) return null;
+
+    // Rejects "//evil.com" and "https://evil.com" alike, both of which a
+    // browser resolves off-site.
+    if (!raw.startsWith("/") || raw.startsWith("//")) return null;
+
+    return raw;
+  } catch {
+    return null;
+  }
+};
+
 export const useMounted = () => {
   const [mounted, setMounted] = useState(false);
 
@@ -266,6 +287,7 @@ export const useRedirectOnFirstConnect = (params: {
   // yet", and a latch set there means nothing ever asks again.
   const settledFor = useRef<string | null>(null);
   const announcedFor = useRef<string | null>(null);
+  const retryTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [recheck, setRecheck] = useState(0);
 
   // Held in a ref so an inline callback from the caller does not re-run the
@@ -283,6 +305,7 @@ export const useRedirectOnFirstConnect = (params: {
     if (!address) {
       settledFor.current = null;
       announcedFor.current = null;
+      clearTimeout(retryTimer.current);
       return;
     }
 
@@ -317,6 +340,18 @@ export const useRedirectOnFirstConnect = (params: {
         return;
       }
 
+      // Sent here by the guard after a session lapsed. Going back to the page
+      // they were actually on beats dropping them at a dashboard root and
+      // making them navigate again.
+      const next = readNextPath();
+      if (next) {
+        if (!hasSessionFor(address)) return;
+
+        settledFor.current = address;
+        router.replace(next);
+        return;
+      }
+
       const cacheKey = `authCheck:${address}`;
       if (tryRedirectFromCache({ cacheKey, router })) {
         settledFor.current = address;
@@ -324,7 +359,17 @@ export const useRedirectOnFirstConnect = (params: {
       }
 
       const result = await fetchAuthCheck({ address, router });
-      if (!live || result.status === "pending") return;
+      if (!live) return;
+
+      // Pending means the session had not landed yet. The auth:completed event
+      // normally brings us back, but it can fire while this pass is still in
+      // flight, and then nothing else would ask again. Retrying on our own
+      // makes arriving at a session sufficient, rather than arriving at it at
+      // the right moment.
+      if (result.status === "pending") {
+        retryTimer.current = setTimeout(() => setRecheck((n) => n + 1), 1000);
+        return;
+      }
 
       settledFor.current = address;
       if (result.status === "redirected") return;
@@ -346,6 +391,7 @@ export const useRedirectOnFirstConnect = (params: {
 
     return () => {
       live = false;
+      clearTimeout(retryTimer.current);
     };
   }, [account?.address, router, recheck]);
 };
