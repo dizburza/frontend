@@ -311,6 +311,14 @@ export function DashboardHeader() {
             <span className="absolute -top-0.5 right-0.5 size-2 rounded-full bg-orange-700" />
           </button>
 
+          <button
+            type="button"
+            aria-label="Settings"
+            className="rounded-full bg-surface-canvas p-2 outline outline-1 -outline-offset-1 outline-[#E3E4F6] transition-colors hover:bg-white"
+          >
+            <Image src="/icons/setting-2.svg" alt="" width={14} height={14} />
+          </button>
+
           <div className="relative" ref={menuRef}>
             <button
               type="button"
