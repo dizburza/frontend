@@ -30,6 +30,27 @@ interface LoginResponse {
 // Global event name for auth completion
 const AUTH_COMPLETED_EVENT = "auth:completed";
 
+// Bounds every step of performAuth. Without it a stalled fetch or a stuck
+// wallet SDK call left the UI on "Signing you in..." with nothing to time out,
+// since the 15s timer in the sign-in card only ever repainted the screen.
+const AUTH_STEP_TIMEOUT_MS = 15_000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = globalThis.setTimeout(() => reject(new Error(`${label} timed out`)), ms);
+    promise.then(
+      (value) => {
+        globalThis.clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        globalThis.clearTimeout(timer);
+        reject(error);
+      }
+    );
+  });
+}
+
 // Providers mounts exactly one AutoAuthenticate, deliberately: two instances
 // would each hold their own in-progress flag and both prompt the wallet to
 // sign. Anything else that needs to know whether sign-in is stuck, such as
@@ -105,12 +126,16 @@ export function useAutoAuthenticate() {
    * Get auth message from backend
    */
   const getAuthMessage = useCallback(async (address: string): Promise<string | null> => {
+    const controller = new AbortController();
+    const timer = globalThis.setTimeout(() => controller.abort(), AUTH_STEP_TIMEOUT_MS);
+
     try {
       const response = await fetch(`/api/auth/message/${address}`, {
         credentials: "include",
+        signal: controller.signal,
       });
       const data = await response.json();
-      
+
       if (data.success && data.data?.message) {
         return data.data.message;
       }
@@ -118,6 +143,8 @@ export function useAutoAuthenticate() {
     } catch (error) {
       console.error("[useAutoAuthenticate] Failed to get auth message:", error);
       return null;
+    } finally {
+      globalThis.clearTimeout(timer);
     }
   }, []);
 
@@ -128,8 +155,14 @@ export function useAutoAuthenticate() {
     if (!account) return null;
 
     try {
-      // Use thirdweb's signMessage method
-      const signature = await account.signMessage({ message });
+      // thirdweb's call has no AbortController of its own, so a stall is
+      // capped by racing it rather than cancelling it; the SDK call itself
+      // may still resolve later, unobserved.
+      const signature = await withTimeout(
+        account.signMessage({ message }),
+        AUTH_STEP_TIMEOUT_MS,
+        "signMessage"
+      );
       return signature;
     } catch (error) {
       console.error("[useAutoAuthenticate] Failed to sign message:", error);
@@ -157,6 +190,9 @@ export function useAutoAuthenticate() {
     address: string,
     signature: string
   ): Promise<LoginResponse | null> => {
+    const controller = new AbortController();
+    const timer = globalThis.setTimeout(() => controller.abort(), AUTH_STEP_TIMEOUT_MS);
+
     try {
       // Signature only. The server rebuilds the message from the challenge it
       // issued, so there is nothing here worth forging.
@@ -170,13 +206,16 @@ export function useAutoAuthenticate() {
           walletAddress: address,
           signature,
         }),
+        signal: controller.signal,
       });
-      
+
       const data: LoginResponse = await response.json();
       return data;
     } catch (error) {
       console.error("[useAutoAuthenticate] Login failed:", error);
       return null;
+    } finally {
+      globalThis.clearTimeout(timer);
     }
   }, []);
 
@@ -286,6 +325,11 @@ export function useAutoAuthenticate() {
     // leave this convinced it is signed in while every request is refused.
     if (hasSessionFor(address)) {
       setAuthState({ isAuthenticated: true, isLoading: false, error: null });
+
+      // A session that was already here is still news to whoever is waiting to
+      // route on one. Only performAuth used to announce this, so a returning
+      // user skipped the announcement and left the redirect waiting forever.
+      globalThis.dispatchEvent(new CustomEvent(AUTH_COMPLETED_EVENT));
 
       let live = true;
       void fetchSessionProfile().then((profile) => {
