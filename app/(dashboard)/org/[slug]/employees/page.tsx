@@ -40,9 +40,7 @@ export default function EmployeesPage() {
   const { address } = useSessionIdentity()
 
   const [searchTerm, setSearchTerm] = useState("")
-  const [filterBy, setFilterBy] = useState<
-    "all" | "joined" | "pending" | "high-salary" | "suspended"
-  >("all")
+  const [filterBy, setFilterBy] = useState<"all" | "joined" | "pending" | "high-salary">("all")
   const [sortBy, setSortBy] = useState<"name" | "salary" | "date">("name")
   const [page, setPage] = useState(1)
   const [limit, setLimit] = useState(10)
@@ -64,6 +62,8 @@ export default function EmployeesPage() {
   const [pendingSigner, setPendingSigner] = useState<Employee | null>(null)
   const [pendingReminder, setPendingReminder] = useState<Employee | null>(null)
   const [isWorking, setIsWorking] = useState(false)
+  const [showSuspended, setShowSuspended] = useState(false)
+  const [reactivatingUsername, setReactivatingUsername] = useState<string | null>(null)
 
   const filterRef = useRef<HTMLDivElement>(null)
   const sortRef = useRef<HTMLDivElement>(null)
@@ -103,6 +103,7 @@ export default function EmployeesPage() {
 
   const totalEmployees = employeesData?.totalEmployees ?? 0
   const activeEmployees = useMemo(() => employees.filter((e) => e.isActive), [employees])
+  const suspendedEmployees = useMemo(() => employees.filter((e) => !e.isActive), [employees])
   const joinedCount = activeEmployees.filter((e) => e.hasJoined).length
   const pendingCount = activeEmployees.length - joinedCount
 
@@ -124,20 +125,16 @@ export default function EmployeesPage() {
         (e.email ?? "").toLowerCase().includes(term)
     )
 
-    // Suspended rows only surface when asked for. A signer who removed
-    // someone should not see them reappear in the ordinary roster, but they
-    // have to be findable somehow to be reactivated.
-    if (filterBy === "suspended") rows = rows.filter((e) => !e.isActive)
-    else {
-      rows = rows.filter((e) => e.isActive)
+    // Suspended rows have their own section below, findable there rather than
+    // through this filter, so the main roster never shows them.
+    rows = rows.filter((e) => e.isActive)
 
-      if (filterBy === "joined") rows = rows.filter((e) => e.hasJoined)
-      else if (filterBy === "pending") rows = rows.filter((e) => !e.hasJoined)
-      else if (filterBy === "high-salary") {
-        // The backend already formatted this into the human figure, so the
-        // threshold is the amount the label promises.
-        rows = rows.filter((e) => e.salary >= HIGH_SALARY_THRESHOLD)
-      }
+    if (filterBy === "joined") rows = rows.filter((e) => e.hasJoined)
+    else if (filterBy === "pending") rows = rows.filter((e) => !e.hasJoined)
+    else if (filterBy === "high-salary") {
+      // The backend already formatted this into the human figure, so the
+      // threshold is the amount the label promises.
+      rows = rows.filter((e) => e.salary >= HIGH_SALARY_THRESHOLD)
     }
 
     const sorted = [...rows]
@@ -218,15 +215,15 @@ export default function EmployeesPage() {
   const handleReactivate = async (employee: Employee) => {
     if (!organization?.id) return
 
-    setIsWorking(true)
+    setReactivatingUsername(employee.username)
     try {
       await reactivateOrganizationEmployee(organization.id, employee.username)
       refresh()
-      toast.success("Employee reactivated")
+      toast.success(`${employee.firstName || "Employee"} reactivated`)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to reactivate employee")
     } finally {
-      setIsWorking(false)
+      setReactivatingUsername(null)
     }
   }
 
@@ -347,7 +344,6 @@ export default function EmployeesPage() {
     { value: "joined", label: "Joined" },
     { value: "pending", label: "Pending Invitations" },
     { value: "high-salary", label: `High Salary (>=500k ${symbol})` },
-    { value: "suspended", label: "Suspended" },
   ]
 
   const sortOptions = [
@@ -632,6 +628,56 @@ export default function EmployeesPage() {
           </div>
         </div>
       </SectionCard>
+
+      {suspendedEmployees.length > 0 ? (
+        <SectionCard title={`Suspended Employees (${suspendedEmployees.length})`}>
+          <button
+            type="button"
+            onClick={() => setShowSuspended((v) => !v)}
+            className="flex items-center gap-2 self-start text-sm font-medium text-neutral-600 hover:text-neutral-800"
+          >
+            <ChevronDown
+              size={16}
+              className={`transition-transform ${showSuspended ? "rotate-180" : ""}`}
+            />
+            {showSuspended ? "Hide" : "Show"}
+          </button>
+
+          {showSuspended ? (
+            <div className="flex flex-col divide-y divide-gray-100">
+              {suspendedEmployees.map((employee) => (
+                <div
+                  key={employee.id}
+                  className="flex flex-wrap items-center justify-between gap-3 py-3"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-neutral-700">
+                      {[employee.surname, employee.firstName].filter(Boolean).join(" ") ||
+                        employee.username ||
+                        "Unnamed"}
+                    </p>
+                    <p className="truncate text-xs text-neutral-500">
+                      {employee.role} &middot;{" "}
+                      {employee.walletAddress ? shortAddress(employee.walletAddress) : "--"}
+                    </p>
+                  </div>
+                  <PillButton
+                    tone="soft"
+                    className="h-9 shrink-0 px-4"
+                    disabled={reactivatingUsername === employee.username}
+                    onClick={() => handleReactivate(employee)}
+                  >
+                    {reactivatingUsername === employee.username ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : null}
+                    Reactivate
+                  </PillButton>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </SectionCard>
+      ) : null}
 
       {showAddEmployeeModal && organization?.id ? (
         <AddEmployeesDrawer
