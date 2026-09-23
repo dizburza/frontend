@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useMemo } from "react";
-import { useActiveAccount } from "thirdweb/react";
 import { useCachedResource } from "@/hooks/useCachedResource";
+import { useSessionIdentity } from "@/hooks/useSessionIdentity";
 import { TRANSACTION_HISTORY_ENABLED } from "@/lib/features";
 import {
   ChartBucket,
@@ -38,8 +38,10 @@ export default function useTransactionActivity(params?: {
   bucket?: ChartBucket;
   staleTimeMs?: number;
 }) {
-  const account = useActiveAccount();
-  const walletAddress = (params?.walletAddress || account?.address || "").toLowerCase();
+  // Session rather than wallet, so the cache key exists on first paint instead
+  // of waiting for the smart account to restore. See useSessionIdentity.
+  const { address: sessionAddress } = useSessionIdentity();
+  const walletAddress = (params?.walletAddress || sessionAddress || "").toLowerCase();
 
   const range = params?.range ?? "1y";
   const bucket = params?.bucket ?? "month";

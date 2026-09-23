@@ -11,7 +11,7 @@ import { QRScanModal } from "@/components/qr-scan-modal"
 import { SendToCNGNFlow } from "@/components/send-to-cngn-flow"
 import { CreateCashLinkModal } from "@/components/cashlink/create-cashlink-modal"
 import { CashLinkList } from "@/components/cashlink/cashlink-list"
-import { useActiveAccount } from "thirdweb/react"
+import { useSessionIdentity } from "@/hooks/useSessionIdentity"
 import { useTransactionHistory } from "@/lib/api/organization"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useToken } from "@/hooks/useToken"
@@ -30,8 +30,7 @@ export default function PersonalPaymentsPage() {
   const [page, setPage] = useState(1)
   const [limit, setLimit] = useState(10)
 
-  const account = useActiveAccount()
-  const address = account?.address ?? null
+  const { address } = useSessionIdentity()
   const { data, loading: isLoading, error } = useTransactionHistory(address, { limit: 100, page: 1 })
 
   const transactions = data?.transactions ?? []

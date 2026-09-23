@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useActiveAccount } from "thirdweb/react";
+import { useSessionIdentity } from "@/hooks/useSessionIdentity";
 
 import { PillButton } from "@/components/ui/pill-button";
 import { BatchPaymentPromo } from "@/components/dashboard/batch-payment-promo";
@@ -40,8 +40,8 @@ export default function OrganizationDashboardPage() {
   const { data: batchesData, refresh: refreshBatches } = useOrganizationBatches(organizationId);
   const { data: proposalData } = useOrganizationProposals(organizationId);
 
-  const account = useActiveAccount();
-  const transactionsAddress = organization?.contractAddress ?? account?.address ?? null;
+  const { address } = useSessionIdentity();
+  const transactionsAddress = organization?.contractAddress ?? address ?? null;
   const { data: transactionsData, refresh: refreshTransactions } = useTransactionHistory(
     transactionsAddress,
     { limit: 5, page: 1 }

@@ -5,7 +5,7 @@ import { StatCard } from "@/components/stat-card"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { ChevronDown, Search, Copy, MoreVertical } from "lucide-react"
-import { useActiveAccount } from "thirdweb/react"
+import { useSessionIdentity } from "@/hooks/useSessionIdentity"
 import { useTransactionHistory, useTransactionSummary } from "@/lib/api/organization"
 import { useToken } from "@/hooks/useToken"
 
@@ -15,8 +15,7 @@ export default function PersonalTransactionsPage() {
   const [page, setPage] = useState(1)
   const [limit, setLimit] = useState(10)
 
-  const account = useActiveAccount()
-  const address = account?.address ?? null
+  const { address } = useSessionIdentity()
   const { data, loading: isLoading } = useTransactionHistory(address, { page, limit })
   const { data: summaryData, loading: summaryLoading } = useTransactionSummary(address)
 
@@ -27,7 +26,7 @@ export default function PersonalTransactionsPage() {
   // Reset pagination on wallet switch
   useEffect(() => {
     setPage(1)
-  }, [account?.address, limit])
+  }, [address, limit])
 
   const pageItems = (() => {
     const safeTotalPages = Math.max(1, totalPages)

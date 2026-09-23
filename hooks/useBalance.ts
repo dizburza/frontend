@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useMemo } from "react";
-import { useActiveAccount } from "thirdweb/react";
 import { useCachedResource } from "@/hooks/useCachedResource";
+import { useSessionIdentity } from "@/hooks/useSessionIdentity";
 import { BalanceView, fetchBalance } from "@/lib/api/transactions";
 
 const formatFromRaw = (raw: string, decimals: number): number => {
@@ -27,8 +27,11 @@ const formatFromRaw = (raw: string, decimals: number): number => {
  * realtime stream.
  */
 export function useBalance(address?: string | null) {
-  const account = useActiveAccount();
-  const target = (address ?? account?.address ?? "").toLowerCase();
+  // The session's address, not the wallet's: keying off the wallet meant the
+  // cache key was null for as long as the smart account took to restore, so a
+  // reload showed nothing while the answer sat in localStorage unread.
+  const { address: sessionAddress } = useSessionIdentity();
+  const target = (address ?? sessionAddress ?? "").toLowerCase();
 
   const key = target ? `balance:${target}` : null;
 
