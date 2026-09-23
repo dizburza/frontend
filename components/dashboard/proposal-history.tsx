@@ -14,7 +14,7 @@ export function ProposalHistory({ proposals, viewAllHref }: ProposalHistoryProps
   return (
     <SectionCard title="Proposal History" viewAllHref={viewAllHref} className="h-full">
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[460px] text-left">
+        <table className="w-full text-left">
           <thead>
             <tr className="border-y border-gray-100 bg-neutral-100">
               <th className="w-8 px-1.5 py-2 text-sm font-semibold text-gray-800">#</th>
@@ -27,25 +27,12 @@ export function ProposalHistory({ proposals, viewAllHref }: ProposalHistoryProps
               <th className="px-1.5 py-2 text-center text-xs font-normal tracking-wide text-neutral-600">
                 STATUS
               </th>
-              <th
-                className="px-1.5 py-2 text-xs font-normal tracking-wide text-neutral-600"
-                colSpan={2}
-              >
-                <span className="block text-center">VOTES</span>
-                <span className="mt-1 flex items-center justify-between text-[8px] font-medium">
-                  <span>FOR</span>
-                  <span>AGAINST</span>
-                </span>
-              </th>
-              <th className="px-1.5 py-2 text-center text-xs font-normal tracking-wide text-neutral-600">
-                SIGNATURES
-              </th>
             </tr>
           </thead>
           <tbody>
             {proposals.length === 0 ? (
               <tr>
-                <td colSpan={7} className="py-10 text-center text-sm text-gray-500">
+                <td colSpan={4} className="py-10 text-center text-sm text-gray-500">
                   No proposals raised yet.
                 </td>
               </tr>
@@ -73,15 +60,6 @@ export function ProposalHistory({ proposals, viewAllHref }: ProposalHistoryProps
                     >
                       {statusLabel[proposal.status]}
                     </span>
-                  </td>
-                  <td className="px-1.5 py-3 text-center text-xs font-medium text-neutral-600">
-                    {proposal.votesFor}
-                  </td>
-                  <td className="px-1.5 py-3 text-center text-xs font-medium text-neutral-600">
-                    {proposal.votesAgainst}
-                  </td>
-                  <td className="px-1.5 py-3 text-center text-xs font-semibold leading-4 text-neutral-800">
-                    {proposal.votesFor + proposal.votesAgainst}/{proposal.votesRequired}
                   </td>
                 </tr>
               ))
