@@ -43,6 +43,7 @@ export function PaymentActivity({ transactions, batches, viewAllHref }: PaymentA
               <Th>BATCH NAME</Th>
               <Th>INITIATED BY</Th>
               <Th className="text-right">AMOUNT ({symbol || "--"})</Th>
+              <Th className="text-right">TAX ({symbol || "--"})</Th>
               <Th>TYPE</Th>
               <Th className="text-center">RECIPIENTS</Th>
               <Th className="text-center">SIGNATURES</Th>
@@ -54,7 +55,7 @@ export function PaymentActivity({ transactions, batches, viewAllHref }: PaymentA
           <tbody>
             {transactions.length === 0 ? (
               <tr>
-                <td colSpan={11} className="py-10 text-center text-sm text-gray-500">
+                <td colSpan={12} className="py-10 text-center text-sm text-gray-500">
                   No payment activity yet.
                 </td>
               </tr>
@@ -65,6 +66,14 @@ export function PaymentActivity({ transactions, batches, viewAllHref }: PaymentA
                 const amount = Number.parseFloat(
                   String(tx.displayAmount || "0").replaceAll(/[+-]/g, "")
                 );
+
+                const taxValue = Number.parseFloat(tx.taxFormatted ?? "");
+                const tax = Number.isFinite(taxValue)
+                  ? taxValue.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })
+                  : "-";
 
                 // Formatted server side from the token's decimals. A fee of
                 // zero is a real figure and prints as one; only a transfer
@@ -108,6 +117,7 @@ export function PaymentActivity({ transactions, batches, viewAllHref }: PaymentA
                         ? amount.toLocaleString(undefined, { maximumFractionDigits: 2 })
                         : "--"}
                     </Td>
+                    <Td className="whitespace-nowrap text-right text-neutral-600">{tax}</Td>
                     <Td className="text-neutral-600">{inflow ? "Inflow" : "Outflow"}</Td>
                     <Td className="text-center text-neutral-600">
                       {batch ? batch.recipients.length : "-"}

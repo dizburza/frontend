@@ -245,6 +245,8 @@ export interface ApiTransaction {
   /** What the user was actually charged, in token base units. */
   chargedFee?: string;
   chargedFeeFormatted?: string;
+  /** PAYE withheld on this transfer, formatted from the token's decimals. */
+  taxFormatted?: string;
   description?: string;
   memo?: string;
   category?: string;
