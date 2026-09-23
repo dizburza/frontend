@@ -291,7 +291,7 @@ export function DashboardHeader() {
           })}
         </nav>
 
-        <div className="flex items-center gap-4 xl:gap-10">
+        <div className="flex items-center gap-2 xl:gap-5">
           {pendingSyncCount > 0 ? (
             <button
               type="button"
