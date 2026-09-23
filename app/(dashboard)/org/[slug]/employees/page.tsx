@@ -25,7 +25,7 @@ import useOrgSlug from "@/hooks/useOrgSlug"
 import { useSignerManagement } from "@/hooks/useSignerManagement"
 import useGetOrgTreasuryBalance from "@/hooks/ERC20/useGetOrgTreasuryBalance"
 import { useToken } from "@/hooks/useToken"
-import { useActiveAccount } from "thirdweb/react"
+import { useSessionIdentity } from "@/hooks/useSessionIdentity"
 
 type Employee = ReturnType<typeof mapApiEmployeeToEmployee>
 
@@ -36,7 +36,7 @@ const shortAddress = (value: string) =>
 
 export default function EmployeesPage() {
   const { symbol } = useToken()
-  const account = useActiveAccount()
+  const { address } = useSessionIdentity()
 
   const [searchTerm, setSearchTerm] = useState("")
   const [filterBy, setFilterBy] = useState<"all" | "joined" | "pending" | "high-salary">("all")
@@ -105,10 +105,10 @@ export default function EmployeesPage() {
   /** The name this signer is recorded under when they approve something. */
   const currentSignerName = useMemo(() => {
     const me = (organization?.signers ?? []).find(
-      (s) => s.address.toLowerCase() === account?.address?.toLowerCase()
+      (s) => s.address.toLowerCase() === address
     )
-    return me?.name || account?.address || "Signer"
-  }, [organization?.signers, account?.address])
+    return me?.name || address || "Signer"
+  }, [organization?.signers, address])
 
   const filtered = useMemo(() => {
     const term = searchTerm.toLowerCase()
@@ -440,29 +440,32 @@ export default function EmployeesPage() {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1080px] table-fixed text-left">
+        <div>
+          <table className="w-full table-fixed text-left">
+            {/* Proportions from the design's fixed widths at a 1608px table. */}
             <colgroup>
-              <col className="w-10" />
+              <col className="w-[3%]" />
+              <col className="w-[10%]" />
+              <col className="w-[10%]" />
+              <col className="w-[15%]" />
+              <col className="w-[10%]" />
               <col className="w-[11%]" />
               <col className="w-[11%]" />
-              <col className="w-[16%]" />
-              <col className="w-[11%]" />
-              <col className="w-[13%]" />
               <col className="w-[11%]" />
               <col className="w-[12%]" />
-              <col className="w-[13%]" />
-              <col className="w-12" />
+              <col className="w-[7%]" />
             </colgroup>
             <thead>
               <tr className="border-y border-gray-100 bg-neutral-100">
-                <Th>#</Th>
+                <Th>
+                  <span className="text-sm font-semibold text-gray-800">#</span>
+                </Th>
                 <Th>SURNAME</Th>
                 <Th>FIRST NAME</Th>
                 <Th>EMAIL</Th>
                 <Th>PHONE</Th>
                 <Th>ROLE</Th>
-                <Th className="text-right">SALARY ({symbol || "--"})</Th>
+                <Th className="text-center">SALARY ({symbol || "--"})</Th>
                 <Th>USERNAME</Th>
                 <Th>WALLET ADDRESS</Th>
                 <Th className="text-right">ACTION</Th>
@@ -481,33 +484,61 @@ export default function EmployeesPage() {
                     key={employee.id}
                     className="border-b border-gray-100 transition-colors hover:bg-surface-canvas"
                   >
-                    <Td className="text-gray-500">{startIndex + index + 1}</Td>
-                    <Td className="truncate font-medium text-neutral-800">{employee.surname || "--"}</Td>
-                    <Td className="truncate text-neutral-700">{employee.firstName || "--"}</Td>
-                    <Td className="truncate text-indigo-600">{employee.email || "--"}</Td>
-                    <Td className="truncate text-neutral-600">{employee.phoneNumber || "--"}</Td>
-                    <Td className="truncate text-neutral-700">
+                    <Td>
+                      <span className="text-sm font-semibold text-gray-500">
+                        {startIndex + index + 1}
+                      </span>
+                    </Td>
+                    <Td>
+                      <div className="truncate font-semibold text-neutral-500">
+                        {employee.surname || "--"}
+                      </div>
+                    </Td>
+                    <Td>
+                      <div className="truncate font-semibold text-neutral-500">
+                        {employee.firstName || "--"}
+                      </div>
+                    </Td>
+                    <Td>
+                      <div className="truncate font-semibold text-indigo-600">
+                        {employee.email || "--"}
+                      </div>
+                    </Td>
+                    <Td>
+                      <div className="truncate font-semibold text-neutral-500">
+                        {employee.phoneNumber || "--"}
+                      </div>
+                    </Td>
+                    <Td>
                       {employee.isSigner ? (
-                        <span className="inline-flex items-center rounded-full bg-purple-100 px-2 py-1 text-xs font-medium text-purple-700">
+                        <span className="inline-flex items-center whitespace-nowrap rounded-full bg-purple-100 px-3 py-2 text-xs font-medium leading-3 text-purple-700">
                           Signer
                         </span>
                       ) : (
-                        employee.role
+                        <div className="truncate font-semibold text-neutral-500">
+                          {employee.role}
+                        </div>
                       )}
                     </Td>
-                    <Td className="text-right font-semibold text-neutral-800">
+                    <Td className="text-center font-semibold text-neutral-800">
                       {employee.salary.toLocaleString()}
                     </Td>
-                    <Td className="truncate text-neutral-600">
+                    <Td>
                       {employee.hasJoined ? (
-                        employee.displayUsername || employee.username || "--"
+                        <div className="truncate font-semibold text-neutral-800">
+                          {employee.displayUsername || employee.username
+                            ? `@${employee.displayUsername || employee.username}`
+                            : "--"}
+                        </div>
                       ) : (
                         <Badge>Not Joined</Badge>
                       )}
                     </Td>
-                    <Td className="truncate font-mono text-neutral-600">
+                    <Td>
                       {employee.walletAddress ? (
-                        shortAddress(employee.walletAddress)
+                        <div className="truncate font-semibold text-neutral-800">
+                          {shortAddress(employee.walletAddress)}
+                        </div>
                       ) : (
                         <Badge>Not Connected</Badge>
                       )}
@@ -721,7 +752,7 @@ function Divider() {
 
 function Badge({ children }: { children: React.ReactNode }) {
   return (
-    <span className="inline-flex items-center rounded-md bg-neutral-100 px-2 py-1 text-[11px] font-medium text-neutral-500">
+    <span className="inline-flex items-center whitespace-nowrap rounded-full bg-gray-100 px-3 py-2 text-xs font-medium leading-3 text-gray-500">
       {children}
     </span>
   )
@@ -729,14 +760,16 @@ function Badge({ children }: { children: React.ReactNode }) {
 
 function Th({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
-    <th className={`px-2 py-3 text-xs font-normal tracking-wide text-neutral-600 ${className}`}>
+    <th
+      className={`truncate px-1.5 py-3 text-[11px] font-normal tracking-tight text-neutral-600 ${className}`}
+    >
       {children}
     </th>
   )
 }
 
 function Td({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <td className={`px-2 py-3 text-xs ${className}`}>{children}</td>
+  return <td className={`px-1.5 py-4 text-xs leading-4 ${className}`}>{children}</td>
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
