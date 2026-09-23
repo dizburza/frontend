@@ -32,7 +32,7 @@ export function BatchPaymentCreationModal({
 }: Readonly<BatchPaymentCreationModalProps>) {
   const { symbol } = useToken()
   const account = useActiveAccount()
-  const { send } = useSponsoredTransaction()
+  const { send, canSign } = useSponsoredTransaction()
   const [step, setStep] = useState<"details" | "employees" | "preview" | "success">("details")
   const [selectedEmployees, setSelectedEmployees] = useState<string[]>([])
   const [employeeSearch, setEmployeeSearch] = useState("")
@@ -507,8 +507,12 @@ export function BatchPaymentCreationModal({
                 <Button
                   onClick={handleProceedToPayment}
                   disabled={
-                    isSubmitting || !formData.batchName || selectedEmployees.length === 0
+                    isSubmitting ||
+                    !formData.batchName ||
+                    selectedEmployees.length === 0 ||
+                    !canSign
                   }
+                  title={canSign ? undefined : "Still getting your account ready"}
                   className="bg-blue-600 hover:bg-blue-700 text-white disabled:bg-gray-300"
                 >
                   {isSubmitting ? "Submitting..." : "Proceed to Payment"}

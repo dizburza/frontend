@@ -40,7 +40,7 @@ const TONES: Record<SenderLink["status"], string> = {
  */
 export function CashLinkList({ refreshKey }: Readonly<{ refreshKey?: number }>) {
   const { symbol } = useToken();
-  const { send } = useSponsoredTransaction();
+  const { send, canSign } = useSponsoredTransaction();
   const [links, setLinks] = useState<SenderLink[]>([]);
   const [loading, setLoading] = useState(true);
   const [cancelling, setCancelling] = useState<string | null>(null);
@@ -123,7 +123,8 @@ export function CashLinkList({ refreshKey }: Readonly<{ refreshKey?: number }>) 
               <Button
                 variant="outline"
                 size="sm"
-                disabled={cancelling === link.claimAddress}
+                disabled={cancelling === link.claimAddress || !canSign}
+                title={canSign ? undefined : "Still getting your account ready"}
                 onClick={() => cancel(link)}
               >
                 {cancelling === link.claimAddress ? "Cancelling..." : "Cancel"}

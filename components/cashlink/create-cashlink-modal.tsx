@@ -40,7 +40,7 @@ export function CreateCashLinkModal({
 }: Readonly<{ onClose: () => void; onCreated?: () => void }>) {
   const { symbol } = useToken();
   const account = useActiveAccount();
-  const { send } = useSponsoredTransaction();
+  const { send, canSign } = useSponsoredTransaction();
   const { mutateAsync: sendAndConfirmTx } = useSendAndConfirmTransaction();
 
   const [step, setStep] = useState<Step>("amount");
@@ -228,7 +228,12 @@ export function CreateCashLinkModal({
               <Button variant="outline" className="flex-1" onClick={() => setStep("amount")}>
                 Back
               </Button>
-              <Button className="flex-1" disabled={busy} onClick={handleCreate}>
+              <Button
+                className="flex-1"
+                disabled={busy || !canSign}
+                title={canSign ? undefined : "Still getting your account ready"}
+                onClick={handleCreate}
+              >
                 {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Create link"}
               </Button>
             </div>

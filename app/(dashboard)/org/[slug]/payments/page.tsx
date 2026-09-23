@@ -62,7 +62,7 @@ export default function PaymentsPage() {
   )
 
   const account = useActiveAccount()
-  const { send } = useSponsoredTransaction()
+  const { send, canSign } = useSponsoredTransaction()
 
   const accountAddressLower = (account?.address || "").toLowerCase()
 
@@ -528,7 +528,8 @@ export default function PaymentsPage() {
                                 <Button
                                   variant="outline"
                                   className="h-8 px-3"
-                                  disabled={isActionLoading}
+                                  disabled={isActionLoading || !canSign}
+                                  title={canSign ? undefined : "Still getting your account ready"}
                                   onClick={() => void handleRevokeApproval(batch.batchName)}
                                 >
                                   {actionLoadingBatch === batch.batchName ? "Processing..." : "Revoke"}
@@ -537,14 +538,18 @@ export default function PaymentsPage() {
                               <Button
                                 variant="outline"
                                 className="h-8 px-3"
-                                disabled={isActionLoading || userHasApproved}
+                                disabled={isActionLoading || userHasApproved || !canSign}
+                                title={canSign ? undefined : "Still getting your account ready"}
                                 onClick={() => void handleApproveBatch(batch.batchName)}
                               >
                                 {actionLoadingBatch === batch.batchName ? "Processing..." : "Approve"}
                               </Button>
                               <Button
                                 className="h-8 px-3 bg-blue-600 hover:bg-blue-700"
-                                disabled={isActionLoading || batch.approvalCount < batch.quorumRequired}
+                                disabled={
+                                  isActionLoading || batch.approvalCount < batch.quorumRequired || !canSign
+                                }
+                                title={canSign ? undefined : "Still getting your account ready"}
                                 onClick={() => void handleExecuteBatch(batch.batchName)}
                               >
                                 {actionLoadingBatch === batch.batchName ? "Processing..." : "Execute"}
@@ -552,7 +557,8 @@ export default function PaymentsPage() {
                               <Button
                                 variant="outline"
                                 className="h-8 px-3"
-                                disabled={isActionLoading}
+                                disabled={isActionLoading || !canSign}
+                                title={canSign ? undefined : "Still getting your account ready"}
                                 onClick={() => void handleCancelBatch(batch.batchName)}
                               >
                                 {actionLoadingBatch === batch.batchName ? "Processing..." : "Cancel"}
