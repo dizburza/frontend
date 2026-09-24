@@ -1,65 +1,72 @@
 "use client"
 
 import { activeChain } from "@/constants/chain";
-import { useEffect, useMemo, useState } from "react"
-import { StatCard } from "@/components/stat-card"
-import { Card } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+import { useEffect, useMemo, useRef, useState } from "react"
+import Link from "next/link"
+import Image from "next/image"
+import { toast } from "sonner"
+import { ChevronDown, ChevronRight, Loader2 } from "lucide-react"
 import { Input } from "@/components/ui/input"
-import { ChevronDown, Search, MoreVertical } from "lucide-react"
+import { PillButton } from "@/components/ui/pill-button"
 import { BatchPaymentCreationModal } from "@/components/payments/batch-payment-creation-modal"
-import { 
-  useOrganizationBySlug, 
+import {
+  useOrganizationBySlug,
   useOrganizationBatches,
-  useTransactionHistory,
   mapApiBatchToPaymentBatch,
   recordBatchApproval,
   recordBatchApprovalRevocation,
   recordBatchExecution,
-  recordBatchCancellation 
+  recordBatchCancellation,
 } from "@/lib/api/organization"
 import useOrgSlug from "@/hooks/useOrgSlug"
-import { toast } from "sonner"
 import { useActiveAccount } from "thirdweb/react"
 import { getContract, prepareContractCall } from "thirdweb"
 import { thirdwebClient } from "@/app/client"
 import { useToken } from "@/hooks/useToken"
 import { useSponsoredTransaction } from "@/hooks/useSponsoredTransaction"
+import useGetOrgTreasuryBalance from "@/hooks/ERC20/useGetOrgTreasuryBalance"
+
+type SortKey = "date" | "amount" | "name"
+
+const sortOptions: { value: SortKey; label: string }[] = [
+  { value: "date", label: "Date" },
+  { value: "amount", label: "Amount (High to Low)" },
+  { value: "name", label: "Batch Name" },
+]
+
+const shortHash = (value: string) =>
+  value && value.length >= 12 ? `${value.slice(0, 8)}...` : value || "--"
 
 export default function PaymentsPage() {
   const { symbol } = useToken()
   const [searchTerm, setSearchTerm] = useState("")
   const [showBatchModal, setShowBatchModal] = useState(false)
   const [page, setPage] = useState(1)
-  const [limit, setLimit] = useState(10)
+  const [limit] = useState(10)
   const [actionLoadingBatch, setActionLoadingBatch] = useState<string | null>(null)
-  const [expandedBatchId, setExpandedBatchId] = useState<string | null>(null)
+  const [sortBy, setSortBy] = useState<SortKey>("date")
+  const [showSortDropdown, setShowSortDropdown] = useState(false)
 
-  const getPageItems = (currentPage: number, total: number) => {
-    const safeTotalPages = Math.max(1, total)
-    const safeCurrent = Math.min(Math.max(1, currentPage), safeTotalPages)
-    if (safeTotalPages <= 7) {
-      return Array.from({ length: safeTotalPages }, (_, i) => i + 1)
+  const sortRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const onPointerDown = (event: MouseEvent) => {
+      if (sortRef.current && !sortRef.current.contains(event.target as Node)) {
+        setShowSortDropdown(false)
+      }
     }
-    const items: Array<number | "..."> = [1]
-    const start = Math.max(2, safeCurrent - 1)
-    const end = Math.min(safeTotalPages - 1, safeCurrent + 1)
-
-    if (start > 2) items.push("...")
-    for (let p = start; p <= end; p++) items.push(p)
-    if (end < safeTotalPages - 1) items.push("...")
-    items.push(safeTotalPages)
-
-    return items
-  }
+    document.addEventListener("mousedown", onPointerDown)
+    return () => document.removeEventListener("mousedown", onPointerDown)
+  }, [])
 
   const orgSlug = useOrgSlug()
+  const base = orgSlug ? `/org/${orgSlug}` : "/"
   const { data: organization } = useOrganizationBySlug(orgSlug)
-  const { data: batchesData, loading: batchesLoading, error, refresh } = useOrganizationBatches(organization?.id || null)
-  const { data: transactionsData } = useTransactionHistory(
-    organization?.contractAddress || null,
-    { limit: 100 }
+  const { data: batchesData, loading: batchesLoading, error, refresh } = useOrganizationBatches(
+    organization?.id || null
   )
+
+  const treasuryBalance = useGetOrgTreasuryBalance()
 
   const account = useActiveAccount()
   const { send, canSign } = useSponsoredTransaction()
@@ -75,10 +82,9 @@ export default function PaymentsPage() {
   const isSignerOrAdmin = useMemo(() => {
     const addr = account?.address
     if (!addr) return false
-    const userIsSigner = (organization?.signers || []).some(
+    return (organization?.signers || []).some(
       (s) => s.address?.toLowerCase() === addr.toLowerCase() && s.isActive
     )
-    return userIsSigner
   }, [account?.address, organization?.signers])
 
   const currentSignerName = useMemo(() => {
@@ -90,92 +96,49 @@ export default function PaymentsPage() {
     return (signer?.name || "Signer").trim() || "Signer"
   }, [account?.address, organization?.signers])
 
-  const paymentBatches = batchesData?.batches?.map(mapApiBatchToPaymentBatch) || []
-  const stats = batchesData?.stats || { pending: 0, approved: 0, executed: 0, cancelled: 0 }
-  const totalBatches = batchesData?.totalBatches || 0
+  const paymentBatches = useMemo(
+    () => (batchesData?.batches ?? []).map(mapApiBatchToPaymentBatch),
+    [batchesData]
+  )
+  const totalBatches = batchesData?.totalBatches ?? 0
 
-  const transactions = transactionsData?.transactions ?? []
+  const lastPayrollAmount = useMemo(() => {
+    const executed = paymentBatches.filter((b) => b.statusRaw === "executed")
+    if (executed.length === 0) return null
+    return executed.reduce((latest, b) => (b.date > latest.date ? b : latest), executed[0])
+      .totalAmount
+  }, [paymentBatches])
 
-  const outflow = transactions
-    .filter((t) => t.direction === "sent")
-    .reduce((acc, t) => {
-      const amt = Number.parseFloat(String(t.displayAmount || "0").replaceAll("-", ""))
-      return acc + (Number.isFinite(amt) ? amt : 0)
-    }, 0)
-
-  const inflow = transactions
-    .filter((t) => t.direction === "received")
-    .reduce((acc, t) => {
-      const amt = Number.parseFloat(String(t.displayAmount || "0").replaceAll("+", ""))
-      return acc + (Number.isFinite(amt) ? amt : 0)
-    }, 0)
+  const pendingApprovalCount = batchesData?.stats?.pending ?? 0
 
   const handlePaymentCreated = () => {
     refresh()
     setShowBatchModal(false)
   }
 
-  // Format amount for display
-  const formatAmount = (amount: number) => {
-    if (amount >= 1000000) {
-      return `${(amount / 1000000).toFixed(3)}M`
-    }
-    return amount.toLocaleString()
-  }
+  const filtered = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase()
+    const rows = paymentBatches.filter((b) => b.batchName.toLowerCase().includes(term))
 
-  let totalBatchesUpdatedText = "--"
-  const latestBatchUpdatedAt = batchesData?.batches?.[0]?.updatedAt
-  if (batchesLoading) {
-    totalBatchesUpdatedText = "updating ..."
-  } else if (latestBatchUpdatedAt) {
-    totalBatchesUpdatedText = new Date(latestBatchUpdatedAt).toLocaleString()
-  }
+    const sorted = [...rows]
+    if (sortBy === "amount") sorted.sort((a, b) => b.totalAmount - a.totalAmount)
+    else if (sortBy === "name") sorted.sort((a, b) => a.batchName.localeCompare(b.batchName))
+    else sorted.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
 
-  const filteredBatches = paymentBatches.filter(batch =>
-    batch.batchName.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+    return sorted
+  }, [paymentBatches, searchTerm, sortBy])
 
   useEffect(() => {
     setPage(1)
-  }, [organization?.id, searchTerm, limit])
+  }, [organization?.id, searchTerm, sortBy, limit])
 
-  const totalPages = Math.max(1, Math.ceil(filteredBatches.length / limit))
+  const totalPages = Math.max(1, Math.ceil(filtered.length / limit))
   const safePage = Math.min(Math.max(1, page), totalPages)
   const startIndex = (safePage - 1) * limit
-  const paginatedBatches = filteredBatches.slice(startIndex, startIndex + limit)
-  const pageItems = getPageItems(safePage, totalPages)
-
-  if (error) {
-    return (
-      <div className="py-4 sm:py-6 lg:py-8 px-4 sm:px-6 lg:px-8">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <p className="text-red-600">Failed to load payment batches: {error}</p>
-          <Button onClick={refresh} className="mt-2" variant="outline">Try Again</Button>
-        </div>
-      </div>
-    )
-  }
-
-  const getStatusStyle = (status: string) => {
-    const normalizedStatus = status.toLowerCase();
-    if (normalizedStatus === "executed") return "bg-green-100 text-green-700";
-    if (normalizedStatus === "pending") return "bg-yellow-100 text-yellow-700";
-    if (normalizedStatus === "approved") return "bg-blue-100 text-blue-700";
-    return "bg-gray-100 text-gray-700";
-  };
-
-  const toShortAddress = (value: string) => {
-    if (!value) return "--"
-    return `${value.slice(0, 6)}...${value.slice(-4)}`
-  }
-
-  const toggleBatchExpanded = (batchId: string) => {
-    setExpandedBatchId((prev) => (prev === batchId ? null : batchId))
-  }
+  const paginated = filtered.slice(startIndex, startIndex + limit)
 
   const handleApproveBatch = async (batchName: string) => {
     if (actionLoadingBatch) return
-
     try {
       setActionLoadingBatch(batchName)
 
@@ -183,12 +146,10 @@ export default function PaymentsPage() {
         toast.error("Still getting your account ready, try again in a moment")
         return
       }
-
       if (!organization?.id || !organization.contractAddress) {
         toast.error("Missing organization details")
         return
       }
-
       if (!isSignerOrAdmin) {
         toast.error("Only signers can approve batches")
         return
@@ -199,7 +160,6 @@ export default function PaymentsPage() {
         address: organization.contractAddress,
         chain: activeChain,
       })
-
       const tx = prepareContractCall({
         contract,
         method: "function approveBatch(string batchName)",
@@ -207,7 +167,6 @@ export default function PaymentsPage() {
       })
 
       await send(tx)
-
       await recordBatchApproval(batchName, {
         signerAddress: account.address,
         signerName: currentSignerName,
@@ -216,8 +175,7 @@ export default function PaymentsPage() {
       refresh()
       toast.success("Batch approved")
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Failed to approve batch"
-      toast.error(msg)
+      toast.error(e instanceof Error ? e.message : "Failed to approve batch")
     } finally {
       setActionLoadingBatch(null)
     }
@@ -225,7 +183,6 @@ export default function PaymentsPage() {
 
   const handleExecuteBatch = async (batchName: string) => {
     if (actionLoadingBatch) return
-
     try {
       setActionLoadingBatch(batchName)
 
@@ -233,12 +190,10 @@ export default function PaymentsPage() {
         toast.error("Still getting your account ready, try again in a moment")
         return
       }
-
       if (!organization?.contractAddress) {
         toast.error("Missing organization contract address")
         return
       }
-
       if (!isSignerOrAdmin) {
         toast.error("Only signers can execute batches")
         return
@@ -249,7 +204,6 @@ export default function PaymentsPage() {
         address: organization.contractAddress,
         chain: activeChain,
       })
-
       const tx = prepareContractCall({
         contract,
         method: "function executeBatchPayroll(string batchName)",
@@ -257,7 +211,6 @@ export default function PaymentsPage() {
       })
 
       const { transactionHash } = await send(tx)
-
       await recordBatchExecution(batchName, {
         executorAddress: account.address,
         txHash: transactionHash,
@@ -266,8 +219,7 @@ export default function PaymentsPage() {
       refresh()
       toast.success("Batch executed")
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Failed to execute batch"
-      toast.error(msg)
+      toast.error(e instanceof Error ? e.message : "Failed to execute batch")
     } finally {
       setActionLoadingBatch(null)
     }
@@ -275,7 +227,6 @@ export default function PaymentsPage() {
 
   const handleRevokeApproval = async (batchName: string) => {
     if (actionLoadingBatch) return
-
     try {
       setActionLoadingBatch(batchName)
 
@@ -283,12 +234,10 @@ export default function PaymentsPage() {
         toast.error("Still getting your account ready, try again in a moment")
         return
       }
-
       if (!organization?.contractAddress) {
         toast.error("Missing organization contract address")
         return
       }
-
       if (!isSignerOrAdmin) {
         toast.error("Only signers can revoke approvals")
         return
@@ -299,7 +248,6 @@ export default function PaymentsPage() {
         address: organization.contractAddress,
         chain: activeChain,
       })
-
       const tx = prepareContractCall({
         contract,
         method: "function revokeBatchApproval(string batchName)",
@@ -307,16 +255,12 @@ export default function PaymentsPage() {
       })
 
       await send(tx)
-
-      await recordBatchApprovalRevocation(batchName, {
-        signerAddress: account.address,
-      })
+      await recordBatchApprovalRevocation(batchName, { signerAddress: account.address })
 
       refresh()
       toast.success("Approval revoked")
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Failed to revoke approval"
-      toast.error(msg)
+      toast.error(e instanceof Error ? e.message : "Failed to revoke approval")
     } finally {
       setActionLoadingBatch(null)
     }
@@ -324,7 +268,6 @@ export default function PaymentsPage() {
 
   const handleCancelBatch = async (batchName: string) => {
     if (actionLoadingBatch) return
-
     try {
       setActionLoadingBatch(batchName)
 
@@ -332,12 +275,10 @@ export default function PaymentsPage() {
         toast.error("Still getting your account ready, try again in a moment")
         return
       }
-
       if (!organization?.contractAddress) {
         toast.error("Missing organization contract address")
         return
       }
-
       if (!isSignerOrAdmin) {
         toast.error("Only signers can cancel batches")
         return
@@ -348,7 +289,6 @@ export default function PaymentsPage() {
         address: organization.contractAddress,
         chain: activeChain,
       })
-
       const tx = prepareContractCall({
         contract,
         method: "function cancelBatch(string batchName)",
@@ -356,338 +296,402 @@ export default function PaymentsPage() {
       })
 
       await send(tx)
-
       await recordBatchCancellation(batchName)
+
       refresh()
       toast.success("Batch cancelled")
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Failed to cancel batch"
-      toast.error(msg)
+      toast.error(e instanceof Error ? e.message : "Failed to cancel batch")
     } finally {
       setActionLoadingBatch(null)
     }
   }
 
-  return (
-    <div className="py-4 sm:py-6 lg:py-8 px-4 sm:px-6 lg:px-8 space-y-6">
-      {/* Breadcrumb */}
-      <div className="text-sm text-gray-600">
-        <span>Dashboard</span>
-        <span className="mx-2">›</span>
-        <span>Treasury Payments</span>
-      </div>
-
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="space-y-1">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Treasury Payments</h1>
-          <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
-            <span className="px-2 py-0.5 rounded border border-gray-200 bg-gray-50 text-gray-700">Org Treasury</span>
-            <span>Address:</span>
-            <span className="font-mono text-gray-800">
-              {organization?.contractAddress ? toShortAddress(organization.contractAddress) : "--"}
-            </span>
-          </div>
+  if (error) {
+    return (
+      <div className="px-1 lg:px-10">
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+          <p className="text-red-600">Failed to load payment batches: {error}</p>
         </div>
-        <Button onClick={() => setShowBatchModal(true)} className="bg-blue-600 hover:bg-blue-700 text-white">
-          + Create New Batch
-        </Button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-3 px-1 lg:px-10">
+      <div className="flex flex-col">
+        <div className="flex items-center py-2 text-xs text-gray-400">
+          <Link href={base} className="px-1 hover:underline">
+            Dashboard
+          </Link>
+          <ChevronRight size={10} className="text-gray-500" />
+          <Link href={`${base}/employees`} className="px-1 hover:underline">
+            Employees
+          </Link>
+          <ChevronRight size={10} className="text-gray-500" />
+          <span className="px-1">Payroll</span>
+        </div>
+
+        <div className="flex flex-col items-start justify-between gap-4 lg:flex-row lg:items-center">
+          <h1 className="font-nohemi text-3xl font-normal text-gray-600 lg:text-4xl">Payroll</h1>
+          <PillButton tone="primary" className="h-11" onClick={() => setShowBatchModal(true)}>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M4 8h8M8 4v8" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+            Create Batch Payment
+          </PillButton>
+        </div>
       </div>
 
-      {/* Stat Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          label="Total Batches"
-          value={totalBatches.toString()}
-          lastUpdated={totalBatchesUpdatedText}
-        />
-        <StatCard label="Pending Approval" value={stats.pending.toString()} />
-        <StatCard
-          label={`Outflow (${symbol})`}
-          value={outflow.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-        />
-        <StatCard
-          label={`Inflow (${symbol})`}
-          value={inflow.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-        />
-      </div>
-
-      {/* Payment Batches Table */}
-      <Card className="p-4 sm:p-6">
-        <h2 className="text-lg font-semibold mb-4">Payment Batches</h2>
-
-        {/* Search and Filters */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between mb-6 gap-4">
-          <div className="flex items-center gap-2 flex-1 max-w-md">
-            <Search className="w-5 h-5 text-gray-400 flex-shrink-0" />
-            <Input
-              placeholder="Search batches"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="border-0 bg-transparent focus:ring-0"
+      <div className="min-h-[600px] overflow-hidden rounded-lg bg-white xl:h-[835px]">
+        <div className="flex h-14 shrink-0 items-center bg-neutral-50 p-4">
+          <Stat
+            label="Total Payroll"
+            unit={symbol}
+            value={totalBatches === 0 ? "--" : filtered.reduce((s, b) => s + b.totalAmount, 0).toLocaleString()}
+            icon="/icons/vuesax/outline/convert-card.svg"
+          />
+          <Stat
+            label="Last Payroll"
+            unit={symbol}
+            value={lastPayrollAmount === null ? "--" : lastPayrollAmount.toLocaleString()}
+            icon="/icons/vuesax/broken/money-tick.svg"
+          />
+          <Stat
+            label="Pending Approval"
+            value={String(pendingApprovalCount)}
+            icon="/icons/vuesax/linear/user-minus.svg"
+          />
+          <div className="ml-auto">
+            <Stat
+              label="Available Balance"
+              unit={symbol}
+              value={
+                treasuryBalance === null
+                  ? "--"
+                  : treasuryBalance.toLocaleString(undefined, { maximumFractionDigits: 2 })
+              }
+              icon="/icons/document-text.svg"
+              noBorder
             />
           </div>
+        </div>
 
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 text-sm">
-              <span className="text-gray-600">Filters:</span>
-              <button className="flex items-center gap-1 text-gray-700 hover:text-gray-900">
-                Recent Batches
-                <ChevronDown className="w-4 h-4" />
-              </button>
+        <div className="flex flex-col gap-5 p-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex h-9 w-full max-w-xs items-center overflow-hidden rounded-full pl-4 outline outline-[0.3px] -outline-offset-[0.3px] outline-neutral-300">
+              <Input
+                placeholder="Search batches"
+                className="h-9 flex-1 border-0 bg-transparent px-0 text-xs shadow-none focus-visible:ring-0"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+              <span className="flex h-9 items-center bg-indigo-50 px-4 outline outline-[0.3px] -outline-offset-[0.3px] outline-neutral-100">
+                <Image src="/icons/vuesax/linear/search-normal.svg" alt="" width={16} height={16} className="size-4" />
+              </span>
             </div>
 
-            <div className="flex items-center gap-2 text-sm">
-              <span className="text-gray-600">Sort:</span>
-              <button className="flex items-center gap-1 text-gray-700 hover:text-gray-900">
-                Date
-                <ChevronDown className="w-4 h-4" />
-              </button>
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-1 rounded-lg bg-slate-50 p-2 text-neutral-600">
+                <Image src="/icons/vuesax/linear/sort.svg" alt="" width={16} height={16} className="size-4" />
+                <span>Filters :</span>
+                <span className="text-sm font-medium text-neutral-800">Recent Batches</span>
+                <ChevronDown size={14} className="text-neutral-400" />
+              </div>
+
+              <div className="relative" ref={sortRef}>
+                <button
+                  type="button"
+                  onClick={() => setShowSortDropdown((v) => !v)}
+                  className="flex items-center gap-1 rounded-lg bg-slate-50 p-2 text-neutral-600"
+                >
+                  <Image src="/icons/vuesax/linear/setting-4.svg" alt="" width={16} height={16} className="size-4" />
+                  <span>Sort :</span>
+                  <span className="text-sm font-medium text-neutral-800">
+                    {sortOptions.find((o) => o.value === sortBy)?.label ?? "Date"}
+                  </span>
+                  <ChevronDown size={14} className="text-neutral-400" />
+                </button>
+
+                {showSortDropdown ? (
+                  <div className="absolute right-0 top-full z-30 mt-1 w-56 overflow-hidden rounded-lg border border-neutral-200 bg-white py-1 shadow-lg">
+                    {sortOptions.map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => {
+                          setSortBy(option.value)
+                          setShowSortDropdown(false)
+                        }}
+                        className={`block w-full px-4 py-2 text-left text-sm transition-colors hover:bg-[#EEF0FC] ${
+                          sortBy === option.value ? "bg-[#EEF0FC] text-[#4F51D9]" : "text-neutral-700"
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-gray-200">
-                <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">#</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">BATCH NAME</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">INITIATED BY</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">TOTAL AMOUNT ({symbol})</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">DATE</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">EMPLOYEES</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">STATUS</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">APPROVALS</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">TRANSACTION HASH</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">ACTION</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredBatches.length === 0 ? (
-                <tr>
-                  <td colSpan={10} className="py-8 text-center text-gray-500">
-                    No payment batches yet. Create your first batch to get started.
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[1100px] table-fixed text-left">
+              <colgroup>
+                <col className="w-[3%]" />
+                <col className="w-[12%]" />
+                <col className="w-[20%]" />
+                <col className="w-[10%]" />
+                <col className="w-[13%]" />
+                <col className="w-[8%]" />
+                <col className="w-[10%]" />
+                <col className="w-[10%]" />
+                <col className="w-[14%]" />
+              </colgroup>
+              <thead>
+                <tr className="h-14 border-y border-gray-100 bg-neutral-100">
+                  <Th className="font-semibold text-gray-800">#</Th>
+                  <Th>TNX HASH</Th>
+                  <Th className="text-center">BATCH NAME</Th>
+                  <Th className="text-center">INITIATED BY</Th>
+                  <Th className="text-center">
+                    AMOUNT <span className="font-bold">({symbol || "--"})</span>
+                  </Th>
+                  <Th className="text-center">TYPE</Th>
+                  <Th className="text-center">RECIPIENTS</Th>
+                  <Th className="text-center">STATUS</Th>
+                  <Th className="text-center">DATE</Th>
                 </tr>
-              ) : (
-                paginatedBatches.flatMap((batch, index) => {
-                  const isExpanded = expandedBatchId === batch.id
-                  const approvalCountText = `${batch.approvalCount}/${batch.quorumRequired}`
-                  const userHasApproved = hasSignedApproval(batch.approvalSignerAddresses)
-                  const showActionButtons = isSignerOrAdmin && !isBatchTerminal(batch.statusRaw)
-                  const isActionLoading = actionLoadingBatch !== null
-
-                  const row = (
-                    <tr key={batch.id} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="py-4 px-4 text-sm text-gray-900">{startIndex + index + 1}</td>
-                      <td className="py-4 px-4 text-sm text-gray-900">{batch.batchName}</td>
-                      <td className="py-4 px-4 text-sm text-gray-600">{(batch.creatorJobRole || "").trim() || toShortAddress(batch.creatorAddress)}</td>
-                      <td className="py-4 px-4 text-sm font-semibold text-gray-900">
-                        {formatAmount(batch.totalAmount)}
-                      </td>
-                      <td className="py-4 px-4 text-sm text-gray-600">{batch.date}</td>
-                      <td className="py-4 px-4 text-sm text-gray-900">{batch.employees}</td>
-                      <td className="py-4 px-4 text-sm">
-                        <span className={`px-3 py-1 rounded text-xs font-medium ${getStatusStyle(batch.status)}`}>
-                          {batch.status}
-                        </span>
-                      </td>
-                      <td className="py-4 px-4 text-sm text-gray-700">
-                        <div className="flex items-center gap-2">
-                          <span>{approvalCountText}</span>
-                          {batch.approvals.length > 0 && (
-                            <button
-                              type="button"
-                              onClick={() => toggleBatchExpanded(batch.id)}
-                              className="text-blue-600 hover:underline text-xs"
+              </thead>
+              <tbody>
+                {batchesLoading ? (
+                  <tr>
+                    <td colSpan={9} className="py-10 text-center">
+                      <Loader2 className="mx-auto size-6 animate-spin text-[#4F51D9]" />
+                    </td>
+                  </tr>
+                ) : paginated.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="py-10 text-center text-sm text-gray-500">
+                      No payment batches yet. Create your first batch to get started.
+                    </td>
+                  </tr>
+                ) : (
+                  paginated.map((batch, index) => {
+                    return (
+                      <tr key={batch.id} className="border-b border-gray-100 hover:bg-surface-canvas">
+                        <Td className="text-sm font-semibold text-gray-500">{startIndex + index + 1}</Td>
+                        <Td>
+                          {batch.txHash ? (
+                            <a
+                              href={`https://sepolia.basescan.org/tx/${batch.txHash}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="truncate font-semibold text-neutral-500 hover:text-indigo-600"
                             >
-                              {isExpanded ? "Hide" : "View"}
-                            </button>
+                              {shortHash(batch.txHash)}
+                            </a>
+                          ) : (
+                            <span className="truncate font-semibold text-neutral-500">--</span>
                           )}
-                        </div>
-                      </td>
-                      <td className="py-4 px-4 text-sm text-gray-600">
-                        {batch.txHash ? (
-                          <a
-                            href={`https://sepolia.basescan.org/tx/${batch.txHash}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-blue-600 hover:underline"
-                          >
-                            {toShortAddress(batch.txHash)}
-                          </a>
-                        ) : "--"}
-                      </td>
-                      <td className="py-4 px-4 text-sm">
-                        <div className="flex items-center gap-2">
-                          {showActionButtons && (
-                            <>
-                              {userHasApproved && (
-                                <Button
-                                  variant="outline"
-                                  className="h-8 px-3"
-                                  disabled={isActionLoading || !canSign}
-                                  title={canSign ? undefined : "Still getting your account ready"}
-                                  onClick={() => void handleRevokeApproval(batch.batchName)}
-                                >
-                                  {actionLoadingBatch === batch.batchName ? "Processing..." : "Revoke"}
-                                </Button>
-                              )}
-                              <Button
-                                variant="outline"
-                                className="h-8 px-3"
-                                disabled={isActionLoading || userHasApproved || !canSign}
-                                title={canSign ? undefined : "Still getting your account ready"}
-                                onClick={() => void handleApproveBatch(batch.batchName)}
-                              >
-                                {actionLoadingBatch === batch.batchName ? "Processing..." : "Approve"}
-                              </Button>
-                              <Button
-                                className="h-8 px-3 bg-blue-600 hover:bg-blue-700"
-                                disabled={
-                                  isActionLoading || batch.approvalCount < batch.quorumRequired || !canSign
-                                }
-                                title={canSign ? undefined : "Still getting your account ready"}
-                                onClick={() => void handleExecuteBatch(batch.batchName)}
-                              >
-                                {actionLoadingBatch === batch.batchName ? "Processing..." : "Execute"}
-                              </Button>
-                              <Button
-                                variant="outline"
-                                className="h-8 px-3"
-                                disabled={isActionLoading || !canSign}
-                                title={canSign ? undefined : "Still getting your account ready"}
-                                onClick={() => void handleCancelBatch(batch.batchName)}
-                              >
-                                {actionLoadingBatch === batch.batchName ? "Processing..." : "Cancel"}
-                              </Button>
-                            </>
-                          )}
-                          <button className="text-gray-400 hover:text-gray-600">
-                            <MoreVertical className="w-5 h-5" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-
-                  const detailRow = isExpanded ? (
-                    <tr key={`${batch.id}-approvals`} className="border-b border-gray-100 bg-gray-50">
-                      <td colSpan={10} className="px-4 pb-4">
-                        <div className="pt-2">
-                          <p className="text-xs font-semibold text-gray-700">Approvals</p>
-                          <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                            {batch.approvals.map((a) => (
-                              <div
-                                key={`${batch.id}-${a.signerAddress}-${a.approvedAt}`}
-                                className="rounded border border-gray-200 bg-white px-3 py-2"
-                              >
-                                <p className="text-xs font-medium text-gray-900">{a.signerName || "Signer"}</p>
-                                <p className="text-[10px] text-gray-600 font-mono">{toShortAddress(a.signerAddress)}</p>
-                                <p className="text-[10px] text-gray-500">{new Date(a.approvedAt).toLocaleString()}</p>
-                              </div>
-                            ))}
+                        </Td>
+                        <Td className="text-center font-semibold text-neutral-500">{batch.batchName}</Td>
+                        <Td className="text-center font-semibold text-neutral-500">
+                          {(batch.creatorJobRole || "").trim() ||
+                            `${batch.creatorAddress.slice(0, 6)}...${batch.creatorAddress.slice(-4)}`}
+                        </Td>
+                        <Td className="text-center font-semibold text-neutral-800">
+                          {batch.totalAmount.toLocaleString()}
+                        </Td>
+                        <Td className="text-center font-semibold text-neutral-500">Outflow</Td>
+                        <Td className="text-center font-semibold text-neutral-500">{batch.employees}</Td>
+                        <Td className="text-center">
+                          <StatusPill status={batch.status} />
+                        </Td>
+                        <Td>
+                          <div className="flex flex-col items-center gap-1">
+                            <span className="text-center text-xs font-semibold text-neutral-800">
+                              {batch.date}
+                            </span>
                           </div>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : null
+                        </Td>
+                      </tr>
+                    )
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
 
-                  return detailRow ? [row, detailRow] : [row]
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+          {!batchesLoading && paginated.some((b) => isSignerOrAdmin && !isBatchTerminal(b.statusRaw)) ? (
+            <div className="flex flex-col gap-2">
+              {paginated
+                .filter((b) => isSignerOrAdmin && !isBatchTerminal(b.statusRaw))
+                .map((batch) => {
+                  const userHasApproved = hasSignedApproval(batch.approvalSignerAddresses)
+                  const isActionLoading = actionLoadingBatch !== null
+                  const isBusy = actionLoadingBatch === batch.batchName
 
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-6">
-          <div className="flex items-center gap-3 text-sm text-gray-600">
-            <span>
+                  return (
+                    <div
+                      key={`${batch.id}-actions`}
+                      className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-slate-50 px-4 py-3 outline outline-[0.5px] -outline-offset-[0.5px] outline-zinc-100"
+                    >
+                      <div className="flex items-center gap-2 text-xs text-neutral-600">
+                        <span className="font-semibold text-neutral-800">{batch.batchName}</span>
+                        <span>
+                          {batch.approvalCount}/{batch.quorumRequired} approvals
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {userHasApproved ? (
+                          <PillButton
+                            tone="soft"
+                            size="sm"
+                            disabled={isActionLoading || !canSign}
+                            title={canSign ? undefined : "Still getting your account ready"}
+                            onClick={() => void handleRevokeApproval(batch.batchName)}
+                          >
+                            {isBusy ? <Loader2 size={14} className="animate-spin" /> : null}
+                            Revoke
+                          </PillButton>
+                        ) : (
+                          <PillButton
+                            tone="soft"
+                            size="sm"
+                            disabled={isActionLoading || !canSign}
+                            title={canSign ? undefined : "Still getting your account ready"}
+                            onClick={() => void handleApproveBatch(batch.batchName)}
+                          >
+                            {isBusy ? <Loader2 size={14} className="animate-spin" /> : null}
+                            Approve
+                          </PillButton>
+                        )}
+                        <PillButton
+                          tone="primary"
+                          size="sm"
+                          disabled={isActionLoading || batch.approvalCount < batch.quorumRequired || !canSign}
+                          title={canSign ? undefined : "Still getting your account ready"}
+                          onClick={() => void handleExecuteBatch(batch.batchName)}
+                        >
+                          {isBusy ? <Loader2 size={14} className="animate-spin" /> : null}
+                          Execute
+                        </PillButton>
+                        <PillButton
+                          tone="soft"
+                          size="sm"
+                          disabled={isActionLoading || !canSign}
+                          title={canSign ? undefined : "Still getting your account ready"}
+                          onClick={() => void handleCancelBatch(batch.batchName)}
+                        >
+                          {isBusy ? <Loader2 size={14} className="animate-spin" /> : null}
+                          Cancel
+                        </PillButton>
+                      </div>
+                    </div>
+                  )
+                })}
+            </div>
+          ) : null}
+
+          <div className="flex flex-col items-center justify-between gap-3 sm:flex-row">
+            <span className="text-sm text-gray-600">
               Page {safePage} of {totalPages}
             </span>
-            <div className="flex items-center gap-2">
-              <span>Rows:</span>
-              <select
-                value={limit}
-                onChange={(e) => setLimit(Number(e.target.value))}
-                disabled={batchesLoading}
-                className="h-9 rounded border border-gray-200 bg-white px-2 text-sm text-gray-700 disabled:opacity-50"
-              >
-                <option value={10}>10</option>
-                <option value={25}>25</option>
-                <option value={50}>50</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="flex flex-col sm:flex-row items-center gap-3">
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={safePage <= 1 || batchesLoading}
-                className="px-3 py-2 rounded border border-gray-200 text-sm text-gray-700 disabled:opacity-50"
+                className="rounded border border-gray-200 px-3 py-2 text-sm text-gray-700 disabled:opacity-50"
               >
                 Prev
               </button>
-
-              <div className="flex items-center gap-1">
-                {(() => {
-                  let ellipsisCount = 0
-                  return pageItems.map((item) => {
-                    if (item === "...") {
-                      ellipsisCount += 1
-                      const side = ellipsisCount === 1 ? "left" : "right"
-                      return (
-                        <span key={`ellipsis-${side}`} className="px-2 text-gray-500">
-                          ...
-                        </span>
-                      )
-                    }
-
-                    const isActive = item === safePage
-                    return (
-                      <button
-                        key={item}
-                        type="button"
-                        onClick={() => setPage(item)}
-                        disabled={batchesLoading}
-                        className={`h-9 min-w-9 rounded border text-sm disabled:opacity-50 ${
-                          isActive
-                            ? "border-gray-900 bg-gray-900 text-white"
-                            : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
-                        }`}
-                      >
-                        {item}
-                      </button>
-                    )
-                  })
-                })()}
-              </div>
-
               <button
                 type="button"
                 onClick={() => setPage((p) => p + 1)}
                 disabled={safePage >= totalPages || batchesLoading}
-                className="px-3 py-2 rounded border border-gray-200 text-sm text-gray-700 disabled:opacity-50"
+                className="rounded border border-gray-200 px-3 py-2 text-sm text-gray-700 disabled:opacity-50"
               >
                 Next
               </button>
             </div>
           </div>
         </div>
-      </Card>
+      </div>
 
       {showBatchModal && (
-        <BatchPaymentCreationModal 
+        <BatchPaymentCreationModal
           organizationId={organization?.id}
           organizationAddress={organization?.contractAddress}
-          onClose={() => setShowBatchModal(false)} 
+          onClose={() => setShowBatchModal(false)}
           onPaymentCreated={handlePaymentCreated}
         />
       )}
     </div>
   )
+}
+
+function Stat({
+  label,
+  unit,
+  value,
+  icon,
+  noBorder = false,
+}: {
+  label: string
+  unit?: string
+  value: string
+  icon: string
+  noBorder?: boolean
+}) {
+  return (
+    <span
+      className={`flex items-start gap-2 pl-2 pr-6 ${noBorder ? "" : "border-r border-gray-300"}`}
+    >
+      <span className="flex size-6 shrink-0 items-center justify-center bg-white outline outline-[0.75px] -outline-offset-[0.75px] outline-indigo-50">
+        <Image src={icon} alt="" width={14} height={14} className="size-3.5" />
+      </span>
+      <span className="flex items-center gap-1">
+        <span className="font-nohemi text-[10px] text-gray-500">
+          {label}
+          {unit ? ` (${unit})` : ""} :
+        </span>
+        <span className="font-bricolage text-xl font-bold text-[#1D1E49]">{value}</span>
+      </span>
+    </span>
+  )
+}
+
+function StatusPill({ status }: { status: string }) {
+  const normalized = status.toLowerCase()
+  const classes =
+    normalized === "executed" || normalized === "completed"
+      ? "bg-green-50 text-lime-700"
+      : normalized === "pending"
+        ? "bg-amber-50 text-yellow-600"
+        : normalized === "cancelled" || normalized === "expired" || normalized === "failed"
+          ? "bg-pink-100 text-red-600"
+          : "bg-blue-50 text-blue-700"
+
+  return (
+    <span
+      className={`inline-flex items-center justify-center whitespace-nowrap rounded-full px-3 py-2 text-xs font-medium leading-3 ${classes}`}
+    >
+      {status.charAt(0).toUpperCase() + status.slice(1)}
+    </span>
+  )
+}
+
+function Th({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return (
+    <th className={`truncate px-1.5 py-3 text-[11px] font-normal tracking-tight text-neutral-600 ${className}`}>
+      {children}
+    </th>
+  )
+}
+
+function Td({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return <td className={`px-1.5 py-4 text-xs leading-4 ${className}`}>{children}</td>
 }
