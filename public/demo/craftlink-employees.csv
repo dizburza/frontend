@@ -1,0 +1,8 @@
+surname,firstname,email,phone,jobRole,salary,department,employeeId,walletAddress
+Adeoye,Adetola,adetola.adeoye@craftlink.test,+2348012345001,HR Manager,750000,People,CL-001,0xbf4EE65FE67C291DfC34ffe2455ecA9d97DF9148
+Balogun,Timi,timi.balogun@craftlink.test,+2348012345002,Graphics Designer,900000,Design,CL-002,0xb7B943fFbA78e33589971e630AD6EB544252D88C
+Hassan,Amina,amina.hassan@craftlink.test,+2348012345003,Finance Officer,1200000,Finance,CL-003,0x26372592E47C04f2D3509a3C88E73d36a68D931d
+Eze,Chidera,chidera.eze@craftlink.test,+2348012345004,Product Manager,1800000,Product,CL-004,0x3E7dfBF99f10402E860Df4e7420217EF56e94cc1
+Johnson,Femi,femi.johnson@craftlink.test,+2348012345005,Software Engineer,2500000,Engineering,CL-005,0x38168dE41fcACe018C381986A960C8DA00fD39F1
+Uche,Kelechi,kelechi.uche@craftlink.test,+2348012345006,Operations Lead,3200000,Operations,CL-006,0xCca97489E5222C20C5645BBdc527d2508375BD6e
+Adebayo,Ridwan,ridwan.adebayo@craftlink.test,+2348012345007,Backend Developer,4500000,Engineering,CL-007,0x8754FE2165C4eA746843EfbBc2455830e19e744B
