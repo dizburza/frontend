@@ -31,11 +31,13 @@ export function VotingPanel({
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   // The signer's own vote isn't in `proposal.votes` until a refresh comes
-  // back, so the submitted panel shows the choice just made in the meantime
-  // rather than waiting on a round trip to know what it should say.
+  // back, so this both shows the choice just made and closes the voting
+  // buttons immediately: `hasSigned` is derived from the same stale prop and
+  // would otherwise still say no for the length of that round trip, which is
+  // long enough for a second click to land and hit the "already voted" error.
   const [justVoted, setJustVoted] = useState<"for" | "against" | null>(null)
 
-  const canCastVote = canSign && !hasSigned && proposal.status === "open"
+  const canCastVote = canSign && !hasSigned && !justVoted && proposal.status === "open"
 
   const handleConfirm = async () => {
     if (!pendingChoice || isSubmitting) return
@@ -59,7 +61,7 @@ export function VotingPanel({
 
   return (
     <>
-      {hasSigned ? (
+      {hasSigned || justVoted ? (
         <VoteSubmittedCard proposal={proposal} choice={submittedChoice} />
       ) : (
         <div className="self-stretch bg-white rounded-lg flex flex-col justify-start items-start gap-4 overflow-hidden">
