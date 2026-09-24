@@ -14,6 +14,7 @@ import { PillButton } from "@/components/ui/pill-button"
 import { SectionCard } from "@/components/dashboard/section-card"
 import {
   mapApiEmployeeToEmployee,
+  recordBootstrapSignerAdd,
   recordSignerChangeProposal,
   remindEmployee,
   removeOrganizationEmployee,
@@ -326,6 +327,10 @@ export default function EmployeesPage() {
         toast.success("Signer change proposed. It needs quorum approval to take effect.")
       } else {
         await signerManagement.addSigner(subject)
+        await recordBootstrapSignerAdd(organization.id, {
+          subjectAddress: subject,
+          subjectName: `${pendingSigner.firstName} ${pendingSigner.surname}`.trim(),
+        })
         toast.success("Signer added")
       }
 

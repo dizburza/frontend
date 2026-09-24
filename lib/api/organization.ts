@@ -754,6 +754,17 @@ export async function fetchSignerChangeProposals(
   return response.data || response;
 }
 
+/** Records a bootstrap addSigner() call already made on chain, with no proposal to attach it to. */
+export async function recordBootstrapSignerAdd(
+  organizationId: string,
+  payload: { subjectAddress: string; subjectName: string }
+): Promise<void> {
+  await apiFetch(`/api/organizations/${organizationId}/signers`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 // React Hooks
 export function useOrganizationEmployees(organizationId: string | null) {
   const [data, setData] = useState<EmployeesResponse | null>(null);
