@@ -2,13 +2,18 @@
 
 import { activeChain } from "@/constants/chain";
 import type React from "react"
-import { useMemo, useState } from "react"
-import { Button } from "@/components/ui/button"
+import { useEffect, useMemo, useState } from "react"
+import Image from "next/image"
 import { Input } from "@/components/ui/input"
-import { X, ChevronLeft, Loader2 } from "lucide-react"
-import { Card } from "@/components/ui/card"
-import { SuccessModal } from "@/components/success-modal"
-import { mapApiEmployeeToEmployee, recordBatchCreation, useOrganizationEmployees } from "@/lib/api/organization"
+import { PillButton } from "@/components/ui/pill-button"
+import { ChevronLeft, Loader2 } from "lucide-react"
+import {
+  fetchTaxPreview,
+  mapApiEmployeeToEmployee,
+  recordBatchCreation,
+  useOrganizationEmployees,
+  type TaxPreviewResponse,
+} from "@/lib/api/organization"
 import { toast } from "sonner"
 import { useActiveAccount } from "thirdweb/react"
 import { getContract, prepareContractCall } from "thirdweb"
@@ -16,6 +21,18 @@ import { thirdwebClient } from "@/app/client"
 import { toBaseUnits } from "@/lib/token"
 import { useToken } from "@/hooks/useToken"
 import { useSponsoredTransaction } from "@/hooks/useSponsoredTransaction"
+
+const steps = [
+  { key: "details", label: "Details" },
+  { key: "employees", label: "Select Employees" },
+  { key: "preview", label: "Preview" },
+] as const
+
+const today = () =>
+  new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+
+const shortAddress = (value: string) =>
+  value && value.length >= 12 ? `${value.slice(0, 5)}...${value.slice(-4)}` : value || "--"
 
 interface BatchPaymentCreationModalProps {
   onClose: () => void
@@ -37,9 +54,12 @@ export function BatchPaymentCreationModal({
   const [selectedEmployees, setSelectedEmployees] = useState<string[]>([])
   const [employeeSearch, setEmployeeSearch] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [taxPreview, setTaxPreview] = useState<TaxPreviewResponse | null>(null)
+  const [taxLoading, setTaxLoading] = useState(false)
   const [formData, setFormData] = useState({
     batchName: "",
-    paymentDate: "Oct 21,2025",
+    paymentDate: today(),
+    description: "",
   })
 
   const { data: employeesData, loading: employeesLoading, error: employeesError } = useOrganizationEmployees(organizationId || null)
@@ -167,66 +187,140 @@ export function BatchPaymentCreationModal({
   const selectedEmployeeData = employees.filter((e) => selectedEmployees.includes(e.id))
   const totalAmount = selectedEmployeeData.reduce((sum, emp) => sum + Number(emp.salary || 0), 0)
 
-  const renderStepIndicator = () => {
-    const detailsActive = step === "details" || step === "employees" || step === "preview"
-    const employeesActive = step === "employees" || step === "preview"
-    const previewActive = step === "preview"
+  // Fetched rather than computed here: PAYE is progressive and depends on the
+  // organization's regime and each member's salaryIsGross, so a rate assumed in
+  // the browser would not match what the receipt ends up carrying.
+  useEffect(() => {
+    if (step !== "preview" || !organizationId || selectedEmployeeData.length === 0) return
 
-    const baseCircleClass = "w-10 h-10 rounded-full flex items-center justify-center font-semibold"
-    const activeCircleClass = "bg-blue-600 text-white"
-    const inactiveCircleClass = "bg-gray-300 text-gray-600"
+    const addresses = selectedEmployeeData.map((e) => e.walletAddress).filter(Boolean)
+    if (addresses.length === 0) return
 
-    const detailsCircleClass = `${baseCircleClass} ${detailsActive ? activeCircleClass : inactiveCircleClass}`
-    const employeesCircleClass = `${baseCircleClass} ${employeesActive ? activeCircleClass : inactiveCircleClass}`
-    const previewCircleClass = `${baseCircleClass} ${previewActive ? activeCircleClass : inactiveCircleClass}`
-    const employeesCircleText = employeesActive ? "✓" : "2"
+    let cancelled = false
+    setTaxLoading(true)
 
-    return (
-      <div className="flex items-center justify-center gap-8 mb-8">
-        <div className="flex flex-col items-center">
-          <div className={detailsCircleClass}>✓</div>
-          <span className="text-xs mt-2 text-gray-600">Details</span>
-        </div>
-        <div className="w-12 h-1 bg-gray-300"></div>
-        <div className="flex flex-col items-center">
-          <div className={employeesCircleClass}>{employeesCircleText}</div>
-          <span className="text-xs mt-2 text-gray-600">Select Employees</span>
-        </div>
-        <div className="w-12 h-1 bg-gray-300"></div>
-        <div className="flex flex-col items-center">
-          <div className={previewCircleClass}>3</div>
-          <span className="text-xs mt-2 text-gray-600">Preview</span>
-        </div>
+    fetchTaxPreview(organizationId, addresses)
+      .then((result) => {
+        if (!cancelled) setTaxPreview(result)
+      })
+      .catch(() => {
+        // The batch can still be raised without the estimate, so the columns
+        // fall back to showing the salary alone rather than blocking review.
+        if (!cancelled) setTaxPreview(null)
+      })
+      .finally(() => {
+        if (!cancelled) setTaxLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, organizationId, selectedEmployees.join(",")])
+
+  const taxByAddress = useMemo(() => {
+    const map = new Map<string, TaxPreviewResponse["lines"][number]>()
+    for (const line of taxPreview?.lines ?? []) {
+      map.set(line.address.toLowerCase(), line)
+    }
+    return map
+  }, [taxPreview])
+
+  const showTax = (taxPreview?.taxEnabled ?? false) && taxByAddress.size > 0
+
+  // Summed from the same lines the table renders, so the totals cannot drift
+  // from the rows above them.
+  const sumLines = (pick: (line: TaxPreviewResponse["lines"][number]) => string) =>
+    selectedEmployeeData.reduce((sum, emp) => {
+      const line = taxByAddress.get(emp.walletAddress.toLowerCase())
+      return sum + (line ? Number(pick(line)) : 0)
+    }, 0)
+
+  const grossTotal = showTax ? sumLines((l) => l.grossFormatted) : totalAmount
+  const taxTotal = showTax ? sumLines((l) => l.taxFormatted) : 0
+  const netTotal = showTax ? sumLines((l) => l.netFormatted) : totalAmount
+
+  const stepIndex = steps.findIndex((s) => s.key === step)
+
+  const renderStepIndicator = () => (
+    <div className="flex w-72 flex-col gap-2">
+      <div className="flex items-center">
+        {steps.map((s, index) => (
+          <div key={s.key} className="contents">
+            {index > 0 ? (
+              <div
+                className={`h-0.5 flex-1 ${index <= stepIndex ? "bg-indigo-300" : "bg-gray-300"}`}
+              />
+            ) : null}
+            {index < stepIndex ? (
+              <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-indigo-600">
+                <svg viewBox="0 0 12 12" fill="none" aria-hidden="true" className="size-3">
+                  <path
+                    d="M2.5 6.2 4.8 8.5 9.5 3.8"
+                    stroke="white"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </span>
+            ) : (
+              <Image
+                src={index === stepIndex ? "/icons/step-dot-active.svg" : "/icons/step-dot-pending.svg"}
+                alt=""
+                width={24}
+                height={24}
+                className="size-6 shrink-0"
+              />
+            )}
+          </div>
+        ))}
       </div>
-    )
-  }
+      <div className="flex items-center justify-between">
+        {steps.map((s, index) => (
+          <span
+            key={s.key}
+            className={`text-xs ${
+              index < stepIndex ? "font-medium text-indigo-700" : "text-neutral-600"
+            }`}
+          >
+            {s.label}
+          </span>
+        ))}
+      </div>
+    </div>
+  )
 
   // Show success modal
   if (step === "success") {
     return (
-      <SuccessModal
-        title="Batch Payment Created"
-        icon="check"
-        summary={[
-          {
-            label: "Batch Name",
-            value: formData.batchName,
-          },
-          {
-            label: "Total Amount",
-            value: formatAmount(totalAmount),
-          },
-          {
-            label: "Employees",
-            value: selectedEmployeeData.length.toString(),
-          },
-          {
-            label: "Payment Date",
-            value: formData.paymentDate,
-          },
-        ]}
-        onClose={onClose}
-      />
+      <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 p-6">
+        <div className="flex w-full max-w-[552px] flex-col items-center gap-10 rounded-xl bg-white p-10 shadow-[0px_16px_135px_0px_rgba(24,34,57,0.12)] outline outline-[0.5px] -outline-offset-[0.5px] outline-zinc-300">
+          <div className="flex flex-col items-center gap-8">
+            <Image
+              src="/illustrations/batch-submitted.svg"
+              alt=""
+              width={160}
+              height={160}
+              className="size-40"
+            />
+
+            <div className="flex flex-col items-center gap-3">
+              <h2 className="text-center font-nohemi text-3xl font-medium text-zinc-600">
+                Batch payment submitted
+              </h2>
+              <p className="text-center text-base text-neutral-600">
+                {formData.batchName} has been submitted successfully and is waiting for the
+                required approvals.
+              </p>
+            </div>
+          </div>
+
+          <PillButton tone="primary" className="w-full py-4" onClick={onClose}>
+            View Batch
+          </PillButton>
+        </div>
+      </div>
     )
   }
 
@@ -234,18 +328,18 @@ export function BatchPaymentCreationModal({
   if (employeesLoading) {
     employeesTableBody = (
       <tr>
-        <td colSpan={7} className="py-10 text-center text-gray-500">
-          <div className="flex items-center justify-center gap-2">
-            <Loader2 className="w-5 h-5 animate-spin" />
+        <td colSpan={7} className="py-10 text-center text-sm text-gray-500">
+          <span className="flex items-center justify-center gap-2">
+            <Loader2 className="size-5 animate-spin" />
             Loading employees...
-          </div>
+          </span>
         </td>
       </tr>
     )
   } else if (employeesError) {
     employeesTableBody = (
       <tr>
-        <td colSpan={7} className="py-10 text-center text-gray-500">
+        <td colSpan={7} className="py-10 text-center text-sm text-gray-500">
           Failed to load employees: {employeesError}
         </td>
       </tr>
@@ -253,295 +347,490 @@ export function BatchPaymentCreationModal({
   } else if (filteredEmployees.length === 0) {
     employeesTableBody = (
       <tr>
-        <td colSpan={7} className="py-10 text-center text-gray-500">
+        <td colSpan={7} className="py-10 text-center text-sm text-gray-500">
           No employees found.
         </td>
       </tr>
     )
   } else {
-    employeesTableBody = filteredEmployees.map((emp) => (
+    employeesTableBody = filteredEmployees.map((emp, index) => (
       <tr
         key={emp.id}
-        className="border-b border-gray-100 hover:bg-gray-50"
+        onClick={() => handleEmployeeToggle(emp.id)}
+        className="cursor-pointer border-b border-gray-100 hover:bg-slate-50"
       >
-        <td className="py-4 px-4">
-          <input
-            type="checkbox"
-            checked={selectedEmployees.includes(emp.id)}
-            onChange={() => handleEmployeeToggle(emp.id)}
-            className="w-4 h-4"
-          />
-        </td>
-        <td className="py-4 px-4 text-sm text-gray-900">{emp.surname}</td>
-        <td className="py-4 px-4 text-sm text-gray-900">{emp.firstName}</td>
-        <td className="py-4 px-4 text-sm text-gray-900">
+        <SelectTd>
+          <span className="flex items-center gap-2.5">
+            <Checkbox
+              checked={selectedEmployees.includes(emp.id)}
+              onChange={() => handleEmployeeToggle(emp.id)}
+              label={`Select ${emp.firstName} ${emp.surname}`.trim()}
+            />
+            <span className="text-sm font-semibold text-gray-500">{index + 1}</span>
+          </span>
+        </SelectTd>
+        <SelectTd className="truncate text-center font-semibold text-neutral-500">
+          {emp.surname}
+        </SelectTd>
+        <SelectTd className="truncate text-center font-semibold text-neutral-500">
+          {emp.firstName}
+        </SelectTd>
+        <SelectTd className="text-center font-semibold text-neutral-800">
           {formatAmount(Number(emp.salary || 0))}
-        </td>
-        <td className="py-4 px-4 text-sm text-gray-600">
-          {emp.displayUsername ? `@${emp.displayUsername}` : `@${emp.username}`}
-        </td>
-        <td className="py-4 px-4 text-sm text-gray-600">{emp.walletAddress}</td>
-        <td className="py-4 px-4 text-sm text-gray-900">{emp.role}</td>
+        </SelectTd>
+        <SelectTd className="truncate text-center font-semibold text-neutral-800">
+          @{emp.displayUsername || emp.username}
+        </SelectTd>
+        <SelectTd className="truncate text-center font-semibold text-neutral-800">
+          {shortAddress(emp.walletAddress)}
+        </SelectTd>
+        <SelectTd className="truncate text-center font-semibold text-neutral-500">
+          {emp.role}
+        </SelectTd>
       </tr>
     ))
   }
 
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg w-full max-w-3xl max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <div className="flex items-center gap-3">
-            {step !== "details" && (
-              <button
-                onClick={() =>
-                  setStep(step === "employees" ? "details" : "employees")
-                }
-                className="text-gray-600 hover:text-gray-900"
-              >
-                <ChevronLeft size={24} />
-              </button>
-            )}
-            <h2 className="text-xl font-semibold">Batch Payment Creation</h2>
+  if (step === "details") {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="flex w-[554px] flex-col gap-10 rounded-[20px] bg-white p-12 shadow-[0px_4px_78px_31px_rgba(69,74,222,0.08)] outline outline-[0.5px] -outline-offset-[0.5px] outline-neutral-300">
+          <div className="flex flex-col items-center gap-10">
+            <ModalHeader onClose={onClose} />
+            {renderStepIndicator()}
           </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
-          >
-            <X size={24} />
-          </button>
-        </div>
 
-        {/* Content */}
-        <div className="p-6 space-y-6">
-          {renderStepIndicator()}
+          <div className="flex flex-col gap-2">
+            <p className="text-base font-medium text-neutral-500">Basic Details</p>
+            <p className="text-xs text-neutral-600">
+              Set up your payment batch name and approval requirements
+            </p>
+          </div>
 
-          {/* Step 1: Details */}
-          {step === "details" && (
-            <div className="space-y-6">
-              <div>
-                <h3 className="text-lg font-semibold mb-2">Basic Details</h3>
-                <p className="text-gray-600 text-sm mb-4">
-                  Set up your payment batch name and approval requirements
-                </p>
-              </div>
-
-              <div>
-                <label
-                  htmlFor="batchName"
-                  className="block text-sm font-medium text-gray-700 mb-2"
-                >
-                  Batch Name
-                </label>
-                <Input
-                  id="batchName"
-                  name="batchName"
-                  placeholder="Enter batch name"
-                  value={formData.batchName}
-                  onChange={handleInputChange}
-                  className="w-full"
-                />
-              </div>
-
-              <div>
-                <label
-                  htmlFor="paymentDate"
-                  className="block text-sm font-medium text-gray-700 mb-2"
-                >
-                  Payment Date
-                </label>
-                <Input
-                  id="paymentDate"
-                  name="paymentDate"
-                  value={formData.paymentDate}
-                  onChange={handleInputChange}
-                  className="w-full"
-                />
-              </div>
+          <div className="flex flex-col gap-6">
+            <div className="flex flex-col gap-5">
+              <DetailsField
+                id="batchName"
+                label="Batch Name"
+                placeholder="Enter batch name"
+                value={formData.batchName}
+                onChange={handleInputChange}
+              />
+              <DetailsField
+                id="paymentDate"
+                label="Payment Date"
+                placeholder="Enter payment date"
+                value={formData.paymentDate}
+                onChange={handleInputChange}
+              />
+              <DetailsField
+                id="description"
+                label="Description (optional)"
+                placeholder="September monthly payroll"
+                value={formData.description}
+                onChange={handleInputChange}
+              />
             </div>
-          )}
 
-          {/* Step 2: Select Employees */}
-          {step === "employees" && (
-            <div className="space-y-6">
-              <div>
-                <h3 className="text-lg font-semibold mb-1">Select Employees</h3>
-                <p className="text-gray-600 text-sm">
+            <PillButton
+              tone="primary"
+              className="w-full"
+              onClick={() => setStep("employees")}
+              disabled={!formData.batchName.trim()}
+            >
+              Next
+            </PillButton>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (step === "employees") {
+    const allSelected =
+      filteredEmployees.length > 0 && selectedEmployees.length === filteredEmployees.length
+
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 p-6">
+        <div className="flex w-full max-w-[1237px] flex-col gap-10 rounded-[20px] bg-white p-12 shadow-[0px_4px_78px_31px_rgba(69,74,222,0.08)] outline outline-[0.5px] -outline-offset-[0.5px] outline-neutral-300">
+          <ModalHeader onBack={() => setStep("details")} onClose={onClose} />
+
+          <div className="flex flex-col gap-6">
+            <div className="flex items-center justify-between gap-6">
+              <div className="flex flex-col gap-2">
+                <p className="text-base font-medium text-neutral-500">Select Employees</p>
+                <p className="text-xs text-neutral-600">
                   Choose which employees to include in this payment batch
                 </p>
               </div>
+              {renderStepIndicator()}
+            </div>
 
-              {/* Search and Select All */}
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-2 flex-1 max-w-md">
-                  <Input
-                    placeholder="Search for Employee"
-                    className="w-full"
-                    value={employeeSearch}
-                    onChange={(e) => setEmployeeSearch(e.target.value)}
-                  />
+            <div className="flex flex-col gap-5 rounded-[20px] p-5 outline outline-[0.5px] -outline-offset-[0.5px] outline-zinc-100">
+              <div className="flex flex-col">
+                <div className="flex h-10 items-center">
+                  <p className="font-nohemi text-xl font-medium leading-6 text-neutral-600">
+                    Employee&apos;s List
+                  </p>
                 </div>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={filteredEmployees.length > 0 && selectedEmployees.length === filteredEmployees.length}
-                    onChange={handleSelectAll}
-                    className="w-4 h-4"
-                  />
-                  <span className="text-sm text-gray-700">Select All</span>
-                </label>
+
+                <div className="flex items-center justify-between gap-4 py-4">
+                  <div className="flex h-9 w-64 items-center overflow-hidden rounded-full pl-4 outline outline-[0.3px] -outline-offset-[0.3px] outline-neutral-300">
+                    <Input
+                      placeholder="Search for Employee"
+                      className="h-9 flex-1 border-0 bg-transparent px-0 text-xs shadow-none focus-visible:ring-0"
+                      value={employeeSearch}
+                      onChange={(e) => setEmployeeSearch(e.target.value)}
+                    />
+                    <span className="flex h-9 items-center bg-indigo-50 px-4 outline outline-[0.3px] -outline-offset-[0.3px] outline-neutral-100">
+                      <Image
+                        src="/icons/vuesax/linear/search-normal.svg"
+                        alt=""
+                        width={16}
+                        height={16}
+                        className="size-4"
+                      />
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2.5 p-2">
+                    <Checkbox
+                      checked={allSelected}
+                      onChange={handleSelectAll}
+                      label="Select all employees"
+                    />
+                    <span className="text-sm font-medium text-neutral-800">Select All</span>
+                  </div>
+                </div>
               </div>
 
-              {/* Employee List */}
-              <div className="border border-gray-200 rounded-lg overflow-hidden">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-gray-200 bg-gray-50">
-                      <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm w-12">
-                        #
-                      </th>
-                      <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">
-                        SURNAME
-                      </th>
-                      <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">
-                        FIRST NAME
-                      </th>
-                      <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">
-                        SALARY ({symbol})
-                      </th>
-                      <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">
-                        USERNAME
-                      </th>
-                      <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">
-                        WALLET ADDRESS
-                      </th>
-                      <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">
-                        ROLE
-                      </th>
+              <div className="max-h-[420px] overflow-auto">
+                <table className="w-full min-w-[980px] table-fixed text-left">
+                  <colgroup>
+                    <col className="w-[5%]" />
+                    <col className="w-[15%]" />
+                    <col className="w-[15%]" />
+                    <col className="w-[11%]" />
+                    <col className="w-[19%]" />
+                    <col className="w-[17%]" />
+                    <col className="w-[18%]" />
+                  </colgroup>
+                  <thead className="sticky top-0 z-10">
+                    <tr className="h-14 border-y border-gray-100 bg-neutral-100">
+                      <SelectTh className="text-left text-sm font-semibold text-gray-800">#</SelectTh>
+                      <SelectTh className="text-center">SURNAME</SelectTh>
+                      <SelectTh className="text-center">FIRST NAME</SelectTh>
+                      <SelectTh className="text-center">SALARY ({symbol || "--"})</SelectTh>
+                      <SelectTh className="text-center">USERNAME</SelectTh>
+                      <SelectTh className="text-center">WALLET ADDRESS</SelectTh>
+                      <SelectTh className="text-center">ROLE</SelectTh>
+                    </tr>
+                  </thead>
+                  <tbody>{employeesTableBody}</tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <PillButton tone="soft" onClick={() => setStep("details")}>
+                Back
+              </PillButton>
+              <PillButton
+                tone="primary"
+                onClick={() => setStep("preview")}
+                disabled={selectedEmployees.length === 0}
+              >
+                Next
+              </PillButton>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 p-6">
+      <div className="flex w-full max-w-[1237px] flex-col gap-10 rounded-[20px] bg-white p-12 shadow-[0px_4px_78px_31px_rgba(69,74,222,0.08)] outline outline-[0.5px] -outline-offset-[0.5px] outline-neutral-300">
+        <ModalHeader onBack={() => setStep("employees")} onClose={onClose} />
+
+        <div className="flex flex-col gap-6">
+          <div className="flex items-center justify-between gap-6">
+            <div className="flex flex-col gap-2">
+              <p className="text-base font-medium text-neutral-500">Review</p>
+              <p className="max-w-sm text-xs text-neutral-600">
+                Review employee payments, deductions, and total payroll before submitting for
+                approval.
+              </p>
+            </div>
+            {renderStepIndicator()}
+          </div>
+
+          <div className="flex flex-col items-start gap-4 lg:flex-row">
+            <div className="w-full rounded-[20px] p-4 outline outline-[0.5px] -outline-offset-[0.5px] outline-zinc-100 lg:w-[730px]">
+              <div className="max-h-[300px] overflow-auto">
+                <table className="w-full min-w-[600px] table-fixed text-left">
+                  <colgroup>
+                    <col className="w-[25%]" />
+                    <col className="w-[25%]" />
+                    <col className="w-[25%]" />
+                    <col className="w-[25%]" />
+                  </colgroup>
+                  <thead className="sticky top-0 z-10">
+                    <tr className="h-14 border-y border-gray-100 bg-neutral-100">
+                      <SelectTh className="text-center">NAMES</SelectTh>
+                      <SelectTh className="text-center">
+                        {showTax ? `GROSS SALARY (${symbol || "--"})` : `SALARY (${symbol || "--"})`}
+                      </SelectTh>
+                      {showTax ? (
+                        <>
+                          <SelectTh className="text-center">TAX</SelectTh>
+                          <SelectTh className="text-center">NET PAY ({symbol || "--"})</SelectTh>
+                        </>
+                      ) : null}
                     </tr>
                   </thead>
                   <tbody>
-                    {employeesTableBody}
+                    {selectedEmployeeData.map((emp) => {
+                      const line = taxByAddress.get(emp.walletAddress.toLowerCase())
+                      return (
+                        <tr key={emp.id} className="border-b border-gray-100">
+                          <SelectTd className="truncate text-center font-semibold text-neutral-500">
+                            {`${emp.surname} ${emp.firstName}`.trim()}
+                          </SelectTd>
+                          <SelectTd className="text-center font-semibold text-neutral-800">
+                            {line
+                              ? Number(line.grossFormatted).toLocaleString()
+                              : formatAmount(Number(emp.salary || 0))}
+                          </SelectTd>
+                          {showTax ? (
+                            <>
+                              <SelectTd className="text-center font-semibold text-neutral-800">
+                                {line ? Number(line.taxFormatted).toLocaleString() : "--"}
+                              </SelectTd>
+                              <SelectTd className="text-center font-semibold text-neutral-800">
+                                {line ? Number(line.netFormatted).toLocaleString() : "--"}
+                              </SelectTd>
+                            </>
+                          ) : null}
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
             </div>
-          )}
 
-          {/* Step 3: Preview */}
-          {step === "preview" && (
-            <div className="space-y-6">
-              <div>
-                <h3 className="text-lg font-semibold mb-4">
-                  {formData.batchName}
-                </h3>
+            <div className="flex w-full flex-1 flex-col gap-6 rounded-lg bg-neutral-50 px-2 pb-2 pt-4 outline outline-1 -outline-offset-1 outline-zinc-200">
+              <div className="px-2">
+                <p className="font-nohemi text-xs font-medium tracking-wide text-zinc-600">
+                  PAYROLL SUMMARY
+                </p>
               </div>
 
-              {/* Summary Cards */}
-              <div className="grid grid-cols-3 gap-4">
-                <Card className="p-4">
-                  <p className="text-gray-600 text-sm mb-1">Employees</p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {selectedEmployeeData.length}
-                  </p>
-                </Card>
-                <Card className="p-4">
-                  <p className="text-gray-600 text-sm mb-1">Total Amount ({symbol})</p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {formatAmount(totalAmount)}
-                  </p>
-                </Card>
-                <Card className="p-4">
-                  <p className="text-gray-600 text-sm mb-1">Payment Date</p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {formData.paymentDate}
-                  </p>
-                </Card>
+              <div className="rounded-sm bg-white p-2 outline outline-[0.5px] -outline-offset-[0.5px] outline-zinc-200">
+                <SummaryRow label="Employees" value={String(selectedEmployeeData.length)} />
+                <SummaryRow
+                  label={showTax ? "Gross Payroll" : "Total Payroll"}
+                  unit={symbol}
+                  value={grossTotal.toLocaleString()}
+                />
+                {showTax ? (
+                  <>
+                    <SummaryRow label="Total Tax" unit={symbol} value={taxTotal.toLocaleString()} />
+                    <SummaryRow
+                      label="Employee Payments"
+                      unit={symbol}
+                      value={netTotal.toLocaleString()}
+                    />
+                  </>
+                ) : null}
+                {/* Every write is sponsored, so there is no network fee to
+                    report here. Quoting one would bill the sender for gas the
+                    paymaster paid. */}
+                <SummaryRow
+                  label="Total Outflow"
+                  unit={symbol}
+                  value={(showTax ? netTotal : grossTotal).toLocaleString()}
+                  emphasis
+                />
               </div>
 
-              {/* Payment Breakdown */}
-              <div>
-                <h4 className="font-semibold text-gray-900 mb-4">
-                  Payment Breakdown
-                </h4>
-                <div className="space-y-3 max-h-64 overflow-y-auto">
-                  {selectedEmployeeData.map((emp) => (
-                    <div
-                      key={emp.id}
-                      className="flex items-center justify-between p-3 bg-gray-50 rounded"
-                    >
-                      <div>
-                        <p className="font-medium text-gray-900">
-                          {emp.surname} {emp.firstName}
-                        </p>
-                        <p className="text-xs text-gray-600">
-                          @{emp.displayUsername || emp.username} • {emp.role}
-                        </p>
-                      </div>
-                      <p className="font-semibold text-gray-900">
-                        {formatAmount(Number(emp.salary || 0))}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              {taxLoading ? (
+                <p className="px-2 pb-2 text-[10px] text-zinc-500">Estimating deductions...</p>
+              ) : null}
+
+              {showTax && taxPreview && !taxPreview.regimeVerified ? (
+                <p className="px-2 pb-2 text-[10px] leading-relaxed text-amber-700">
+                  These figures come from an unverified tax table and are an estimate.
+                </p>
+              ) : null}
             </div>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-between p-6 border-t border-gray-200">
-          <div>
-            {step === "preview" && (
-              <Button variant="outline" onClick={() => setStep("employees")}>
-                Back
-              </Button>
-            )}
           </div>
-          <div className="flex items-center gap-3">
-            {step === "preview" && (
-              <>
-                <Button variant="outline" onClick={() => setStep("details")}>
-                  Save Draft
-                </Button>
-                <Button
-                  onClick={handleProceedToPayment}
-                  disabled={
-                    isSubmitting ||
-                    !formData.batchName ||
-                    selectedEmployees.length === 0 ||
-                    !canSign
-                  }
-                  title={canSign ? undefined : "Still getting your account ready"}
-                  className="bg-blue-600 hover:bg-blue-700 text-white disabled:bg-gray-300"
-                >
-                  {isSubmitting ? "Submitting..." : "Proceed to Payment"}
-                </Button>
-              </>
-            )}
-            {step !== "preview" && (
-              <>
-                <Button variant="outline" onClick={onClose}>
-                  Cancel
-                </Button>
-                <Button
-                  onClick={() =>
-                    setStep(step === "details" ? "employees" : "preview")
-                  }
-                  className="bg-blue-600 hover:bg-blue-700 text-white"
-                  disabled={
-                    isSubmitting ||
-                    (step === "employees" && selectedEmployees.length === 0) ||
-                    (step === "details" && !formData.batchName)
-                  }
-                >
-                  Next
-                </Button>
-              </>
-            )}
+
+          <div className="flex items-center justify-between">
+            <PillButton tone="soft" onClick={() => setStep("employees")}>
+              Back
+            </PillButton>
+            <PillButton
+              tone="primary"
+              onClick={handleProceedToPayment}
+              disabled={
+                isSubmitting ||
+                !formData.batchName ||
+                selectedEmployees.length === 0 ||
+                !canSign
+              }
+              title={canSign ? undefined : "Still getting your account ready"}
+            >
+              {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : null}
+              Submit for Approval
+            </PillButton>
           </div>
         </div>
       </div>
     </div>
   );
 }
+
+function ModalHeader({ onBack, onClose }: { onBack?: () => void; onClose: () => void }) {
+  return (
+    <div className="flex w-full items-center justify-between">
+      <div className="flex items-center gap-8">
+        <button
+          type="button"
+          onClick={onBack}
+          aria-label="Back"
+          // Kept in the layout when there is nowhere to go back to, so the
+          // title sits at the same x on every step.
+          className={`text-neutral-500 transition-colors hover:text-neutral-700 ${onBack ? "" : "invisible"}`}
+        >
+          <ChevronLeft size={24} />
+        </button>
+        <h2 className="font-nohemi text-2xl font-medium text-blue-950">Batch Payment Creation</h2>
+      </div>
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label="Close"
+        className="flex size-8 items-center justify-center rounded-sm bg-rose-100 transition-colors hover:bg-rose-200"
+      >
+        <Image
+          src="/icons/vuesax/linear/octagonal-close-icon.svg"
+          alt=""
+          width={20}
+          height={20}
+          className="size-5"
+        />
+      </button>
+    </div>
+  )
+}
+
+function SummaryRow({
+  label,
+  unit,
+  value,
+  emphasis = false,
+}: {
+  label: string
+  unit?: string
+  value: string
+  emphasis?: boolean
+}) {
+  return (
+    <div
+      className={`flex items-center justify-between gap-2 border-b-[0.3px] border-zinc-300 px-2.5 py-3 last:border-b-0 ${
+        emphasis ? "bg-gray-200" : ""
+      }`}
+    >
+      <span className="flex flex-col items-start">
+        <span className={`text-xs ${emphasis ? "font-medium text-zinc-800" : "text-zinc-500"}`}>
+          {label}
+        </span>
+        {unit ? <span className="text-[10px] text-zinc-500">({unit})</span> : null}
+      </span>
+      <span className="font-nohemi text-sm font-medium text-neutral-700">{value}</span>
+    </div>
+  )
+}
+
+function SelectTh({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return (
+    <th
+      className={`truncate p-2 text-xs font-normal tracking-wide text-neutral-600 ${className}`}
+    >
+      {children}
+    </th>
+  )
+}
+
+function SelectTd({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return <td className={`p-2 py-4 text-xs leading-4 ${className}`}>{children}</td>
+}
+
+function Checkbox({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean
+  onChange: () => void
+  label: string
+}) {
+  return (
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={checked}
+      aria-label={label}
+      onClick={onChange}
+      className={`flex size-3 shrink-0 items-center justify-center rounded-[2px] border ${
+        checked ? "border-indigo-600 bg-indigo-600" : "border-zinc-400"
+      }`}
+    >
+      {checked ? (
+        <svg viewBox="0 0 10 10" fill="none" aria-hidden="true" className="size-2.5">
+          <path
+            d="M2 5.2 4 7.2 8 3"
+            stroke="white"
+            strokeWidth="1.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      ) : null}
+    </button>
+  )
+}
+
+function DetailsField({
+  id,
+  label,
+  placeholder,
+  value,
+  onChange,
+}: {
+  id: string
+  label: string
+  placeholder: string
+  value: string
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      <label htmlFor={id} className="text-xs text-neutral-500">
+        {label}
+      </label>
+      <Input
+        id={id}
+        name={id}
+        placeholder={placeholder}
+        value={value}
+        onChange={onChange}
+        className="h-auto rounded-lg border-0 bg-slate-50 p-4 text-sm text-gray-600 shadow-none outline outline-1 -outline-offset-1 outline-indigo-200 focus-visible:ring-0"
+      />
+    </div>
+  )
+}
+

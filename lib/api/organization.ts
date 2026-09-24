@@ -1127,3 +1127,31 @@ export function mapApiBatchToPaymentBatch(apiBatch: ApiPaymentBatch): {
     }),
   };
 }
+
+export interface TaxPreviewResponse {
+  taxEnabled: boolean;
+  regimeVerified: boolean;
+  lines: {
+    address: string;
+    grossFormatted: string;
+    taxFormatted: string;
+    netFormatted: string;
+  }[];
+}
+
+/**
+ * What PAYE would be withheld if these people were paid now.
+ *
+ * Computed from the organization's own regime rather than a rate assumed here,
+ * so the figures the signer reviews are the ones the receipt will carry.
+ */
+export async function fetchTaxPreview(
+  organizationId: string,
+  addresses: string[]
+): Promise<TaxPreviewResponse> {
+  const response = await apiFetch(`/api/tax/organizations/${organizationId}/preview`, {
+    method: "POST",
+    body: JSON.stringify({ addresses }),
+  });
+  return response.data || response;
+}
