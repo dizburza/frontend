@@ -3,9 +3,7 @@
 import type React from "react"
 
 import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { X } from "lucide-react"
+import { ModalChrome } from "./modal-chrome"
 import { ProposalPreviewModal } from "./proposal-preview-modal"
 import { useToken } from "@/hooks/useToken"
 import { toast } from "sonner"
@@ -16,11 +14,23 @@ interface CreateProposalModalProps {
   onProposalCreated?: () => void
 }
 
+// The schema's description column is unbounded text; this is a soft cap
+// against runaway pasting, not a constraint the backend enforces.
+const DESCRIPTION_LIMIT = 1000
+
 /** Voting runs for a week unless the raiser picks another closing date. */
 const defaultClosesAt = () => {
   const date = new Date()
   date.setDate(date.getDate() + 7)
   return date.toISOString().slice(0, 10)
+}
+
+/** Thousands separators for display only; the stored value stays plain digits. */
+export const formatAmountInput = (raw: string): string => {
+  if (!raw) return ""
+  const [whole, decimal] = raw.split(".")
+  const withCommas = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+  return decimal !== undefined ? `${withCommas}.${decimal}` : withCommas
 }
 
 export function CreateProposalModal({
@@ -42,20 +52,27 @@ export function CreateProposalModal({
     setFormData((prev) => ({ ...prev, [name]: value }))
   }
 
+  // The backend takes a plain decimal string (no thousands separators), so
+  // typed commas are stripped before they reach state. Only one decimal point
+  // survives, and everything past it is kept intact rather than parsed, since
+  // this is a string the amount is formatted from, not a number to round.
+  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const digits = e.target.value.replace(/[^\d.]/g, "")
+    const [whole, ...rest] = digits.split(".")
+    const cleaned = rest.length > 0 ? `${whole}.${rest.join("")}` : whole
+    setFormData((prev) => ({ ...prev, amount: cleaned }))
+  }
+
   const handlePreview = () => {
     if (!formData.title.trim()) {
       toast.error("Give the proposal a title")
       return
     }
     if (new Date(formData.closesAt).getTime() <= Date.now()) {
-      toast.error("The voting window must close in the future")
+      toast.error("The expiry date must be in the future")
       return
     }
     setStep("preview")
-  }
-
-  const handleBack = () => {
-    setStep("form")
   }
 
   if (step === "preview") {
@@ -63,7 +80,7 @@ export function CreateProposalModal({
       <ProposalPreviewModal
         formData={formData}
         organizationId={organizationId}
-        onBack={handleBack}
+        onBack={() => setStep("form")}
         onClose={onClose}
         onProposalCreated={onProposalCreated}
       />
@@ -71,89 +88,85 @@ export function CreateProposalModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 className="text-xl font-semibold">Create New Proposal</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-            <X size={24} />
-          </button>
+    <ModalChrome title="Create New Proposal" onBack={onClose} onClose={onClose}>
+      <div className="self-stretch flex flex-col justify-start items-start gap-10">
+        <div className="self-stretch text-neutral-600 text-xs font-normal">
+          Enter the details of your new proposal for review and approval.
         </div>
+      </div>
 
-        {/* Content */}
-        <div className="p-6 space-y-6">
-          <p className="text-gray-600">Enter the details of your new proposal for review and approval.</p>
-
-          {/* Title */}
-          <div>
-            <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-2">Title</label>
-            <Input
-              id="title"
+      <div className="self-stretch flex flex-col justify-start items-start gap-6">
+        <div className="self-stretch flex flex-col justify-start items-start gap-5">
+          <Field label="Title">
+            <input
               name="title"
               placeholder="Enter proposal title"
               value={formData.title}
               onChange={handleInputChange}
-              className="w-full"
+              className="w-full bg-transparent text-gray-600 text-sm font-normal outline-none placeholder:text-gray-600"
             />
-          </div>
+          </Field>
 
-          {/* Request Amount */}
-          <div>
-            <label htmlFor="requestAmount" className="block text-sm font-medium text-gray-700 mb-2">Request Amount ({symbol})</label>
-            <Input
-              id="requestAmount"
+          <Field label={`Request Amount (${symbol})`}>
+            <input
               name="amount"
+              inputMode="decimal"
               placeholder="Enter required amount"
-              value={formData.amount}
-              onChange={handleInputChange}
-              className="w-full"
+              value={formatAmountInput(formData.amount)}
+              onChange={handleAmountChange}
+              className="w-full bg-transparent text-gray-600 text-sm font-normal outline-none placeholder:text-gray-600"
             />
-          </div>
+          </Field>
 
-          {/* Voting window */}
-          <div>
-            <label htmlFor="closesAt" className="block text-sm font-medium text-gray-700 mb-2">
-              Signing closes on
-            </label>
-            <Input
-              id="closesAt"
+          <Field label="Expiry Date">
+            <input
               name="closesAt"
               type="date"
               value={formData.closesAt}
               onChange={handleInputChange}
-              className="w-full"
+              className="w-full bg-transparent text-gray-600 text-sm font-normal outline-none"
             />
-            <p className="text-xs text-gray-500 mt-2">
-              Signers can vote until this date. Reaching quorum either way decides it sooner.
-            </p>
-          </div>
+          </Field>
+        </div>
 
-          {/* Description */}
-          <div>
-            <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">Description</label>
+        <div className="self-stretch flex flex-col justify-start items-end gap-2">
+          <div className="self-stretch flex flex-col justify-start items-start gap-2">
+            <label htmlFor="description" className="text-neutral-500 text-xs font-normal">
+              Description
+            </label>
             <textarea
               id="description"
               name="description"
               placeholder="Enter brief description about the proposal"
               value={formData.description}
               onChange={handleInputChange}
-              className="w-full border border-gray-300 rounded-md p-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-              rows={6}
+              maxLength={DESCRIPTION_LIMIT}
+              className="self-stretch h-48 px-4 py-3 bg-slate-50 rounded-lg outline outline-1 outline-offset-[-1px] outline-indigo-200 text-gray-600 text-sm font-normal resize-none placeholder:text-gray-600"
             />
-            <p className="text-xs text-gray-500 mt-2">{formData.description.length}/700</p>
+          </div>
+          <div className="text-neutral-500 text-[10px] font-normal">
+            {formData.description.length}/{DESCRIPTION_LIMIT}
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200">
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button onClick={handlePreview} className="bg-blue-600 hover:bg-blue-700 text-white">
-            Preview
-          </Button>
-        </div>
+        <button
+          type="button"
+          onClick={handlePreview}
+          className="self-stretch px-6 py-3 bg-indigo-600 rounded-sm shadow-[0px_2px_9px_-1.5px_rgba(13,15,74,0.25),inset_0px_-6px_8px_-3.5px_rgba(13,15,74,0.60),inset_0px_-2px_1px_0.5px_rgba(13,15,74,0.60),inset_0px_11px_8px_-3.5px_rgba(13,15,74,0.60),inset_0px_3px_1px_0px_rgba(13,15,74,0.22)] outline outline-2 outline-indigo-400 flex justify-center items-center gap-2.5 overflow-hidden text-white text-base font-medium transition-[filter] hover:brightness-[1.04]"
+        >
+          Preview
+        </button>
+      </div>
+    </ModalChrome>
+  )
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="self-stretch flex flex-col justify-start items-start gap-2">
+      <div className="self-stretch text-neutral-500 text-xs font-normal">{label}</div>
+      <div className="self-stretch p-4 bg-slate-50 rounded-lg outline outline-1 outline-offset-[-1px] outline-indigo-200 flex justify-start items-center gap-4">
+        {children}
       </div>
     </div>
   )

@@ -1,37 +1,33 @@
 "use client"
 
-import { Button } from "@/components/ui/button"
-import { X, CheckCircle } from "lucide-react"
+import { OnboardingButton } from "@/components/organization-setup/onboarding-button"
+import { SuccessSeal } from "@/components/ui/success-seal"
 
 interface ProposalSuccessModalProps {
-  onClose: () => void
+  onViewProposal: () => void
 }
 
-export function ProposalSuccessModal({ onClose }: Readonly<ProposalSuccessModalProps>) {
+export function ProposalSuccessModal({ onViewProposal }: Readonly<ProposalSuccessModalProps>) {
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg w-full max-w-md">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 className="text-xl font-semibold">Proposal Created</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-            <X size={24} />
-          </button>
-        </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-50/50 backdrop-blur-sm px-4">
+      <div className="w-full max-w-[581px] px-6 sm:px-10 py-14 bg-white rounded-[40px] shadow-[0px_4px_78px_31px_rgba(69,74,222,0.08)] outline outline-[0.5px] outline-offset-[-0.5px] outline-gray-200 flex justify-center items-center">
+        <div className="w-full max-w-[501px] flex flex-col items-center gap-16">
+          <SuccessSeal />
 
-        {/* Content */}
-        <div className="p-6 flex flex-col items-center justify-center text-center space-y-4">
-          <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
-            <CheckCircle size={32} className="text-blue-600" />
+          <div className="flex flex-col items-center gap-10 w-full">
+            <div className="flex flex-col items-center gap-4">
+              <div className="text-center text-blue-950 text-3xl font-normal font-nohemi">
+                Proposal created successfully
+              </div>
+              <div className="w-full max-w-[393px] text-center text-neutral-500 text-lg font-normal">
+                Proposal has been submitted and is now waiting for the required signer approvals.
+              </div>
+            </div>
+
+            <OnboardingButton className="self-stretch" onClick={onViewProposal}>
+              View Proposal
+            </OnboardingButton>
           </div>
-          <p className="text-lg font-semibold text-blue-600">Successful</p>
-        </div>
-
-        {/* Footer */}
-        <div className="p-6 border-t border-gray-200">
-          <Button onClick={onClose} className="w-full bg-blue-600 hover:bg-blue-700 text-white">
-            Back Home
-          </Button>
         </div>
       </div>
     </div>

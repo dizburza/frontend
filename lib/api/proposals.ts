@@ -57,7 +57,14 @@ async function apiFetch(path: string, options: RequestInit = {}) {
   const payload = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    throw new Error(payload?.error || payload?.message || `HTTP ${response.status}`);
+    // express-validator's "Validation failed" is a summary, not a reason.
+    // `details` carries the actual per-field message, which is what someone
+    // needs to fix the form rather than just knowing it was rejected.
+    const fieldMessage = Array.isArray(payload?.details)
+      ? payload.details.find((d: { msg?: string }) => d?.msg)?.msg
+      : undefined;
+
+    throw new Error(fieldMessage || payload?.error || payload?.message || `HTTP ${response.status}`);
   }
 
   return payload.data ?? payload;

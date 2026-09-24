@@ -1,11 +1,14 @@
 "use client"
 
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { X, ChevronLeft } from "lucide-react"
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
+import { ModalChrome } from "./modal-chrome"
+import { formatAmountInput } from "./create-proposal-modal"
 import { ProposalSuccessModal } from "./proposal-success-modal"
 import { createProposal } from "@/lib/api/proposals"
+import { fetchSessionProfile } from "@/lib/session"
 import { useToken } from "@/hooks/useToken"
+import useOrgSlug from "@/hooks/useOrgSlug"
 import { toast } from "sonner"
 
 interface ProposalPreviewModalProps {
@@ -21,6 +24,9 @@ interface ProposalPreviewModalProps {
   onProposalCreated?: () => void
 }
 
+const formatDate = (value: Date) =>
+  value.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })
+
 export function ProposalPreviewModal({
   formData,
   organizationId,
@@ -28,9 +34,25 @@ export function ProposalPreviewModal({
   onClose,
   onProposalCreated,
 }: Readonly<ProposalPreviewModalProps>) {
+  const router = useRouter()
+  const orgSlug = useOrgSlug()
   const { symbol } = useToken()
-  const [showSuccess, setShowSuccess] = useState(false)
+  const [createdId, setCreatedId] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // Nothing is created yet, so the byline is whoever is about to raise it.
+  const [author, setAuthor] = useState("You")
+
+  useEffect(() => {
+    const controller = new AbortController()
+
+    fetchSessionProfile(controller.signal).then((profile) => {
+      const name = profile?.fullName?.trim() || profile?.username?.trim()
+      if (name) setAuthor(name)
+    })
+
+    return () => controller.abort()
+  }, [])
 
   const handleSubmit = async () => {
     if (isSubmitting) return
@@ -43,7 +65,7 @@ export function ProposalPreviewModal({
     try {
       setIsSubmitting(true)
 
-      await createProposal({
+      const proposal = await createProposal({
         organizationId,
         title: formData.title.trim(),
         description: formData.description.trim() || undefined,
@@ -53,7 +75,7 @@ export function ProposalPreviewModal({
       })
 
       onProposalCreated?.()
-      setShowSuccess(true)
+      setCreatedId(proposal.id)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not raise the proposal")
     } finally {
@@ -61,69 +83,68 @@ export function ProposalPreviewModal({
     }
   }
 
-  if (showSuccess) {
-    return <ProposalSuccessModal onClose={onClose} />
+  if (createdId) {
+    return (
+      <ProposalSuccessModal
+        onViewProposal={() => {
+          onClose()
+          if (orgSlug) router.push(`/org/${orgSlug}/proposals/${createdId}`)
+        }}
+      />
+    )
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <div className="flex items-center gap-3">
-            <button onClick={onBack} className="text-gray-600 hover:text-gray-800">
-              <ChevronLeft size={24} />
-            </button>
-            <h2 className="text-xl font-semibold">Proposal Preview</h2>
+    <ModalChrome title="Proposal Preview" onBack={onBack} onClose={onClose}>
+      <div className="self-stretch flex flex-col justify-start items-start gap-8">
+        <div className="self-stretch flex flex-col justify-start items-center gap-5">
+          <div className="self-stretch text-neutral-600 text-3xl sm:text-5xl font-semibold font-nohemi leading-tight sm:leading-[57.60px]">
+            {formData.title}
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-            <X size={24} />
-          </button>
-        </div>
-
-        {/* Content */}
-        <div className="p-6 space-y-6">
-          <p className="text-gray-600">Enter the details of your new proposal for review and approval.</p>
-
-          <div>
-            <h3 className="text-2xl font-bold mb-4">{formData.title}</h3>
-            <div className="grid grid-cols-2 gap-4 mb-6 text-sm">
-              <div>
-                <p className="text-gray-600">Amount requested:</p>
-                <p className="font-medium">
-                  {formData.amount ? `${symbol} ${formData.amount}` : "None"}
-                </p>
-              </div>
-              <div>
-                <p className="text-gray-600">Signing closes:</p>
-                <p className="font-medium">
-                  {new Date(formData.closesAt).toLocaleDateString()}
-                </p>
-              </div>
-
-            </div>
-          </div>
-
-          <div>
-            <h4 className="font-semibold mb-2">Description</h4>
-            <p className="text-gray-700 leading-relaxed">{formData.description}</p>
+          <div className="self-stretch px-2 py-4 bg-white border-t border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+            <Fact label="Created by:" value={author} />
+            <Fact label="Created on:" value={formatDate(new Date())} />
+            <Fact
+              label="Amount Requested:"
+              value={formData.amount ? `${symbol}${formatAmountInput(formData.amount)}` : "None"}
+            />
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-between p-6 border-t border-gray-200">
-          <Button variant="outline" onClick={onBack}>
-            Back
-          </Button>
-          <Button
-            onClick={handleSubmit}
-            disabled={isSubmitting}
-            className="bg-blue-600 hover:bg-blue-700 text-white"
-          >
-            {isSubmitting ? "Submitting..." : "Submit"}
-          </Button>
+        <div className="self-stretch flex flex-col justify-start items-start gap-4">
+          <div className="self-stretch text-neutral-500 text-base font-medium">Description</div>
+          <div className="self-stretch text-neutral-800 text-lg sm:text-xl font-medium leading-8 whitespace-pre-line">
+            {formData.description || "No description provided."}
+          </div>
         </div>
       </div>
+
+      <div className="self-stretch flex justify-between items-start">
+        <button
+          type="button"
+          onClick={onBack}
+          className="px-6 py-3 bg-violet-50 rounded-sm shadow-[0px_2px_9px_-1.5px_rgba(240,241,253,0.25),inset_0px_-6px_8px_-3.5px_rgba(240,241,253,0.60),inset_0px_-2px_1px_0.5px_rgba(240,241,253,0.60),inset_0px_11px_8px_-3.5px_rgba(240,241,253,0.60),inset_0px_3px_1px_0px_rgba(240,241,253,0.22)] outline outline-2 outline-indigo-50 flex justify-center items-center gap-2.5 overflow-hidden text-blue-950 text-base font-medium transition-[filter] hover:brightness-[1.04]"
+        >
+          Back
+        </button>
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={isSubmitting}
+          className="px-6 py-3 bg-indigo-600 rounded-sm shadow-[0px_2px_9px_-1.5px_rgba(13,15,74,0.25),inset_0px_-6px_8px_-3.5px_rgba(13,15,74,0.60),inset_0px_-2px_1px_0.5px_rgba(13,15,74,0.60),inset_0px_11px_8px_-3.5px_rgba(13,15,74,0.60),inset_0px_3px_1px_0px_rgba(13,15,74,0.22)] outline outline-2 outline-indigo-400 flex justify-center items-center gap-2.5 overflow-hidden text-white text-base font-medium transition-[filter] hover:brightness-[1.04] disabled:opacity-50"
+        >
+          {isSubmitting ? "Submitting..." : "Submit"}
+        </button>
+      </div>
+    </ModalChrome>
+  )
+}
+
+function Fact({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex justify-start items-center gap-1">
+      <div className="text-neutral-500 text-sm font-normal leading-4">{label}</div>
+      <div className="text-neutral-800 text-sm font-semibold leading-4">{value}</div>
     </div>
   )
 }
