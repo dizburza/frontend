@@ -10,14 +10,14 @@ interface OrganizationReadyModalProps {
 
 // Scattered around the seal, at the offsets the design places them.
 const CONFETTI = [
-  { src: "/icons/Ellipse-46.svg", size: [6, 11], className: "left-[9px] top-[47px]" },
-  { src: "/icons/Star-20.svg", size: [5, 5], className: "left-[26px] top-[31px]" },
-  { src: "/icons/Ellipse-47.svg", size: [9, 9], className: "left-[2px] top-[66px]" },
-  { src: "/icons/Star-21.svg", size: [9, 9], className: "right-[6px] top-[10px]" },
-  { src: "/icons/Ellipse-44.svg", size: [9, 9], className: "right-[14px] top-[39px]" },
-  { src: "/icons/Ellipse-45.svg", size: [6, 11], className: "left-[63px] bottom-[6px]" },
-  { src: "/icons/Polygon-3.svg", size: [10, 9], className: "left-[81px] bottom-[2px]" },
-  { src: "/icons/Star-22.svg", size: [5, 5], className: "right-[24px] bottom-[18px]" },
+  { src: "/icons/confetti-capsule.svg", size: [6, 11], className: "left-[9px] top-[47px]" },
+  { src: "/icons/confetti-star-sm.svg", size: [5, 5], className: "left-[26px] top-[31px]" },
+  { src: "/icons/confetti-dot-blue.svg", size: [9, 9], className: "left-[2px] top-[66px]" },
+  { src: "/icons/confetti-star-lg.svg", size: [9, 9], className: "right-[6px] top-[10px]" },
+  { src: "/icons/confetti-dot-lime.svg", size: [9, 9], className: "right-[14px] top-[39px]" },
+  { src: "/icons/confetti-capsule.svg", size: [6, 11], className: "left-[63px] bottom-[6px]" },
+  { src: "/icons/confetti-triangle.svg", size: [10, 9], className: "left-[81px] bottom-[2px]" },
+  { src: "/icons/confetti-star-alt.svg", size: [5, 5], className: "right-[24px] bottom-[18px]" },
 ]
 
 export function OrganizationReadyModal({ onContinue }: Readonly<OrganizationReadyModalProps>) {

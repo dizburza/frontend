@@ -316,7 +316,7 @@ export function DashboardHeader() {
             aria-label="Settings"
             className="rounded-full bg-surface-canvas p-2 outline outline-1 -outline-offset-1 outline-[#E3E4F6] transition-colors hover:bg-white"
           >
-            <Image src="/icons/setting-2.svg" alt="" width={14} height={14} />
+            <Image src="/icons/vuesax/linear/setting-2.svg" alt="" width={14} height={14} />
           </button>
 
           <div className="relative" ref={menuRef}>
