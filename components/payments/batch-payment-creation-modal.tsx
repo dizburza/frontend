@@ -138,10 +138,33 @@ export function BatchPaymentCreationModal({
       // Scaled by the token's real decimals rather than an assumed six, and
       // through BigInt rather than a float, so a large payroll cannot lose
       // precision on its way into the contract call.
+      //
+      // Where PAYE applies the employee is paid net and the withheld total
+      // rides in the same batch as one transfer to the authority, so the
+      // salaries and the tax they funded cannot settle separately. Amounts
+      // come from the preview in base units rather than being re-derived here.
+      const payingTax = taxRidesAlong && taxAuthority !== null
+
       const recipients = selectedEmployeeData.map((e) => e.walletAddress)
       const amounts = await Promise.all(
-        selectedEmployeeData.map((e) => toBaseUnits(e.salary || 0))
+        selectedEmployeeData.map(async (e) => {
+          const line = taxByAddress.get(e.walletAddress.toLowerCase())
+          if (payingTax && line) return BigInt(line.netMinor)
+          return toBaseUnits(e.salary || 0)
+        })
       )
+
+      const taxLegMinor = payingTax
+        ? selectedEmployeeData.reduce((sum, e) => {
+            const line = taxByAddress.get(e.walletAddress.toLowerCase())
+            return sum + (line ? BigInt(line.taxMinor) : BigInt(0))
+          }, BigInt(0))
+        : BigInt(0)
+
+      if (payingTax && taxLegMinor > BigInt(0)) {
+        recipients.push(taxAuthority.address)
+        amounts.push(taxLegMinor)
+      }
 
       const contract = getContract({
         client: thirdwebClient,
@@ -163,12 +186,25 @@ export function BatchPaymentCreationModal({
         organizationId,
         organizationAddress,
         creatorAddress: account.address,
-        recipients: selectedEmployeeData.map((e, idx) => ({
-          userId: e.id,
-          walletAddress: e.walletAddress,
-          amount: amounts[idx].toString(),
-          employeeName: `${e.firstName} ${e.surname}`.trim(),
-        })),
+        recipients: [
+          ...selectedEmployeeData.map((e, idx) => ({
+            userId: e.id,
+            walletAddress: e.walletAddress,
+            amount: amounts[idx].toString(),
+            employeeName: `${e.firstName} ${e.surname}`.trim(),
+            kind: "employee" as const,
+          })),
+          ...(payingTax && taxLegMinor > BigInt(0)
+            ? [
+                {
+                  walletAddress: taxAuthority.address,
+                  amount: taxLegMinor.toString(),
+                  employeeName: taxAuthority.name,
+                  kind: "tax_authority" as const,
+                },
+              ]
+            : []),
+        ],
       })
 
       if (onPaymentCreated) {
@@ -227,6 +263,11 @@ export function BatchPaymentCreationModal({
   }, [taxPreview])
 
   const showTax = (taxPreview?.taxEnabled ?? false) && taxByAddress.size > 0
+
+  // A placeholder authority has no real address behind it, so the batch pays
+  // the employees only and the PAYE stays a liability on the employer.
+  const taxAuthority = taxPreview?.authority ?? null
+  const taxRidesAlong = showTax && taxAuthority !== null && !taxAuthority.isPlaceholder
 
   // Summed from the same lines the table renders, so the totals cannot drift
   // from the rows above them.
@@ -585,7 +626,11 @@ export function BatchPaymentCreationModal({
                       {showTax ? (
                         <>
                           <SelectTh className="text-center">TAX</SelectTh>
-                          <SelectTh className="text-center">NET PAY ({symbol || "--"})</SelectTh>
+                          {/* Net is what the employee is actually sent only when
+                              the PAYE leg goes out with the batch. */}
+                          <SelectTh className="text-center">
+                            {taxRidesAlong ? `NET PAY (${symbol || "--"})` : `PAID (${symbol || "--"})`}
+                          </SelectTh>
                         </>
                       ) : null}
                     </tr>
@@ -609,7 +654,11 @@ export function BatchPaymentCreationModal({
                                 {line ? Number(line.taxFormatted).toLocaleString() : "--"}
                               </SelectTd>
                               <SelectTd className="text-center font-semibold text-neutral-800">
-                                {line ? Number(line.netFormatted).toLocaleString() : "--"}
+                                {line
+                                  ? Number(
+                                      taxRidesAlong ? line.netFormatted : line.grossFormatted
+                                    ).toLocaleString()
+                                  : "--"}
                               </SelectTd>
                             </>
                           ) : null}
@@ -637,11 +686,15 @@ export function BatchPaymentCreationModal({
                 />
                 {showTax ? (
                   <>
-                    <SummaryRow label="Total Tax" unit={symbol} value={taxTotal.toLocaleString()} />
+                    <SummaryRow
+                      label={taxRidesAlong ? `PAYE to ${taxAuthority.name}` : "Total Tax"}
+                      unit={symbol}
+                      value={taxTotal.toLocaleString()}
+                    />
                     <SummaryRow
                       label="Employee Payments"
                       unit={symbol}
-                      value={netTotal.toLocaleString()}
+                      value={(taxRidesAlong ? netTotal : grossTotal).toLocaleString()}
                     />
                   </>
                 ) : null}
@@ -651,7 +704,10 @@ export function BatchPaymentCreationModal({
                 <SummaryRow
                   label="Total Outflow"
                   unit={symbol}
-                  value={(showTax ? netTotal : grossTotal).toLocaleString()}
+                  // The tax leaves the treasury in the same batch when the
+                  // authority is real, so outflow is the gross. Against a
+                  // placeholder only the salaries move.
+                  value={(taxRidesAlong ? grossTotal : showTax ? netTotal : grossTotal).toLocaleString()}
                   emphasis
                 />
               </div>
@@ -663,6 +719,20 @@ export function BatchPaymentCreationModal({
               {showTax && taxPreview && !taxPreview.regimeVerified ? (
                 <p className="px-2 pb-2 text-[10px] leading-relaxed text-amber-700">
                   These figures come from an unverified tax table and are an estimate.
+                </p>
+              ) : null}
+
+              {/* The signer is approving a transfer to an address they did not
+                  choose, so the batch says where the PAYE lands. */}
+              {taxRidesAlong ? (
+                <p className="px-2 pb-2 text-[10px] leading-relaxed text-zinc-500">
+                  PAYE is paid to {taxAuthority.name} at {shortAddress(taxAuthority.address)} in
+                  this same batch. Employees receive the net figure above.
+                </p>
+              ) : showTax ? (
+                <p className="px-2 pb-2 text-[10px] leading-relaxed text-zinc-500">
+                  PAYE is recorded against this batch but not paid: no wallet is confirmed for
+                  the authority yet. Employees receive their full salary.
                 </p>
               ) : null}
             </div>
@@ -677,11 +747,18 @@ export function BatchPaymentCreationModal({
               onClick={handleProceedToPayment}
               disabled={
                 isSubmitting ||
+                taxLoading ||
                 !formData.batchName ||
                 selectedEmployees.length === 0 ||
                 !canSign
               }
-              title={canSign ? undefined : "Still getting your account ready"}
+              title={
+                taxLoading
+                  ? "Still estimating deductions"
+                  : canSign
+                    ? undefined
+                    : "Still getting your account ready"
+              }
             >
               {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : null}
               Submit for Approval

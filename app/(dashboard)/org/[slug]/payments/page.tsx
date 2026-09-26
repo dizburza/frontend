@@ -9,6 +9,7 @@ import { ChevronDown, ChevronRight, Loader2 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { PillButton } from "@/components/ui/pill-button"
 import { BatchPaymentCreationModal } from "@/components/payments/batch-payment-creation-modal"
+import { BatchTaxModal } from "@/components/payments/batch-tax-modal"
 import {
   useOrganizationBySlug,
   useOrganizationBatches,
@@ -41,6 +42,9 @@ export default function PaymentsPage() {
   const { symbol } = useToken()
   const [searchTerm, setSearchTerm] = useState("")
   const [showBatchModal, setShowBatchModal] = useState(false)
+  const [taxModalBatch, setTaxModalBatch] = useState<{ id: string; batchName: string } | null>(
+    null
+  )
   const [page, setPage] = useState(1)
   const [limit] = useState(10)
   const [actionLoadingBatch, setActionLoadingBatch] = useState<string | null>(null)
@@ -507,7 +511,20 @@ export default function PaymentsPage() {
                         <Td className="text-center font-semibold text-neutral-500">Outflow</Td>
                         <Td className="text-center font-semibold text-neutral-500">{batch.employees}</Td>
                         <Td className="text-center">
-                          <StatusPill status={batch.status} />
+                          <div className="flex flex-col items-center gap-1">
+                            <StatusPill status={batch.status} />
+                            {batch.statusRaw === "executed" ? (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setTaxModalBatch({ id: batch.id, batchName: batch.batchName })
+                                }
+                                className="text-[10px] font-medium text-indigo-600 hover:text-indigo-800"
+                              >
+                                View tax
+                              </button>
+                            ) : null}
+                          </div>
                         </Td>
                         <Td>
                           <div className="flex flex-col items-center gap-1">
@@ -629,6 +646,15 @@ export default function PaymentsPage() {
           onPaymentCreated={handlePaymentCreated}
         />
       )}
+
+      {taxModalBatch && organization?.id ? (
+        <BatchTaxModal
+          organizationId={organization.id}
+          batchId={taxModalBatch.id}
+          batchName={taxModalBatch.batchName}
+          onClose={() => setTaxModalBatch(null)}
+        />
+      ) : null}
     </div>
   )
 }

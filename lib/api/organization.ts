@@ -178,6 +178,7 @@ export interface ApiPaymentBatch {
     walletAddress: string;
     amount: string;
     employeeName: string;
+    kind?: "employee" | "tax_authority";
   }[];
   totalAmount: string;
   totalAmountFormatted?: string;
@@ -349,6 +350,7 @@ export async function recordBatchCreation(payload: {
     walletAddress: string;
     amount: string;
     employeeName: string;
+    kind?: "employee" | "tax_authority";
   }[];
 }): Promise<ApiPaymentBatch> {
   try {
@@ -1116,7 +1118,9 @@ export function mapApiBatchToPaymentBatch(apiBatch: ApiPaymentBatch): {
       day: "numeric",
       year: "numeric",
     }),
-    employees: apiBatch.recipients.length,
+    // The PAYE leg is a recipient of the same batch, so it is excluded here
+    // rather than counted as another person being paid.
+    employees: apiBatch.recipients.filter((r) => r.kind !== "tax_authority").length,
     status: apiBatch.status.charAt(0).toUpperCase() + apiBatch.status.slice(1),
     statusRaw: apiBatch.status,
     approvalCount: apiBatch.approvalCount,
@@ -1128,25 +1132,33 @@ export function mapApiBatchToPaymentBatch(apiBatch: ApiPaymentBatch): {
       approvedAt: a.approvedAt,
     })),
     txHash: apiBatch.txHash,
-    recipients: apiBatch.recipients.map(r => {
-      const nameParts = r.employeeName.split(" ");
-      return {
-        surname: nameParts.at(-1) || "",
-        firstName: nameParts.slice(0, -1).join(" ") || r.employeeName,
-        salary: r.amount,
-      };
-    }),
+    recipients: apiBatch.recipients
+      .filter((r) => r.kind !== "tax_authority")
+      .map(r => {
+        const nameParts = r.employeeName.split(" ");
+        return {
+          surname: nameParts.at(-1) || "",
+          firstName: nameParts.slice(0, -1).join(" ") || r.employeeName,
+          salary: r.amount,
+        };
+      }),
   };
 }
 
 export interface TaxPreviewResponse {
   taxEnabled: boolean;
   regimeVerified: boolean;
+  /** Null when tax is off. A placeholder address must never be paid. */
+  authority: { name: string; address: string; isPlaceholder: boolean } | null;
   lines: {
     address: string;
     grossFormatted: string;
     taxFormatted: string;
     netFormatted: string;
+    /** Base units, so the batch is composed from the figures the receipt carries. */
+    grossMinor: string;
+    taxMinor: string;
+    netMinor: string;
   }[];
 }
 
@@ -1163,6 +1175,51 @@ export async function fetchTaxPreview(
   const response = await apiFetch(`/api/tax/organizations/${organizationId}/preview`, {
     method: "POST",
     body: JSON.stringify({ addresses }),
+  });
+  return response.data || response;
+}
+
+export interface TaxLine {
+  id: string;
+  batchId: string;
+  organizationId: string;
+  userId: string | null;
+  walletAddress: string;
+  employeeName: string;
+  grossFormatted: string;
+  taxFormatted: string;
+  netFormatted: string;
+  status: "computed" | "remitted" | "failed";
+  remittanceReference: string | null;
+  remittedAt: string | null;
+  createdAt: string;
+  breakdown: {
+    regimeName: string;
+    regimeVerified: boolean;
+    [key: string]: unknown;
+  } | null;
+}
+
+/** PAYE already recorded for one executed batch, one row per employee paid. */
+export async function fetchTaxLinesForBatch(
+  organizationId: string,
+  batchId: string
+): Promise<TaxLine[]> {
+  const response = await apiFetch(
+    `/api/tax/organizations/${organizationId}/batches/${batchId}`
+  );
+  return response.data || response;
+}
+
+/**
+ * Records that this line's PAYE was sent to the state authority, by whatever
+ * reference the bank transfer gave back. No transaction is sent: nothing here
+ * settles on chain, since no state authority accepts that yet.
+ */
+export async function markTaxLineRemitted(lineId: string, reference: string): Promise<TaxLine> {
+  const response = await apiFetch(`/api/tax/lines/${lineId}/remit`, {
+    method: "POST",
+    body: JSON.stringify({ reference }),
   });
   return response.data || response;
 }
