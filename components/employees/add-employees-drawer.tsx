@@ -60,9 +60,22 @@ export function AddEmployeesDrawer({
   const handleTemplate = () => {
     // Built here rather than fetched: the columns are the contract, and a
     // download should not fail because the API is briefly unreachable.
+    //
+    // Surname, firstname and email are the only required columns. The rest may
+    // be blank, and there is no address column at all: staff are seeded from
+    // their terms and attach a wallet themselves when they claim the invite.
     const rows = [
-      "surname,firstname,email,phone,jobRole,salary",
-      "Adeoye,Adetola,adetola@example.com,+2348012345678,HR Manager,500000",
+      "surname,firstname,email,phone,jobRole,salary,department,employeeId",
+      "Adeoye,Adetola,adetola.adeoye@craftlink.test,+2348012345001,HR Manager,750000,People,CL-001",
+      "Balogun,Timi,timi.balogun@craftlink.test,+2348012345002,Graphics Designer,900000,Design,CL-002",
+      "Hassan,Amina,amina.hassan@craftlink.test,,Finance Officer,1200000,Finance,CL-003",
+      "Eze,Chidera,chidera.eze@craftlink.test,+2348012345004,Product Manager,1800000,Product,CL-004",
+      "Johnson,Femi,femi.johnson@craftlink.test,,Software Engineer,2500000,Engineering,CL-005",
+      "Uche,Kelechi,kelechi.uche@craftlink.test,+2348012345006,Operations Lead,3200000,Operations,CL-006",
+      "Adebayo,Ridwan,ridwan.adebayo@craftlink.test,,Backend Developer,4500000,Engineering,CL-007",
+      "Okonkwo,Ngozi,ngozi.okonkwo@craftlink.test,+2348012345008,QA Engineer,1600000,Engineering,CL-008",
+      "Lawal,Yusuf,yusuf.lawal@craftlink.test,+2348012345009,Customer Success,1100000,Operations,CL-009",
+      "Mensah,Abena,abena.mensah@craftlink.test,,Content Strategist,1400000,Marketing,CL-010",
     ].join("\n")
 
     const url = URL.createObjectURL(new Blob([rows], { type: "text/csv" }))
@@ -302,7 +315,8 @@ function ChooseMode({
               Need the CSV Template?
             </p>
             <p className="font-inter text-[11px] text-neutral-500">
-              Download our CSV template to see the required fields.
+              Ten filled rows to edit. Surname, first name and email are the only
+              ones we need.
             </p>
           </div>
         </div>
