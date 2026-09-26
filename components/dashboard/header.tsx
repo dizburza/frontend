@@ -237,22 +237,13 @@ export function DashboardHeader() {
 
     return [
       { label: "Dashboard", href: orgBase },
+      { label: "Wallet", href: `${orgBase}/wallet` },
       { label: "Signers", href: `${orgBase}/signers` },
       { label: "Proposals", href: `${orgBase}/proposals` },
       { label: "Employees", href: `${orgBase}/employees` },
       { label: "Payroll", href: `${orgBase}/payments` },
     ];
   })();
-
-  // Reachable from the profile menu rather than the pill, which the design
-  // caps at five.
-  const menuLinks =
-    accountType === "personal"
-      ? []
-      : [
-          { label: "Wallet", href: `${orgBase}/wallet` },
-          { label: "My Transactions", href: `${orgBase}/transactions` },
-        ];
 
   const isActive = (href: string) => {
     if (!href || href === "/") return pathname === href;
@@ -373,28 +364,15 @@ export function DashboardHeader() {
                 role="menu"
                 className="absolute right-0 top-[calc(100%+8px)] z-50 w-52 overflow-hidden rounded-lg border border-[#E3E4F6] bg-white py-1 shadow-lg"
               >
-                {menuLinks.map((link) => (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    role="menuitem"
-                    className="block px-4 py-2 text-sm text-gray-700 transition-colors hover:bg-surface-canvas"
-                  >
-                    {link.label}
-                  </Link>
-                ))}
                 {account ? (
-                  <>
-                    {menuLinks.length > 0 ? <div className="my-1 h-px bg-[#EEF0FC]" /> : null}
-                    <button
-                      type="button"
-                      role="menuitem"
-                      onClick={handleDisconnect}
-                      className="block w-full px-4 py-2 text-left text-sm text-red-600 transition-colors hover:bg-red-50"
-                    >
-                      Disconnect
-                    </button>
-                  </>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={handleDisconnect}
+                    className="block w-full px-4 py-2 text-left text-sm text-red-600 transition-colors hover:bg-red-50"
+                  >
+                    Disconnect
+                  </button>
                 ) : null}
               </div>
             ) : null}

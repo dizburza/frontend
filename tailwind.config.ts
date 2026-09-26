@@ -110,9 +110,21 @@ const config: Config = {
           from: { transform: "translateX(0)" },
           to: { transform: "translateX(-50%)" },
         },
+        // A sheen crossing the wordmark. Travels twice its own width so the
+        // gap between passes reads as a beat rather than a stutter.
+        "logo-sheen": {
+          from: { transform: "translateX(-100%)" },
+          to: { transform: "translateX(200%)" },
+        },
+        "logo-breathe": {
+          "0%, 100%": { opacity: "0.55" },
+          "50%": { opacity: "1" },
+        },
       },
       animation: {
         "marquee-x": "marquee-x 36s linear infinite",
+        "logo-sheen": "logo-sheen 1.6s ease-in-out infinite",
+        "logo-breathe": "logo-breathe 1.8s ease-in-out infinite",
       },
     },
   },

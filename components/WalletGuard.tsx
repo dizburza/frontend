@@ -10,6 +10,7 @@ import {
 } from "thirdweb/react";
 
 import { readSessionHint } from "@/lib/session";
+import { BrandLoader } from "@/components/brand-loader";
 
 /**
  * How long a session hint alone keeps the page rendered while the wallet
@@ -75,13 +76,11 @@ export default function WalletGuard({
     return <>{children}</>;
   }
 
+  // Nothing of the app is up yet here, not even the header, so the mark stands
+  // on its own rather than over a skeleton.
   return (
-    <div className="min-h-screen bg-surface-canvas px-4 pb-10 pt-5 sm:px-6 lg:px-5">
-      <div className="h-16 w-full animate-pulse rounded-lg bg-gray-200" />
-      <div className="mt-6 space-y-6">
-        <div className="h-10 w-64 animate-pulse rounded bg-gray-200" />
-        <div className="h-[360px] w-full animate-pulse rounded-lg bg-gray-200" />
-      </div>
+    <div className="flex min-h-screen items-center justify-center bg-surface-canvas px-4">
+      <BrandLoader label="Restoring your session" />
     </div>
   );
 }

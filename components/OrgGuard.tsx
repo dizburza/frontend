@@ -10,6 +10,7 @@ import {
 } from "thirdweb/react";
 import { fetchSessionProfile } from "@/lib/session";
 import { PROFILE_CACHE_VERSION } from "@/components/connectWalletHelpers";
+import { DashboardLoading } from "@/components/brand-loader";
 
 type CachedAuthCheck = {
   isRegistered: boolean;
@@ -129,8 +130,11 @@ export default function OrgGuard(
     fetchAuthCheck();
   }, [account?.address, router, slug, status]);
 
+  // Rendering nothing here left the header up and the page below it blank for
+  // as long as the wallet took to restore, which reads as a broken screen
+  // rather than a loading one.
   if (allowed !== true) {
-    return null;
+    return <DashboardLoading />;
   }
 
   return <>{children}</>;
