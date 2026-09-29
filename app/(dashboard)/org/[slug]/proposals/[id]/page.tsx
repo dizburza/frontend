@@ -54,7 +54,7 @@ export default function ProposalDetailsPage() {
     const key = proposal.createdByAddress.toLowerCase()
     const signer = organization?.signers?.find((s) => s.address.toLowerCase() === key)
     if (signer) return signer.name
-    const employee = organization?.employees?.find((e) => e.walletAddress.toLowerCase() === key)
+    const employee = organization?.employees?.find((e) => e.walletAddress?.toLowerCase() === key)
     return employee?.fullName || shortAddress(proposal.createdByAddress)
   })()
 

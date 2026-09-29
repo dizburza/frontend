@@ -30,7 +30,7 @@ export interface Organization {
     id: string | null;
     username: string | null;
     fullName: string;
-    walletAddress: string;
+    walletAddress: string | null;
     avatar: string | null;
   }[];
   metadata?: {
@@ -138,7 +138,7 @@ export interface ApiEmployee {
   surname: string;
   firstname: string;
   fullName: string;
-  walletAddress: string;
+  walletAddress: string | null;
   email?: string;
   phoneNumber?: string;
   /** "invited" until the person claims their row and connects a wallet. */
@@ -1041,7 +1041,7 @@ export function mapApiEmployeeToEmployee(apiEmployee: ApiEmployee): {
   firstName: string;
   username: string;
   displayUsername?: string;
-  walletAddress: string;
+  walletAddress: string | null;
   email?: string;
   phoneNumber?: string;
   hasJoined: boolean;

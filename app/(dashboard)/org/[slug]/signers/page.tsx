@@ -135,6 +135,7 @@ export default function OrganizationSignersPage() {
   const employeeByAddress = useMemo(() => {
     const map = new Map<string, { username: string | null; avatar: string | null }>();
     for (const e of employeesData?.employees ?? []) {
+      if (!e.walletAddress) continue;
       map.set(e.walletAddress.toLowerCase(), {
         username: e.displayUsername || e.username || null,
         avatar: e.avatar || null,

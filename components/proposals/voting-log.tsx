@@ -24,7 +24,9 @@ const formatMoment = (value: string) =>
  */
 export function VotingLog({ proposal, organization }: Readonly<VotingLogProps>) {
   const employeeByAddress = new Map(
-    (organization?.employees ?? []).map((e) => [e.walletAddress.toLowerCase(), e])
+    (organization?.employees ?? [])
+      .filter((e): e is typeof e & { walletAddress: string } => Boolean(e.walletAddress))
+      .map((e) => [e.walletAddress.toLowerCase(), e])
   )
   const signerByAddress = new Map(
     (organization?.signers ?? []).map((s) => [s.address.toLowerCase(), s])

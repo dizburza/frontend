@@ -68,7 +68,10 @@ export function BatchPaymentCreationModal({
     const apiEmployees = employeesData?.employees || []
     return apiEmployees
       .map(mapApiEmployeeToEmployee)
-      .filter((e) => !e.isSigner)
+      .filter(
+        (e): e is typeof e & { walletAddress: string } =>
+          !e.isSigner && e.hasJoined && Boolean(e.walletAddress)
+      )
   }, [employeesData])
 
   const filteredEmployees = useMemo(() => {
