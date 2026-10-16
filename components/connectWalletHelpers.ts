@@ -3,7 +3,7 @@ import type { Account } from "thirdweb/wallets";
 import { getBasename } from "@superdevfavour/basename";
 import type { useRouter } from "next/navigation";
 import { fetchSessionProfile, hasSessionFor, isWalletRegistered } from "@/lib/session";
-import { useAuthCompleted } from "@/hooks/useAutoAuthenticate";
+import { isAuthInFlight, useAuthCompleted } from "@/hooks/useAutoAuthenticate";
 
 type AppRouter = ReturnType<typeof useRouter>;
 
@@ -367,7 +367,13 @@ export const useRedirectOnFirstConnect = (params: {
       // makes arriving at a session sufficient, rather than arriving at it at
       // the right moment.
       if (result.status === "pending") {
-        retryTimer.current = setTimeout(() => setRecheck((n) => n + 1), 1000);
+        // Only while sign-in is still running or has produced a session. A
+        // declined or failed sign-in never will, and retrying then hits the
+        // backend every second for as long as the page is open. The
+        // auth:completed event restarts this if the user signs in later.
+        if (isAuthInFlight() || hasSessionFor(address)) {
+          retryTimer.current = setTimeout(() => setRecheck((n) => n + 1), 1000);
+        }
         return;
       }
 

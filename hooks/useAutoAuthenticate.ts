@@ -64,6 +64,8 @@ let sharedAuthState: AuthState = {
 };
 let sharedRetry: (() => void) | null = null;
 
+export const isAuthInFlight = () => sharedAuthState.isLoading;
+
 const publishAuthState = (state: AuthState, retry: () => void) => {
   sharedAuthState = state;
   sharedRetry = retry;
